@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22 # Neueste Version nutzen
 
       - name: Install dependencies
         run: npm install
@@ -27,6 +27,7 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_SKIP_SIGNING: true # Verhindert Fehler beim Signieren auf GitHub
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
@@ -39,5 +40,5 @@ jobs:
         if: success()
         run: |
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"🚀 **Neues Update!**\n**Version:** \`${GITHUB_REF_NAME}\`\n[Download](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)\"}" \
+          -d "{\"content\": \"🚀 **Neues Update verfügbar!**\n**Version:** \`${GITHUB_REF_NAME}\`\n[Download](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)\"}" \
           https://discord.com/api/webhooks/1487189165278756924/aYRVcnsC8YTq49rjMzs4VocunHsGAvSei3-webqm81tdNlyTVkPzb1w3WZOYatW-Ni_V
