@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Emden Network Overlay</title>
+    <style>
+        :root {
+            --bg-card: rgba(19, 21, 30, 0.75);
+            --border: rgba(255, 255, 255, 0.08);
+            --radius: 12px;
+            --brand-blue: #00D1A7; /* Teal */
+            --status-online: #00D1A7;
+            --status-warn: #F59E0B;
+            --status-danger: #EF4444;
+            --text: #F3F4F6;
+            --text-sub: #9CA3AF;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            margin: 0;
+            padding: 16px;
+            overflow: hidden;
+            background: transparent !important;
+            font-family: 'Inter', -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: flex-end;
+            gap: 10px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .toast {
+            width: 320px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 16px 18px;
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+            pointer-events: auto; /* Allow clicking to dismiss later */
+            animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            backdrop-filter: blur(10px);
+        }
+
+        .toast.info { border-left: 3px solid var(--brand-blue); }
+        .toast.success { border-left: 3px solid var(--status-online); }
+        .toast.warn { border-left: 3px solid var(--status-warn); }
+        .toast.error { border-left: 3px solid var(--status-danger); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100%) scale(0.9); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0) scale(1); }
+            to { opacity: 0; transform: translateX(100%) scale(0.9); }
+        }
+
+        .toast-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .toast-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .toast-msg {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* Verstecke Progress bar optisch oder zeige sie dezent */
+        .toast-progress {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: rgba(255,255,255,0.1);
+            transform-origin: left;
+            animation: progress 5s linear forwards;
+        }
+
+        .toast.info .toast-progress { background: var(--brand-blue); }
+        .toast.success .toast-progress { background: var(--status-online); }
+        .toast.warn .toast-progress { background: var(--status-warn); }
+        .toast.error .toast-progress { background: var(--status-danger); }
+
+        @keyframes progress {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+        }
+    </style>
+</head>
+<body>
+    <script>
+        window.onerror = function(msg, url, line) {
+            console.error("OVERLAY FEHLER: " + msg + " in " + url + " Zeile " + line);
+        };
+        
+        const icons = { info: 'ℹ️', success: '✅', warn: '⚠️', error: '❌' };
+        
+        // Höre auf das IPC-Event für eingehende Notifications
+        window.electronAPI.onShowOverlayNotification((data) => {
+            const { title, message, type } = data;
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type || 'info'}`;
+            
+            // HTML Escaping (einfach)
+            const escape = (str) => {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            };
+
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || 'ℹ️'}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${escape(title)}</div>
+                    <div class="toast-msg">${escape(message)}</div>
+                </div>
+                <div class="toast-progress"></div>
+            `;
+
+            document.body.appendChild(toast);
+
+            // Nach 5 Sekunden ausblenden
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.4s ease forwards';
+                setTimeout(() => toast.remove(), 400);
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

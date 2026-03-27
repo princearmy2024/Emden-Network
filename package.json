@@ -1,0 +1,46 @@
+{
+    "name": "emden-network",
+    "version": "1.0.0",
+    "description": "Emden Network - Control Center",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron . --dev",
+        "build": "electron-builder --win"
+    },
+    "dependencies": {
+        "electron-updater": "^6.1.8",
+        "socket.io": "^4.8.3"
+    },
+    "devDependencies": {
+        "electron": "^28.0.0",
+        "electron-builder": "^24.13.3"
+    },
+    "build": {
+        "appId": "com.emdennetwork.dashboard",
+        "productName": "Emden Network",
+        "win": {
+            "target": [
+                "nsis"
+            ],
+            "icon": "icon.ico"
+        },
+        "nsis": {
+            "oneClick": true,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": false,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Emden Network"
+        },
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "princearmy2024",
+                "repo": "Emden-Network"
+            }
+        ]
+    },
+    "author": "Emden Network",
+    "license": "MIT"
+}

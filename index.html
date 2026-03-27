@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: https://cdn.discordapp.com; connect-src 'self' http://91.98.124.212:5009 http://localhost:* http://127.0.0.1:* https://enrp.princearmy.de;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emden Network — Control Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="update-manager.css" />
+</head>
+
+<body>
+
+    <!-- ======================== CUSTOM TITLEBAR ======================== -->
+    <div class="titlebar" id="titlebar">
+        <div class="titlebar-brand">
+            <div class="en-logo nano"><span class="en-e">E</span><span class="en-n">N</span></div>
+            <span class="t-emden">Emden</span><span class="t-network">&nbsp;Network</span>
+        </div>
+        <div class="titlebar-drag"></div>
+        <div class="titlebar-controls">
+            <button class="tb-btn tb-min" id="btnMin" title="Minimieren">─</button>
+            <button class="tb-btn tb-max" id="btnMax" title="Maximieren">□</button>
+            <button class="tb-btn tb-close" id="btnClose" title="Schließen">✕</button>
+        </div>
+    </div>
+
+    <!-- ======================== SPLASH SCREEN ======================== -->
+    <div id="splashScreen" class="screen active">
+        <div class="splash-bg">
+            <div class="splash-grid"></div>
+            <div class="splash-orb orb1"></div>
+            <div class="splash-orb orb2"></div>
+        </div>
+        <div class="splash-content">
+            <div class="splash-logo">
+                <div class="en-logo xlarge"><span class="en-e">E</span><span class="en-n">N</span></div>
+                <div class="splash-wordmark">
+                    <span class="w-emden">Emden</span><span class="w-network"> Network</span>
+                </div>
+                <div class="splash-sub" id="splashVersion">Control Center v1.0.0</div>
+            </div>
+            <div class="splash-loader">
+                <div class="loader-track">
+                    <div class="loader-bar" id="loaderBar"></div>
+                </div>
+                <div class="loader-status" id="loaderStatus">Initialisiere System...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================== LOGIN SCREEN ======================== -->
+    <div id="loginScreen" class="screen">
+        <div class="login-bg">
+            <div class="splash-grid"></div>
+            <div class="splash-orb orb1"></div>
+            <div class="splash-orb orb3"></div>
+        </div>
+        <div class="login-container">
+            <div class="en-logo large"><span class="en-e">E</span><span class="en-n">N</span></div>
+            <div class="login-wordmark">
+                <span class="w-emden">Emden</span><span class="w-network"> Network</span>
+            </div>
+            <p class="login-sub">Verifiziere deine Identität über Discord</p>
+
+            <div class="login-card">
+                <!-- Schritt 1: Discord verbinden -->
+                <div class="login-step" id="step1">
+                    <p class="step-info">Schreibe dem Bot <span class="highlight">@EmdenBot</span> auf Discord mit dem
+                        Befehl <span class="highlight">/verify</span> um einen Code zu erhalten.</p>
+                    <button class="btn btn-discord" id="btnDiscord">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.082.114 18.105.132 18.12a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                        </svg>
+                        Mit Discord verbinden
+                    </button>
+                </div>
+
+                <!-- Schritt 2: Code eingeben -->
+                <div class="login-divider"><span>oder Code direkt eingeben</span></div>
+                <div class="input-group">
+                    <label class="input-label">Verifizierungscode</label>
+                    <input type="text" id="verifyInput" class="input-field" placeholder="z.B. EN-847291" maxlength="12"
+                        autocomplete="off" spellcheck="false" />
+                </div>
+                <button class="btn btn-primary" id="btnVerify">
+                    <span id="btnVerifyText">Verifizieren</span>
+                    <div class="btn-spinner hidden" id="btnSpinner"></div>
+                </button>
+
+                <!-- Statusmeldung -->
+                <div class="login-status" id="loginStatus">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Bereit zur Verbindung</span>
+                </div>
+            </div>
+
+            <!-- Demo-Hint entfernt - echter Bot-Betrieb -->
+        </div>
+    </div>
+
+    <!-- ======================== DASHBOARD ======================== -->
+    <div id="dashboardScreen" class="screen">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Logo mark only -->
+            <div class="sidebar-logo">
+                <div class="en-logo small"><span class="en-e">E</span><span class="en-n">N</span></div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a class="nav-item active" data-view="overview" data-label="Dashboard" onclick="App.navigate('overview')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                </a>
+                <a class="nav-item" data-view="messages" data-label="Nachrichten" onclick="App.navigate('messages')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <span class="nav-dot" id="msgBadge"></span>
+                </a>
+                <a class="nav-item" data-view="notifications" data-label="Benachrichtigungen" onclick="App.navigate('notifications')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <span class="nav-dot warn" id="notifBadge"></span>
+                </a>
+
+                <div class="sidebar-divider"></div>
+
+                <a class="nav-item" data-view="channels" data-label="Channels" onclick="App.navigate('channels')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+                    </svg>
+                </a>
+                <a class="nav-item" data-view="walkie" data-label="Walkie-Talkie" onclick="App.navigate('walkie')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                </a>
+
+                <div class="sidebar-divider"></div>
+
+                <a class="nav-item" data-view="servers" data-label="Server" onclick="App.navigate('servers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="2" width="20" height="8" rx="2" />
+                        <rect x="2" y="14" width="20" height="8" rx="2" />
+                        <line x1="6" y1="6" x2="6.01" y2="6" />
+                        <line x1="6" y1="18" x2="6.01" y2="18" />
+                    </svg>
+                </a>
+                <a class="nav-item" data-view="settings" data-label="Einstellungen" onclick="App.navigate('settings')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                </a>
+                <a class="nav-item admin-only hidden" data-view="admin" data-label="Admin Panel" onclick="App.navigate('admin')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                </a>
+            </nav>
+
+            <!-- Profile avatar only -->
+            <div class="sidebar-user">
+                <div class="user-avatar" id="sidebarAvatar">A</div>
+                <div class="user-status-dot online"></div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+                    <div class="topbar-breadcrumb" id="topbarBreadcrumb">Übersicht</div>
+                </div>
+                <div class="topbar-center">
+                    <div class="search-box">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input type="text" class="search-input" placeholder="Suchen..." />
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <div class="conn-status" id="connStatus">
+                        <div class="conn-dot pulse"></div>
+                        <span id="connText">Live verbunden</span>
+                    </div>
+                    <!-- Admin Badge -->
+                    <button class="admin-badge hidden" id="adminBadge" onclick="App.navigate('admin')">⚡ ADMIN</button>
+                    <div class="topbar-avatar" id="topbarAvatar">A</div>
+                </div>
+            </header>
+
+            <!-- UPDATE BANNER -->
+            <div id="updateBanner" class="update-banner hidden">
+                <div style="display:flex;align-items:center;gap:15px;flex:1;">
+                    <div class="update-banner-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-weight:700;font-size:14px;" id="updateBannerTitle">Update verfügbar</span>
+                            <span style="font-size:11px;font-weight:700;opacity:0.6;" id="updatePercent">0%</span>
+                        </div>
+                        <div class="update-progress-track">
+                            <div class="update-progress-bar" id="updateProgressBar" style="width: 0%"></div>
+                        </div>
+                        <div style="font-size:11.5px;opacity:0.7;margin-top:6px;" id="updateBannerText">Suche nach neuer Version...</div>
+                    </div>
+                </div>
+                <button id="updateBtn" class="btn btn-primary" style="background:#fff;color:var(--brand-blue);border:none;padding:8px 18px;font-size:13px;height:auto;display:none;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.1);" onclick="window.electronAPI.restartApp()">Jetzt Neustarten</button>
+            </div>
+
+            <!-- VIEWS -->
+            <div class="view-container">
+
+                <!-- ===== OVERVIEW / DASHBOARD ===== -->
+                <div class="view active" id="view-overview">
+
+                    <!-- HERO BANNER -->
+                    <div class="ov-hero">
+                        <div class="ov-hero-mesh"></div>
+                        <div class="ov-hero-glow"></div>
+                        <div class="ov-hero-inner">
+                            <div class="ov-hero-left">
+                                <div class="ov-label">CONTROL CENTER</div>
+                                <div class="ov-greeting">
+                                    Guten Abend,
+                                    <span class="ov-username" id="overviewUsername">—</span>
+                                </div>
+                                <div class="ov-status-row">
+                                    <span class="ov-status-pill online">
+                                        <span class="ov-status-dot"></span>
+                                        Alle Systeme aktiv
+                                    </span>
+                                    <span class="ov-status-divider">·</span>
+                                    <span class="ov-last-check">Zuletzt geprüft: gerade eben</span>
+                                </div>
+                            </div>
+                            <div class="ov-hero-right">
+                                <div class="ov-clock" id="ovClock">—:—</div>
+                                <div class="ov-date" id="ovDate">—</div>
+                            </div>
+                        </div>
+                        <div class="ov-hero-bar">
+                            <div class="ov-hbar-seg" style="width:60%;background:var(--status-online);opacity:0.7"></div>
+                            <div class="ov-hbar-seg" style="width:15%;background:var(--status-warn);opacity:0.7"></div>
+                            <div class="ov-hbar-seg" style="width:15%;background:var(--brand-blue);opacity:0.7"></div>
+                            <div class="ov-hbar-seg" style="width:10%;background:var(--text-muted);opacity:0.4"></div>
+                        </div>
+                    </div>
+
+                    <!-- METRIC CARDS -->
+                    <div class="ov-metrics">
+                        <div class="ov-metric blue">
+                            <div class="ovm-top">
+                                <div class="ovm-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                </div>
+                                <span class="ovm-delta up">↑ 12 heute</span>
+                            </div>
+                            <div class="ovm-number" id="statMembersTotal">1,577</div>
+                            <div class="ovm-label">Mitglieder gesamt</div>
+                            <div class="ovm-bar"><div class="ovm-bar-fill" style="width:100%"></div></div>
+                        </div>
+                        <div class="ov-metric green">
+                            <div class="ovm-top">
+                                <div class="ovm-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                </div>
+                                <span class="ovm-delta up">↑ 3 neu</span>
+                            </div>
+                            <div class="ovm-number" id="statMessages">12</div>
+                            <div class="ovm-label">Ungelesene Chats</div>
+                            <div class="ovm-bar"><div class="ovm-bar-fill" style="width:60%"></div></div>
+                        </div>
+                        <div class="ov-metric amber">
+                            <div class="ovm-top">
+                                <div class="ovm-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                                    </svg>
+                                </div>
+                                <span class="ovm-delta neutral">— stabil</span>
+                            </div>
+                            <div class="ovm-number" id="statDashboardUsers">8</div>
+                            <div class="ovm-label">Dashboard online</div>
+                            <div class="ovm-bar"><div class="ovm-bar-fill" style="width:30%"></div></div>
+                        </div>
+                        <div class="ov-metric indigo">
+                            <div class="ovm-top">
+                                <div class="ovm-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                </div>
+                                <span class="ovm-delta up">Live</span>
+                            </div>
+                            <div class="ovm-number" id="statDiscordConnected">Verbunden</div>
+                            <div class="ovm-label">Discord Bot-Status</div>
+                            <div class="ovm-bar"><div class="ovm-bar-fill" style="width:100%"></div></div>
+                        </div>
+                    </div>
+
+                    <!-- BOTTOM SPLIT -->
+                    <div class="ov-split">
+
+                        <!-- ADMIN ANNOUNCEMENTS -->
+                        <div class="ov-feed">
+                            <div class="ov-section-head">
+                                <div class="ov-sh-label">Admin-Ankündigungen</div>
+                                <div class="ov-sh-count">Neuigkeiten & Updates</div>
+                            </div>
+                            <div class="announcement-list" id="announcementList">
+                                <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;">
+                                    Lade Ankündigungen...
+                                </div>
+                            </div>
+
+                            <div class="ov-section-head" style="margin-top: 24px;">
+                                <div class="ov-sh-label">Versionsverlauf</div>
+                                <div class="ov-sh-count">Neueste Änderungen</div>
+                            </div>
+                            <div class="changelog-list" id="changelogList">
+                                <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">
+                                    Lade Changelog von GitHub...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIVE PRESENCE PANEL -->
+                        <div class="ov-nodes">
+                            <div class="ov-section-head">
+                                <div class="ov-sh-label">Dashboard Online</div>
+                                <div class="ov-sh-count" id="dashboardOnlineBadge">
+                                    <span class="ovn-dot online" style="display:inline-block;margin-right:4px;width:7px;height:7px;border-radius:50%;background:var(--status-online);"></span>
+                                    <span id="dashboardOnlineCount">—</span> online
+                                </div>
+                            </div>
+
+                            <!-- Wer ist gerade drin -->
+                            <div class="ovn-list" id="dashboardUserList">
+                                <div class="ovn-node" style="opacity:0.5;">
+                                    <div class="ovn-info">
+                                        <div class="ovn-dot" style="background:var(--text-muted)"></div>
+                                        <div style="font-size:12px;color:var(--text-muted);">Lade Präsenzen...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Discord Live Stats -->
+                            <div class="ovn-bandwidth" style="margin-top:16px; border-top: 1px solid var(--border); padding-top: 16px;">
+                                <div class="ovb-label">Discord Live-Feed</div>
+                                <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <div style="width:28px; height:28px; border-radius:6px; background:rgba(88,101,242,0.1); color:#5865F2; display:flex; align-items:center; justify-content:center;">
+                                                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                                                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.082.114 18.105.132 18.12a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                                                </svg>
+                                            </div>
+                                            <div style="font-size:13px; font-weight:500; color:var(--text);">Server</div>
+                                        </div>
+                                        <div style="text-align:right;">
+                                            <div style="font-weight:600;color:var(--text);" id="liveMembers">—</div>
+                                            <div style="font-size:10px;color:var(--text-muted);">Mitglieder gesamt</div>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <div style="width:28px; height:28px; border-radius:6px; background:rgba(0,209,167,0.1); color:var(--status-online); display:flex; align-items:center; justify-content:center;">
+                                                <div style="width:10px;height:10px;border-radius:50%;background:currentColor;"></div>
+                                            </div>
+                                            <div style="font-size:13px; font-weight:500; color:var(--text);">Online</div>
+                                        </div>
+                                        <div style="text-align:right;">
+                                            <div style="font-weight:600;color:var(--status-online);" id="liveOnline">—</div>
+                                            <div style="font-size:10px;color:var(--text-muted);">Nutzer aktiv</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ===== MESSAGES ===== -->
+                <div class="view" id="view-messages">
+                    <div class="view-header">
+                        <h2>Nachrichten</h2>
+                    </div>
+                    <div class="messages-layout">
+                        <div class="chat-list" style="width: 240px; background: var(--bg-surface-2); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; overflow-y: auto;">                            
+                            <div class="chat-section-label" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>LIVE ONLINE</span>
+                                <span class="badge" id="chatOnlineCountBadge" style="background:var(--brand-blue);color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;">0</span>
+                            </div>
+                            
+                            <div id="chatOnlineUsersList" style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="color:var(--text-muted); font-size:12px; font-style:italic;">Lade Live-Daten...</div>
+                            </div>
+                        </div>
+                        <div class="chat-window">
+                            <div class="chat-header" style="border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; flex-direction: column; justify-content: center;">
+                                <span class="chat-header-name" id="activeChatName" style="font-weight: 600; font-size: 16px;">#general</span>
+                                <span class="chat-header-sub" id="chatHeaderOnlineText" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">0 online</span>
+                            </div>
+                            <div class="chat-messages" id="chatMessages">
+                                <div class="msg-item">
+                                    <div class="msg-avatar"
+                                        style="background:linear-gradient(135deg,#0066CC,#003D7A)">S</div>
+                                    <div class="msg-body">
+                                        <div class="msg-meta"><span class="msg-user">ServerBot</span><span
+                                                class="msg-time">14:32</span></div>
+                                        <div class="msg-text">Willkommen im Emden Network Dashboard! 🚀</div>
+                                    </div>
+                                </div>
+                                <div class="msg-item">
+                                    <div class="msg-avatar"
+                                        style="background:linear-gradient(135deg,#1A73CC,#0044AA)">A</div>
+                                    <div class="msg-body">
+                                        <div class="msg-meta"><span class="msg-user">Alex</span><span
+                                                class="msg-time">14:45</span></div>
+                                        <div class="msg-text">Hey, neues Update ist live!</div>
+                                    </div>
+                                </div>
+                                <div class="msg-item own">
+                                    <div class="msg-body">
+                                        <div class="msg-meta"><span class="msg-user">Du</span><span
+                                                class="msg-time">14:50</span></div>
+                                        <div class="msg-text">Sieht gut aus 👍</div>
+                                    </div>
+                                    <div class="msg-avatar you" id="chatOwnAvatar">U</div>
+                                </div>
+                            </div>
+                            <div class="chat-input-area">
+                                <input type="text" id="chatInput" class="input-field"
+                                    placeholder="Nachricht eingeben..." />
+                                <button class="btn btn-primary small" onclick="App.sendMessage()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        width="16" height="16">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== NOTIFICATIONS ===== -->
+                <div class="view" id="view-notifications">
+                    <div class="view-header">
+                        <h2>Benachrichtigungen</h2>
+                        <div style="display:flex;gap:12px;">
+                            <button class="btn btn-ghost" id="btnTestOverlay" onclick="this.textContent = 'Geklickt!'; setTimeout(() => this.textContent = 'Test Overlay', 2000); App.showNotification('Test Alert', 'Dies ist eine Overlay-Testnachricht!', 'info')">Test Overlay</button>
+                            <button class="btn btn-ghost" onclick="document.getElementById('notifList').innerHTML = ''">Alle löschen</button>
+                        </div>
+                    </div>
+                    <div class="notif-list" id="notifList">
+                        <div class="notif-item warn">
+                            <div class="notif-icon warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" width="20" height="20">
+                                    <path
+                                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                    <line x1="12" y1="9" x2="12" y2="13" />
+                                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg></div>
+                            <div class="notif-content">
+                                <div class="notif-title">Hohe CPU-Auslastung</div>
+                                <div class="notif-msg">Node-3 bei 94% — Prüfung empfohlen</div>
+                                <div class="notif-time">vor 5 Min</div>
+                            </div>
+                            <button class="notif-dismiss" onclick="this.closest('.notif-item').remove()">✕</button>
+                        </div>
+                        <div class="notif-item info">
+                            <div class="notif-icon info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" width="20" height="20">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg></div>
+                            <div class="notif-content">
+                                <div class="notif-title">Neue Nachricht</div>
+                                <div class="notif-msg">Alex: Hey, neues Update ist live!</div>
+                                <div class="notif-time">vor 10 Min</div>
+                            </div>
+                            <button class="notif-dismiss" onclick="this.closest('.notif-item').remove()">✕</button>
+                        </div>
+                        <div class="notif-item success">
+                            <div class="notif-icon success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" width="20" height="20">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg></div>
+                            <div class="notif-content">
+                                <div class="notif-title">Server Online</div>
+                                <div class="notif-msg">Server-1 erfolgreich neu gestartet</div>
+                                <div class="notif-time">vor 30 Min</div>
+                            </div>
+                            <button class="notif-dismiss" onclick="this.closest('.notif-item').remove()">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== CHANNELS ===== -->
+                <div class="view" id="view-channels">
+                    <div class="view-header">
+                        <h2>Channel-Verwaltung</h2>
+                        <button class="btn btn-primary" style="width:auto;padding:9px 18px;"
+                            onclick="App.showModal('createChannel')">+ Channel erstellen</button>
+                    </div>
+                    <div class="channel-list" id="channelList">
+                        <!-- Channels werden durch JS gerendert -->
+                    </div>
+                </div>
+
+                <!-- ===== WALKIE-TALKIE ===== -->
+                <div class="view" id="view-walkie">
+                    <div class="view-header">
+                        <h2>Walkie-Talkie</h2>
+                        <button class="btn btn-primary" style="width:auto;padding:9px 18px;"
+                            onclick="App.showModal('createVoice')">+ Kanal erstellen</button>
+                    </div>
+                    <div class="walkie-layout">
+                        <div class="voice-channels">
+                            <div class="section-title">Sprachkanäle</div>
+                            <div class="voice-channel-item active" id="vc-general">
+                                <div class="vc-info">
+                                    <div class="vc-icon">🔊</div>
+                                    <div class="vc-name">#voice-general</div>
+                                </div>
+                                <div class="vc-members">
+                                    <div class="vc-member-avatar">A</div>
+                                </div>
+                            </div>
+                            <div class="voice-channel-item" id="vc-ops">
+                                <div class="vc-info">
+                                    <div class="vc-icon">🔇</div>
+                                    <div class="vc-name">#ops-room</div>
+                                </div>
+                                <div class="vc-members"></div>
+                            </div>
+                        </div>
+                        <div class="walkie-controls">
+                            <div class="ptt-area">
+                                <div class="ptt-status" id="pttStatus">Nicht verbunden</div>
+                                <button class="ptt-btn" id="pttBtn" onmousedown="App.startPTT()"
+                                    onmouseup="App.stopPTT()" ontouchstart="App.startPTT()"
+                                    ontouchend="App.stopPTT()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                                        width="32" height="32">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                        <line x1="12" y1="19" x2="12" y2="23" />
+                                        <line x1="8" y1="23" x2="16" y2="23" />
+                                    </svg>
+                                    <span>Push to Talk</span>
+                                </button>
+                                <div class="ptt-hint">Gedrückt halten zum Sprechen</div>
+                            </div>
+                            <div class="vc-participants">
+                                <div class="section-title">Teilnehmer</div>
+                                <div class="participant-list" id="participantList">
+                                    <div class="participant-item">
+                                        <div class="part-avatar">A</div>
+                                        <div class="part-name">Alex</div>
+                                        <div class="part-status speaking">🎙️</div>
+                                    </div>
+                                    <div class="participant-item">
+                                        <div class="part-avatar you" id="walkieOwnAvatar">U</div>
+                                        <div class="part-name">Du</div>
+                                        <div class="part-status muted">🔇</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== SERVERS ===== -->
+                <div class="view" id="view-servers">
+                    <div class="view-header">
+                        <h2>Server Übersicht</h2>
+                    </div>
+                    <div class="server-grid" id="serverGrid">
+                        <!-- Wird durch JS gerendert -->
+                    </div>
+                </div>
+
+                <!-- ===== SETTINGS ===== -->
+                <div class="view" id="view-settings">
+                    <div class="view-header">
+                        <h2>Einstellungen</h2>
+                    </div>
+                    <div class="settings-layout">
+                        <div class="settings-section">
+                            <h3 class="settings-title">Darstellung</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Akzentfarbe</div>
+                                    <div class="setting-desc">Hauptfarbe der Benutzeroberfläche</div>
+                                </div>
+                                <div class="accent-picker">
+                                    <div class="accent-opt active"
+                                        style="background:linear-gradient(135deg,#0066CC,#003D7A)"
+                                        onclick="App.setAccent('blue')" title="Emden Blau"></div>
+                                    <div class="accent-opt" style="background:linear-gradient(135deg,#00d4ff,#7b2fff)"
+                                        onclick="App.setAccent('cyan')" title="Cyan/Lila"></div>
+                                    <div class="accent-opt" style="background:linear-gradient(135deg,#56ab2f,#a8e063)"
+                                        onclick="App.setAccent('green')" title="Grün"></div>
+                                    <div class="accent-opt" style="background:linear-gradient(135deg,#f857a6,#ff5858)"
+                                        onclick="App.setAccent('pink')" title="Pink"></div>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Animationen</div>
+                                    <div class="setting-desc">UI-Übergänge und Effekte</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" checked id="toggleAnimations"
+                                        onchange="App.toggleSetting('animations',this.checked)" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3 class="settings-title">Benachrichtigungen</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Desktop Benachrichtigungen</div>
+                                    <div class="setting-desc">Native Systembenachrichtigungen</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" checked id="toggleDesktopNotif"
+                                        onchange="App.toggleSetting('desktopNotif',this.checked)" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Sound</div>
+                                    <div class="setting-desc">Akustische Benachrichtigungen</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" id="toggleSound"
+                                        onchange="App.toggleSetting('sound',this.checked)" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3 class="settings-title">Account</h3>
+                            <div class="account-card" style="margin-bottom: 12px;">
+                                <div class="acc-avatar" id="settingsAvatar">U</div>
+                                <div class="acc-info">
+                                    <div class="acc-name" id="settingsUsername">—</div>
+                                    <div class="acc-role" id="settingsRole">—</div>
+                                </div>
+                                <div class="discord-link-status" id="discordLinkStatus">
+                                    <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.082.114 18.105.132 18.12a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                                    </svg>
+                                    Verbunden
+                                </div>
+                            </div>
+                            
+                            <!-- ===== ROBLOX CONNECT CARD ===== -->
+                            <div class="rblx-section" id="rblxSection">
+
+                                <!-- STATE: Nicht verbunden -->
+                                <div id="rblxStateDisconnected">
+                                    <div class="rblx-connect-card">
+                                        <div class="rblx-connect-icon">
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5.013 10.307 10.307 5.013 18.987 13.693 13.693 18.987z"/><path d="M2.196 8.085 8.085 2.196 10.282 4.393 4.393 10.282z" opacity=".5"/><path d="M13.718 19.607 19.607 13.718 21.804 15.915 15.915 21.804z" opacity=".5"/></svg>
+                                        </div>
+                                        <div class="rblx-connect-text">
+                                            <div class="rblx-connect-title">Roblox verbinden</div>
+                                            <div class="rblx-connect-sub">Verknüpfe deinen Roblox-Account mit dem Dashboard</div>
+                                        </div>
+                                        <button class="btn btn-primary" style="width:auto;padding:9px 20px;white-space:nowrap;" onclick="App.startRobloxVerify()">Verknüpfen</button>
+                                    </div>
+                                </div>
+
+                                <!-- STATE: Verifizierungs-Flow -->
+                                <div id="rblxStateVerifying" class="hidden">
+                                    <div class="rblx-verify-card">
+                                        <div class="rblx-verify-step" id="rblxStep1">
+                                            <div class="rblx-step-title">
+                                                <span class="rblx-step-num">1</span>
+                                                Roblox-Benutzername eingeben
+                                            </div>
+                                            <div style="display:flex;gap:10px;margin-top:12px;">
+                                                <input type="text" id="rblxUsernameInput" class="input-field" placeholder="Dein Roblox-Username..." style="flex:1;" />
+                                                <button class="btn btn-primary" style="width:auto;padding:9px 16px;" onclick="App.robloxStep1()">Weiter</button>
+                                            </div>
+                                        </div>
+                                        <div class="rblx-verify-step" id="rblxStep2" style="display:none;">
+                                            <div class="rblx-step-title">
+                                                <span class="rblx-step-num">2</span>
+                                                Code in deine Roblox-Bio einfügen
+                                            </div>
+                                            <div class="rblx-code-box" id="rblxCodeBox">—</div>
+                                            <div class="rblx-code-hint">Gehe auf <strong>Roblox → Profil → Bio bearbeiten</strong> und füge diesen Code ein. Danach klicke auf Verifizieren.</div>
+                                            <div style="display:flex;gap:10px;margin-top:14px;">
+                                                <button class="btn btn-ghost" style="width:auto;padding:9px 16px;" onclick="App.robloxBack()">← Zurück</button>
+                                                <button class="btn btn-primary" style="width:auto;padding:9px 16px;flex:1;" id="rblxConfirmBtn" onclick="App.robloxStep2()">
+                                                    <span id="rblxConfirmText">Verifizieren</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-ghost" style="width:auto;margin-top:12px;padding:7px 14px;font-size:12px;" onclick="App.cancelRobloxVerify()">Abbrechen</button>
+                                    </div>
+                                </div>
+
+                                <!-- STATE: Verbunden — Profilkarte -->
+                                <div id="rblxStateConnected" class="hidden">
+                                    <div class="rblx-profile-card">
+                                        <div class="rblx-profile-top">
+                                            <div class="rblx-avatar-wrap">
+                                                <img class="rblx-avatar" id="rblxAvatar" src="" alt="Avatar" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                                <div class="rblx-avatar-fallback" id="rblxAvatarFallback" style="display:none;">R</div>
+                                            </div>
+                                            <div class="rblx-profile-info">
+                                                <div class="rblx-display-name" id="rblxDisplayName">—</div>
+                                                <div class="rblx-username" id="rblxUsername">@—</div>
+                                                <div class="roblox-actions">
+                                                    <button class="btn btn-secondary btn-sm" onclick="App.testRobloxOverlay()">
+                                                        <span class="icon">✨</span> Overlay testen
+                                                    </button>
+                                                    <button class="btn btn-danger btn-sm" onclick="App.disconnectRoblox()">
+                                                        <span class="icon">🚫</span> Verbindung trennen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="rblx-stats">
+                                            <div class="rblx-stat">
+                                                <div class="rblx-stat-label">User ID</div>
+                                                <div class="rblx-stat-value" id="rblxUserId">—</div>
+                                            </div>
+                                            <div class="rblx-stat">
+                                                <div class="rblx-stat-label">Erstellt am</div>
+                                                <div class="rblx-stat-value" id="rblxCreated">—</div>
+                                            </div>
+                                            <div class="rblx-stat">
+                                                <div class="rblx-stat-label">Verbunden seit</div>
+                                                <div class="rblx-stat-value" id="rblxConnectedAt">—</div>
+                                            </div>
+                                        </div>
+                                        <div class="rblx-bio" id="rblxBioWrap" style="display:none;">
+                                            <div class="rblx-stat-label">Bio</div>
+                                            <div class="rblx-bio-text" id="rblxBio">—</div>
+                                        </div>
+                                        <div style="display:flex;gap:10px;margin-top:16px;">
+                                            <a id="rblxProfileLink" href="#" target="_blank" class="btn btn-ghost" style="width:auto;padding:9px 16px;font-size:13px;text-decoration:none;" onclick="App.openRobloxProfile(event)">↗ Profil öffnen</a>
+                                            <button class="btn btn-danger" style="width:auto;padding:9px 16px;font-size:13px;" onclick="App.disconnectRoblox()">Verbindung trennen</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <button class="btn btn-danger" onclick="App.logout()">Abmelden</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="view admin-only hidden" id="view-admin">
+                    <div class="view-header">
+                        <h2>⚡ Admin Panel</h2>
+                        <span class="admin-badge-label">RESTRICTED</span>
+                    </div>
+
+                    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- Webhook Kontrollzentrum -->
+                        <div class="admin-card" style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px;">
+                            <div class="section-title">Webhook Kontrollzentrum</div>
+                            <p style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Sende eine manuelle Benachrichtigung an den Emden-Discord.</p>
+                            
+                            <div class="input-group" style="margin-bottom:12px;">
+                                <label class="input-label">Update-Titel</label>
+                                <input type="text" id="webhookTitle" class="input-field" placeholder="z.B. Wartungsarbeiten..." />
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom:20px;">
+                                <label class="input-label">Nachricht (Markdown erlaubt)</label>
+                                <textarea id="webhookMessage" class="input-field" style="height:100px; resize:none;" placeholder="Was gibt es neues?"></textarea>
+                            </div>
+                            
+                            <button class="btn btn-primary" onclick="App.sendAdminWebhook()">
+                                <span class="icon">📢</span> Nachricht senden
+                            </button>
+                        </div>
+
+                        <!-- System Status -->
+                        <div class="admin-card" style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px;">
+                            <div class="section-title">System Kontrolle</div>
+                            <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+                                <button class="btn btn-ghost" style="text-align:left; padding:12px;" onclick="App.loadLiveNews()">🔄 News-Cache leeren</button>
+                                <button class="btn btn-ghost" style="text-align:left; padding:12px;" onclick="UpdateManager.checkForUpdates()">🔍 Force Update-Check</button>
+                                <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:10px;">
+                                    <span style="font-size:11px; color:var(--text-muted);">WEBHOOK AKTIV:</span><br>
+                                    <code style="font-size:10px; opacity:0.3; word-break:break-all;">...Ni_V</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                    <div class="admin-grid">
+                        <div class="admin-card">
+                            <div class="admin-card-title">Nutzer verwalten</div>
+                            <div class="admin-card-sub">Rollen, Bans, Berechtigungen</div>
+                            <button class="btn btn-ghost"
+                                onclick="App.showNotification('Admin','Diese Funktion wird bald verfügbar','info')">Öffnen</button>
+                        </div>
+                        <div class="admin-card">
+                            <div class="admin-card-title">Server-Logs</div>
+                            <div class="admin-card-sub">Alle Systemereignisse</div>
+                            <button class="btn btn-ghost"
+                                onclick="App.showNotification('Admin','Diese Funktion wird bald verfügbar','info')">Öffnen</button>
+                        </div>
+                        <div class="admin-card">
+                            <div class="admin-card-title">Bot-Konfiguration</div>
+                            <div class="admin-card-sub">Discord-Bot Einstellungen</div>
+                            <button class="btn btn-ghost"
+                                onclick="App.showNotification('Admin','Diese Funktion wird bald verfügbar','info')">Öffnen</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /view-container -->
+        </div><!-- /main-content -->
+    </div><!-- /dashboardScreen -->
+
+    <!-- ======================== MODAL ======================== -->
+    <div class="modal-overlay hidden" id="modalOverlay" onclick="App.closeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title" id="modalTitle">Modal</span>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- ======================== TOAST NOTIFICATIONS ======================== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="./socket.io.js"></script>
+    <script src="renderer.js"></script>
+    <script src="update-manager.js"></script>
+</body>
+
+</html>

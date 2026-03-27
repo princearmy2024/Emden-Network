@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Emden Network Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 100vw; height: 100vh;
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root {
+  --glass-bg: rgba(12, 12, 26, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --accent-blue: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.35);
+  --text-main: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.45);
+  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+}
+
+/* ── INFO BAR (top-left) ── */
+#info-bar {
+  position: fixed; top: 22px; left: 420px;
+  display: flex; flex-direction: row; gap: 10px;
+  z-index: 100;
+  opacity: 0; transform: translateY(-30px);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#info-bar.visible { opacity: 1; transform: translateY(0); }
+
+.info-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 7px 14px;
+  display: flex; align-items: center; gap: 10px; min-width: 130px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.info-card:hover {
+  transform: translateY(-3px);
+  background: rgba(15, 15, 32, 0.75);
+  border-color: rgba(255,255,255,0.15);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+.info-icon {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.05);
+}
+.info-icon svg { width: 14px; height: 14px; filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.4)); }
+
+.info-label { 
+  font-size: 8px; color: var(--text-muted); 
+  text-transform: uppercase; letter-spacing: 0.1em; 
+  font-weight: 700; margin-bottom: 0px;
+}
+.info-value { 
+  font-size: 13px; color: var(--text-main); 
+  font-weight: 800; letter-spacing: -0.01em;
+}
+.info-value.blue { color: var(--accent-blue); }
+
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #10b981;
+  margin-left: 8px; flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  animation: pulse-green 2.5s infinite;
+}
+@keyframes pulse-green { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+
+/* ── NOTIFICATION AREA (bottom-left) ── */
+#notif-area {
+  position: fixed; bottom: 32px; left: 32px;
+  display: flex; flex-direction: column-reverse; gap: 10px;
+  z-index: 100; max-width: 340px;
+}
+.notif-card {
+  background: rgba(10, 10, 22, 0.85);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px; padding: 14px 18px;
+  display: flex; gap: 14px; align-items: flex-start;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transform-origin: left center;
+  animation: notifIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.notif-card.out { animation: notifOut 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.notif-card.ticket   { border-left: 3px solid var(--accent-blue); }
+.notif-card.announce { border-left: 3px solid #60a5fa; }
+.notif-card.admin    { border-left: 3px solid #f59e0b; }
+
+.notif-ico { color: var(--accent-blue); flex-shrink: 0; margin-top: 2px; }
+.notif-ico svg { width: 20px; height: 20px; }
+
+.notif-title { font-size: 13px; font-weight: 800; color: #fff; margin-bottom: 3px; }
+.notif-text { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; }
+.notif-time { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 6px; font-weight: 500; }
+
+@keyframes notifIn { 
+    from { opacity: 0; transform: translateX(-30px) scale(0.95); filter: blur(4px); } 
+    to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); } 
+}
+@keyframes notifOut { 
+    from { opacity: 1; transform: translateX(0) scale(1); max-height: 150px; } 
+    to { opacity: 0; transform: translateX(-20px) scale(0.9); max-height: 0; padding: 0; margin: 0; } 
+}
+
+/* ── BIG ANNOUNCEMENT (center) ── */
+#big-ann {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 200;
+  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.03) 0%, transparent 70%);
+  opacity: 0; transition: opacity 0.6s ease;
+}
+#big-ann.visible { opacity: 1; }
+
+.big-ann-card {
+  background: rgba(8, 8, 18, 0.92);
+  backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 32px; padding: 50px 70px; text-align: center; max-width: 600px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 100px rgba(59, 130, 246, 0.1);
+  transform: scale(0.85);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#big-ann.visible .big-ann-card { transform: scale(1); }
+
+.big-ann-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.18em;
+  color: var(--accent-blue); background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 100px; padding: 7px 18px; margin-bottom: 24px;
+}
+.big-ann-title { font-size: 36px; font-weight: 900; color: #fff; margin-bottom: 14px; letter-spacing: -0.02em; }
+.big-ann-text  { font-size: 16px; color: rgba(255,255,255,0.65); line-height: 1.7; font-weight: 500; }
+
+/* ── F3 COMMAND BAR ── */
+#cmd-bar {
+  position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+  width: 640px; z-index: 300;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#cmd-bar.visible { top: 32px; }
+
+.cmd-inner {
+  background: rgba(10, 10, 22, 0.95);
+  backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px; padding: 16px 24px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
+}
+#cmd-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 17px; color: #fff; font-family: inherit; font-weight: 600;
+  caret-color: var(--accent-blue);
+}
+.cmd-ico { color: var(--accent-blue); opacity: 0.9; display: flex; align-items: center; }
+.cmd-ico svg { width: 22px; height: 22px; }
+.cmd-badge {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--accent-blue); background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 5px 12px;
+}
+.cmd-esc {
+  font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 700;
+  padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.2s;
+}
+.cmd-esc:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); }
+</style>
+</head>
+<body>
+
+<!-- INFO BAR -->
+<div id="info-bar">
+  <div class="info-card">
+    <div class="info-icon"><i data-lucide="users"></i></div>
+    <div><div class="info-label">On Duty</div><div class="info-value blue" id="supporter-count">0 Supporter</div></div>
+    <span class="live-dot"></span>
+  </div>
+  <div class="info-card">
+    <div class="info-icon"><i data-lucide="timer"></i></div>
+    <div><div class="info-label">Spielzeit</div><div class="info-value" id="playtime">00:00:00</div></div>
+  </div>
+  <div class="info-card">
+    <div class="info-icon"><i data-lucide="clock"></i></div>
+    <div><div class="info-label">Uhrzeit</div><div class="info-value" id="clock">--:--</div></div>
+  </div>
+</div>
+
+<!-- NOTIFICATION AREA -->
+<div id="notif-area"></div>
+
+<!-- BIG ANNOUNCEMENT -->
+<div id="big-ann">
+  <div class="big-ann-card">
+    <div class="big-ann-badge"><i data-lucide="megaphone"></i> <span>Announcement</span></div>
+    <div class="big-ann-title" id="big-ann-title"></div>
+    <div class="big-ann-text"  id="big-ann-text"></div>
+  </div>
+</div>
+
+<!-- F3 COMMAND BAR (admin only) -->
+<div id="cmd-bar">
+  <div class="cmd-inner">
+    <span class="cmd-ico"><i data-lucide="terminal"></i></span>
+    <input id="cmd-input" type="text" placeholder="Command eingeben…  /kick  /tp  /announce" autocomplete="off" spellcheck="false" />
+    <span class="cmd-badge">Admin F3</span>
+    <span class="cmd-esc" onclick="Overlay.toggleCmd()">ESC</span>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="roblox-overlay-renderer.js"></script>
+</body>
+</html>

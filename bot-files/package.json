@@ -1,0 +1,14 @@
+{
+  "name": "emden-network-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "COMPLETE-index.js",
+  "scripts": {
+    "start": "node COMPLETE-index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "socket.io": "^4.7.4"
+  }
+}
