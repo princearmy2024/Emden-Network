@@ -36,10 +36,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Send Discord Notification
+      - name: Send Premium Discord Notification
         if: success()
-        shell: bash # Wir wechseln zu Bash, damit der curl-Befehl perfekt funktioniert!
+        shell: bash
         run: |
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"🚀 **Neues Update verfügbar!**\n**Version:** \`${GITHUB_REF_NAME}\`\n[Download](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)\"}" \
+          -d "{\"embeds\": [{
+            \"title\": \"🚀 Neues Emden Network Update!\",
+            \"description\": \"Ein neues Control Center-Update wurde erfolgreich veröffentlicht! ✨🚀\",
+            \"color\": 3447003,
+            \"fields\": [
+              {\"name\": \"📦 Version\", \"value\": \"\`${GITHUB_REF_NAME}\`\", \"inline\": true},
+              {\"name\": \"🌐 Repository\", \"value\": \"Emden-Network\", \"inline\": true},
+              {\"name\": \"📦 Download\", \"value\": \"[Dashboard herunterladen](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)\"}
+            ],
+            \"footer\": {\"text\": \"Automatisches System by Antigravity 🤖\"},
+            \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+          }]}" \
           https://discord.com/api/webhooks/1487189165278756924/aYRVcnsC8YTq49rjMzs4VocunHsGAvSei3-webqm81tdNlyTVkPzb1w3WZOYatW-Ni_V
