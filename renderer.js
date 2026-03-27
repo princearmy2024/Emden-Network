@@ -146,11 +146,11 @@ const UserRegistry = {
     update(users) {
         const registry = this.get();
         users.forEach(u => {
-            const id = u.discordId || u.id; // Flexibler bei der ID
+            const id = u.discordId || u.id || u.username; // Fallback auf Username
             if (id) {
                 registry[id] = { 
                     ...u, 
-                    discordId: id, // Sicherstellen, dass discordId immer gesetzt ist
+                    discordId: id,
                     lastSeen: Date.now() 
                 };
             }
@@ -191,10 +191,11 @@ const WebSocketService = {
             };
 
             // Direkt beim Verbinden (und bei Reconnects)
-            this.socket.on('connect', announceOnline);
-
-            // Kurze Verzögerung als Fallback
-            setTimeout(announceOnline, 500);
+            this.socket.on('connect', () => {
+                announceOnline();
+                // Nach Socket-Verbindung sofort Status neu holen (für frische User-Liste)
+                setTimeout(() => this._fetchStatus(), 800);
+            });
 
             // Alle 20s nochmal melden
             setInterval(announceOnline, 20000);
@@ -246,24 +247,45 @@ const WebSocketService = {
             App.setConnectionStatus('online');
 
             const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-            
-            // Metric-Karten
-            setEl('statMembersTotal', data.members ?? '—');
-            setEl('statDashboardUsers', data.dashboardOnline ?? '0');
+
+            // Metric-Karten — mehrere mögliche Feldnamen abfangen
+            const totalMembers   = data.members        ?? data.memberCount      ?? '—';
+            const onlineMembers  = data.onlineMembers   ?? data.online_members   ?? data.onlineCount ?? '—';
+            const dashOnline     = data.dashboardOnline ?? data.dashboard_online ?? '0';
+
+            setEl('statMembersTotal',     totalMembers);
+            setEl('statDashboardUsers',   dashOnline);
             setEl('statDiscordConnected', 'Verbunden');
 
-            // Live-Panel rechts befüllen
-            setEl('liveMembers', data.members  ?? '—');
-            setEl('liveOnline',  data.onlineMembers ?? '—');
-            setEl('dashboardOnlineCount', data.dashboardOnline ?? '—');
+            // Live-Panel rechts
+            setEl('liveMembers',          totalMembers);
+            setEl('liveOnline',           onlineMembers);
+            setEl('dashboardOnlineCount', dashOnline);
 
-            // Dashboard-User-Liste rendern
-            if (data.dashboardUsers) {
-                UserRegistry.update(data.dashboardUsers);
-                App.renderFullUserList(data.dashboardUsers);
+            // User-Liste rendern — IMMER versuchen, auch wenn dashboardUsers leer ist
+            const users = data.dashboardUsers ?? data.onlineUsers ?? data.users ?? [];
+            if (users.length > 0) {
+                UserRegistry.update(users);
+                App.renderFullUserList(users);
+            } else if (parseInt(dashOnline) > 0) {
+                // Fallback: Zähler anzeigen aber Liste als "Laden..." markieren
+                const listEl = document.getElementById('dashboardUserList');
+                if (listEl && listEl.innerHTML.trim() === '') {
+                    listEl.innerHTML = `<div class="ovn-node" style="opacity:0.5"><div class="ovn-info">
+                        <div class="ovn-dot online"></div>
+                        <span style="font-size:11px;color:var(--text-muted)">${dashOnline} Nutzer online (synchronisiere...)</span>
+                    </div></div>`;
+                }
             }
         } else {
             App.setConnectionStatus('offline');
+            // Bei Offline alle Zähler auf 0 setzen
+            ['statDashboardUsers', 'dashboardOnlineCount', 'chatOnlineCountBadge'].forEach(id => {
+                const e = document.getElementById(id); if (e) e.textContent = '0';
+            });
+            ['liveOnline', 'liveMembers'].forEach(id => {
+                const e = document.getElementById(id); if (e) e.textContent = '0';
+            });
         }
     },
 
@@ -651,20 +673,25 @@ const App = {
     },
 
     renderFullUserList(onlineUsers) {
+        // Konsolen-Log für den Detektiv in dir (zum Debuggen)
+        console.log('[Presence] Online Users vom Server:', onlineUsers);
+
         const registry = UserRegistry.get();
         
-        // KRITISCHER FIX: Online-User IMMER in die Liste aufnehmen, auch wenn noch nicht in Registry
+        // 1. Online-User in die Registry aufnehmen (falls sie noch nicht da sind)
         onlineUsers.forEach(u => {
-            const id = u.discordId || u.id;
-            if (id && !registry[id]) {
+            const id = u.discordId || u.id || u.username;
+            if (id) {
+                // Wir aktualisieren hier auch die echten Daten, falls der Server was neues geschickt hat
                 registry[id] = { ...u, discordId: id, lastSeen: Date.now() };
             }
         });
 
-        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id));
-        
-        // Vollständige Liste aus Registry generieren
+        // 2. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
         const allMembers = Object.values(registry);
+        
+        // 3. Online-IDs für den grünen Punkt sammeln
+        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
         
         // Zähler nur für ECHTE online Leute
         const onlineCount = onlineUsers.length;
