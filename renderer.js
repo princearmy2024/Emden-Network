@@ -146,9 +146,11 @@ const UserRegistry = {
     update(users) {
         const registry = this.get();
         users.forEach(u => {
-            if (u.discordId) {
-                registry[u.discordId] = { 
+            const id = u.discordId || u.id; // Flexibler bei der ID
+            if (id) {
+                registry[id] = { 
                     ...u, 
+                    discordId: id, // Sicherstellen, dass discordId immer gesetzt ist
                     lastSeen: Date.now() 
                 };
             }
@@ -650,7 +652,16 @@ const App = {
 
     renderFullUserList(onlineUsers) {
         const registry = UserRegistry.get();
-        const onlineIds = new Set(onlineUsers.map(u => u.discordId));
+        
+        // KRITISCHER FIX: Online-User IMMER in die Liste aufnehmen, auch wenn noch nicht in Registry
+        onlineUsers.forEach(u => {
+            const id = u.discordId || u.id;
+            if (id && !registry[id]) {
+                registry[id] = { ...u, discordId: id, lastSeen: Date.now() };
+            }
+        });
+
+        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id));
         
         // Vollständige Liste aus Registry generieren
         const allMembers = Object.values(registry);
