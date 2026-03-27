@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Neueste Version nutzen
+          node-version: 22
 
       - name: Install dependencies
         run: npm install
@@ -27,7 +27,7 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_SKIP_SIGNING: true # Verhindert Fehler beim Signieren auf GitHub
+          CSC_SKIP_SIGNING: true
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
@@ -38,6 +38,7 @@ jobs:
 
       - name: Send Discord Notification
         if: success()
+        shell: bash # Wir wechseln zu Bash, damit der curl-Befehl perfekt funktioniert!
         run: |
           curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\": \"🚀 **Neues Update verfügbar!**\n**Version:** \`${GITHUB_REF_NAME}\`\n[Download](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)\"}" \
