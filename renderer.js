@@ -139,6 +139,24 @@ const ApiService = {
 // =============================================================
 // 3. WEBSOCKET SERVICE (Status-Polling & Live Chat)
 // =============================================================
+const UserRegistry = {
+    get() {
+        try { return JSON.parse(localStorage.getItem('nexus_members') || '{}'); } catch(e) { return {}; }
+    },
+    update(users) {
+        const registry = this.get();
+        users.forEach(u => {
+            if (u.discordId) {
+                registry[u.discordId] = { 
+                    ...u, 
+                    lastSeen: Date.now() 
+                };
+            }
+        });
+        localStorage.setItem('nexus_members', JSON.stringify(registry));
+    }
+};
+
 const WebSocketService = {
     _pollInterval: null,
     _heartbeatInterval: null,
@@ -173,16 +191,26 @@ const WebSocketService = {
             // Direkt beim Verbinden (und bei Reconnects)
             this.socket.on('connect', announceOnline);
 
-            // Kurze Verzögerung als Fallback, falls connect schon gefeuert hat
+            // Kurze Verzögerung als Fallback
             setTimeout(announceOnline, 500);
 
-            // Alle 20s nochmal melden (damit man nicht aus der Liste fliegt)
+            // Alle 20s nochmal melden
             setInterval(announceOnline, 20000);
 
             this.socket.on('chat_history', (msgs) => {
                 const chatBox = document.getElementById('chatMessages');
                 if (chatBox) chatBox.innerHTML = '';
-                msgs.forEach(m => App.appendChatMessage(m));
+                
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+                
+                // 24h FILTER: Nur Nachrichten der letzten 24 Stunden anzeigen
+                const freshMsgs = msgs.filter(m => {
+                    const msgTime = (m.id && !isNaN(m.id)) ? parseInt(m.id) : now;
+                    return (now - msgTime) < oneDay;
+                });
+
+                freshMsgs.forEach(m => App.appendChatMessage(m));
             });
 
             this.socket.on('receive_message', (msg) => {
@@ -190,18 +218,15 @@ const WebSocketService = {
             });
 
             this.socket.on('online_users', (users) => {
-                App.renderLiveUsers(users);
+                UserRegistry.update(users); // Alle neuen Nutzer in die Registry speichern
+                App.renderFullUserList(users); // Die volle Liste inkl. Offline-Usern rendern
             });
 
-            // Roblox OAuth Callback — Server schickt Profil nach erfolgreichem Login
+            // OAuth Callbacks
             this.socket.on(`roblox_connected_${AuthService.getUser()?.discordId}`, (profile) => {
                 RobloxService.saveProfile(profile);
                 App.renderRobloxCard(profile);
                 NotificationService.show('Roblox verbunden! 🎮', `Willkommen, ${profile.displayName}!`, 'success');
-            });
-
-            this.socket.on(`roblox_error_${AuthService.getUser()?.discordId}`, ({ error }) => {
-                NotificationService.show('Roblox Fehler', error || 'Verbindung fehlgeschlagen.', 'error');
             });
         }
     },
@@ -232,7 +257,8 @@ const WebSocketService = {
 
             // Dashboard-User-Liste rendern
             if (data.dashboardUsers) {
-                App.renderLiveUsers(data.dashboardUsers);
+                UserRegistry.update(data.dashboardUsers);
+                App.renderFullUserList(data.dashboardUsers);
             }
         } else {
             App.setConnectionStatus('offline');
@@ -540,13 +566,15 @@ const App = {
         const setAvatar = (id) => {
             const el = document.getElementById(id);
             if (!el) return;
-            if (user.avatar) {
-                el.innerHTML = `<img src="${user.avatar}" alt="Avatar"
+            const imgUrl = user.avatar || user.PFB || user.pfb;
+            if (imgUrl) {
+                el.innerHTML = `<img src="${imgUrl}" alt="Avatar"
                     style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"
-                    onerror="this.remove(); this.parentElement.textContent='${initial}';">`;
+                    onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\' style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;\'>${initial}</div>';">`;
                 el.textContent = '';
             } else {
-                el.textContent = initial;
+                el.innerHTML = `<div class="avatar-fallback-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
+                el.textContent = '';
             }
         };
 
@@ -620,23 +648,38 @@ const App = {
         }
     },
 
-    renderLiveUsers(users) {
-        // Zähler aktualisieren
-        const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-        setEl('statDashboardUsers', users.length);
-        setEl('dashboardOnlineCount', users.length);
-        setEl('chatOnlineCountBadge', users.length);
-        setEl('chatHeaderOnlineText', users.length + ' online');
+    renderFullUserList(onlineUsers) {
+        const registry = UserRegistry.get();
+        const onlineIds = new Set(onlineUsers.map(u => u.discordId));
         
-        // Sortieren: Admin -> Staff -> User
-        const sorted = [...users].sort((a, b) => {
+        // Vollständige Liste aus Registry generieren
+        const allMembers = Object.values(registry);
+        
+        // Zähler nur für ECHTE online Leute
+        const onlineCount = onlineUsers.length;
+        const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        setEl('statDashboardUsers', onlineCount);
+        setEl('dashboardOnlineCount', onlineCount);
+        setEl('chatOnlineCountBadge', onlineCount);
+        setEl('chatHeaderOnlineText', onlineCount + ' online');
+        
+        // Sortieren: Online zuerst, dann nach Rang (Admin > Staff > User)
+        const sorted = allMembers.sort((a, b) => {
+            const aOn = onlineIds.has(a.discordId);
+            const bOn = onlineIds.has(b.discordId);
+            if (aOn !== bOn) return aOn ? -1 : 1;
+            
             const rank = r => r === 'admin' ? 0 : r === 'staff' ? 1 : 2;
             return rank(a.role) - rank(b.role);
         });
 
-        const avatarEl = u => u.avatar
-            ? `<img src="${u.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">`
-            : `<div style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0;">${(u.username||'?')[0].toUpperCase()}</div>`;
+        const avatarEl = u => {
+            const initial = (u.username || '?')[0].toUpperCase();
+            if (u.avatar) {
+                return `<img src="${u.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback\'>${initial}</div>';">`;
+            }
+            return `<div class="avatar-fallback" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0;">${initial}</div>`;
+        };
 
         const badgeEl = u => {
             if (u.role === 'admin') return `<span class="ovn-role-badge admin">Admin</span>`;
@@ -645,21 +688,19 @@ const App = {
         };
 
         const html = sorted.length === 0 
-          ? `<div class="ovn-node" style="opacity:0.4">
+          ? `<div class="ovn-node" style="opacity:0.4"><div class="ovn-info"><div class="ovn-dot"></div><span style="font-size:11px;color:var(--text-muted)">Niemand bekannt</span></div></div>`
+          : sorted.map(u => {
+            const isOnline = onlineIds.has(u.discordId);
+            return `
+            <div class="ovn-node ${isOnline ? '' : 'offline'}" style="${isOnline ? '' : 'opacity: 0.6; filter: grayscale(0.5);'}">
                 <div class="ovn-info">
-                    <div class="ovn-dot"></div>
-                    <span style="font-size:11px;color:var(--text-muted)">Niemand online</span>
-                </div>
-             </div>`
-          : sorted.map(u => `
-            <div class="ovn-node">
-                <div class="ovn-info">
-                    <div class="ovn-dot online"></div>
+                    <div class="ovn-dot ${isOnline ? 'online' : ''}" style="background: ${isOnline ? 'var(--status-online)' : '#666'}"></div>
                     ${avatarEl(u)}
-                    <span class="ovn-name">${escHtml(u.username)}</span>
+                    <span class="ovn-name">${escHtml(u.username)} ${isOnline ? '' : '<small style="font-size:9px; opacity:0.5;">(Offline)</small>'}</span>
                 </div>
                 ${badgeEl(u)}
-            </div>`).join('');
+            </div>`;
+          }).join('');
 
         const homeList = document.getElementById('dashboardUserList');
         if (homeList) homeList.innerHTML = html;
@@ -762,9 +803,10 @@ const App = {
         el.className = 'msg-item ' + (isOwn ? 'own' : '');
         el.setAttribute('data-msgid', msg.id);
 
-        const avatarHtml = msg.avatar 
-            ? `<img src="${msg.avatar}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`
-            : initial;
+        const imgUrl = msg.avatar || msg.PFB || msg.pfb;
+        const avatarHtml = imgUrl 
+            ? `<img src="${imgUrl}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\'>${initial}</div>';">`
+            : `<div class="avatar-fallback-inner">${initial}</div>`;
 
         if (isOwn) {
             el.innerHTML = `
