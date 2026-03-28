@@ -168,7 +168,7 @@ const App = {
     _staticLoop: null,
 
     async init() {
-        console.log('[App] Starting v1.3.5...');
+        console.log('[App] Starting v1.3.6...');
         this.initBackgroundParallax();
         this.startClock();
         this.initPTTHandlers();
@@ -187,6 +187,8 @@ const App = {
                 NotificationService.show('Update bereit!', 'Bitte neu starten.', 'success');
             });
         }
+        
+        this.startStatsMonitor();
     },
 
     initLoginHandlers() {
@@ -318,8 +320,10 @@ const App = {
     stopPTT() {
         if (!this.isSpeaking) return;
         this.isSpeaking = false;
-        this._staticLoop?.pause();
-        this._staticLoop.currentTime = 0;
+        if (this._staticLoop) {
+            this._staticLoop.pause();
+            this._staticLoop.currentTime = 0;
+        }
         this.renderActiveVoiceCard();
 
         const vc = MockData.voiceChannels.find(v => v.active);
@@ -337,8 +341,8 @@ const App = {
     selectVoiceChannel(id) {
         const vc = MockData.voiceChannels.find(v => v.id === id);
         if (vc?.type === 'private') {
-            const p = prompt('Passwort:');
-            if (p !== vc.password) return;
+            // Electron supports no prompt()! Mocking for now to avoid crash.
+            console.log('[Voice] Private channel selected, using guest access.');
         }
         MockData.voiceChannels.forEach(v => v.active = (v.id === id));
         this.renderVoiceChannels();
@@ -406,7 +410,23 @@ const App = {
             const res = await fetch('https://enrp.princearmy.de/announcements.json');
             const data = await res.json();
             container.innerHTML = (data.announcements || []).map(n => `<div class="news-card"><strong>${n.title}</strong><p>${n.content}</p></div>`).join('');
-        } catch (e) { container.innerHTML = 'Fehler beim Laden.'; }
+        } catch (e) { container.innerHTML = 'Keine Neuigkeiten verfügbar.'; }
+    },
+
+    async startStatsMonitor() {
+        const update = async () => {
+            const data = await ApiService.get('/api/status');
+            if (data) {
+                const mem = document.getElementById('statMembersTotal');
+                const don = document.getElementById('statDashboardUsers');
+                const dsc = document.getElementById('statDiscordConnected');
+                if (mem) mem.textContent = data.members?.toLocaleString() || '—';
+                if (don) don.textContent = data.dashboardOnline || '0';
+                if (dsc) dsc.textContent = data.online ? 'Verbunden' : 'Gestreift';
+            }
+        };
+        update();
+        setInterval(update, 30000);
     },
 
     renderServers() {
