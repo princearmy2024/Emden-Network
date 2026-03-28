@@ -470,6 +470,9 @@ const App = {
             // Live clock
             this.startClock();
 
+            // PTT Hotkey (Walkie-Talkie) initialisieren
+            this.initPTTHandlers();
+
             // Splash → Login oder Dashboard
             await this.runSplash();
 
@@ -1105,9 +1108,9 @@ const App = {
                         </label>
                     </div>
                 </div>
-                <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button class="btn btn-primary" onclick="App.createVoiceChannel()">Erstellen</button>
-                    <button class="btn btn-ghost" style="width:auto;flex:1" onclick="App.closeModal()">Abbrechen</button>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:20px;">
+                    <button class="btn btn-primary" onclick="App.createVoiceChannel()" style="width:100%;">Erstellen</button>
+                    <button class="btn btn-ghost" onclick="App.closeModal()" style="width:100%;">Abbrechen</button>
                 </div>
             `;
             App._tempVoiceType = 'public';
@@ -1725,9 +1728,21 @@ Object.assign(App, {
                 <div class="vc-info">
                     <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
                     <div class="vc-name">#${escHtml(vc.name)}</div>
+                    ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
                 </div>
-                <div class="vc-members">
-                    ${vc.members.map(m => `<div class="vc-member-avatar">${m[0].toUpperCase()}</div>`).join('')}
+                <div class="vc-participants-discord">
+                    ${vc.members.map(m => {
+                        const isSpeaking = App.isSpeaking && m === 'Du';
+                        const user = AuthService.getUser();
+                        const img = (m === 'Du' && user.avatar) ? `<img src="${user.avatar}" class="v-avatar-mini" style="border-radius:50%; object-fit:cover;">` : `<div class="v-avatar-mini">${m[0].toUpperCase()}</div>`;
+                        return `
+                            <div class="v-user ${isSpeaking ? 'is-speaking' : ''}">
+                                ${img}
+                                <span class="v-username">${m}</span>
+                                ${m === 'Du' ? '' : '<span class="v-tag">STAFF</span>'}
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `).join('');
@@ -1739,9 +1754,17 @@ Object.assign(App, {
         // Sound-Effekt (Frequenzwechsel)
         this.playBlip(700, 0.08);
 
+        // Auto-Delete Check: Vorherige leere Kanäle löschen (außer die Start-Kanäle)
+        const currentActive = MockData.voiceChannels.find(vc => vc.active);
+        if (currentActive && currentActive.members.length <= 1 && currentActive.id.startsWith('vc-')) {
+             // Wenn nur noch "Du" drin bist und du gehst -> löschen (außer vc-1, vc-2)
+             if (currentActive.id !== 'vc-1' && currentActive.id !== 'vc-2') {
+                MockData.voiceChannels = MockData.voiceChannels.filter(v => v.id !== currentActive.id);
+             }
+        }
+
         MockData.voiceChannels.forEach(vc => {
             vc.active = (vc.id === id);
-            // Mock: "Du" wechselt den Kanal
             vc.members = vc.members.filter(m => m !== 'Du');
             if (vc.active) vc.members.push('Du');
         });
@@ -1751,10 +1774,67 @@ Object.assign(App, {
         const status = document.getElementById('pttStatus');
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
         if (status && activeCh) {
-            status.textContent = 'Verbunden mit #' + activeCh.name;
+            status.textContent = 'Frequenz: #' + activeCh.name;
             status.style.color = 'var(--status-online)';
             status.style.fontWeight = '700';
             status.style.textShadow = '0 0 10px var(--status-online)';
+        }
+    },
+
+    // --- PTT HOTKEY LOGIK ---
+    isSpeaking: false,
+    pttKey: 'v', // Standard Key 'V'
+
+    initPTTHandlers() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
+                const active = document.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+                this.startPTT();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key.toLowerCase() === this.pttKey) {
+                this.stopPTT();
+            }
+        });
+    },
+
+    startPTT() {
+        if (this.isSpeaking) return;
+        this.isSpeaking = true;
+        this.playRadioStatic(true);
+        this.renderVoiceChannels();
+        
+        const btn = document.getElementById('pttBtn');
+        if (btn) btn.classList.add('active');
+        const status = document.getElementById('pttStatus');
+        if (status) status.textContent = '🔊 SENDEN...';
+    },
+
+    stopPTT() {
+        if (!this.isSpeaking) return;
+        this.isSpeaking = false;
+        this.playRadioStatic(false);
+        this.renderVoiceChannels();
+        
+        const btn = document.getElementById('pttBtn');
+        if (btn) btn.classList.remove('active');
+        const status = document.getElementById('pttStatus');
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        if (status && activeCh) status.textContent = 'Frequenz: #' + activeCh.name;
+    },
+
+    playRadioStatic(active) {
+        if (active) {
+            // "Kkrschhh" beim Öffnen
+            this.playBlip(300, 0.05); // Initialer Klick
+            // Simulierter Funk-Chime
+            this.playBlip(800, 0.1); 
+        } else {
+            // "Roger that" / "Over" Sound
+            this.playBlip(500, 0.1);
+            setTimeout(() => this.playBlip(400, 0.05), 100);
         }
     },
 });
