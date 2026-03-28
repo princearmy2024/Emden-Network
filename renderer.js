@@ -197,6 +197,16 @@ const WebSocketService = {
                 App.initVoiceSocketEvents(this.socket);
             });
 
+            this.socket.on('disconnect', () => {
+                console.log('[Socket] Getrennt.');
+            });
+            
+            this.socket.on('chat_message', (data) => {
+                if (window.App && App.appendChatMessage) {
+                    App.appendChatMessage(data);
+                }
+            });
+
             // Alle 20s nochmal melden
             setInterval(announceOnline, 20000);
 
@@ -1339,6 +1349,62 @@ const App = {
             listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--status-warn);font-size:12.5px;">Fehler beim Laden der News. Bitte Internetverbindung prüfen.</div>';
         }
     },
+
+    // =============================================================
+    // CHAT SYSTEM
+    // =============================================================
+    sendMessage() {
+        const input = document.getElementById('chatInput');
+        if (!input || !input.value.trim()) return;
+        
+        const msg = input.value.trim();
+        input.value = '';
+
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('chat_message', {
+                channel: this.currentChat || 'general',
+                message: msg
+            });
+            // Hinzufügen der eigenen Nachricht ins Chatfenster
+            this.appendChatMessage({
+                username: AuthService.getUser()?.username,
+                message: msg
+            });
+        } else {
+            NotificationService.show('Verbindungsfehler', 'Keine Verbindung zum Chat-Server aktiv.', 'error');
+        }
+    },
+    
+    appendChatMessage(data) {
+        const chatBox = document.querySelector('.chat-messages');
+        if (!chatBox) return;
+        
+        const isOwn = data.username === AuthService.getUser()?.username;
+        const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+        const html = `
+            <div class="msg-item ${isOwn ? 'own' : ''}">
+                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#00D1A7'}">${data.username ? data.username[0].toUpperCase() : 'U'}</div>` : ''}
+                <div class="msg-body">
+                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'System')}</span><span class="msg-time">${time}</span></div>
+                    <div class="msg-text">${escHtml(data.message || '')}</div>
+                </div>
+                ${isOwn ? `<div class="msg-avatar you" style="background:var(--accent-blue)">U</div>` : ''}
+            </div>
+        `;
+        
+        chatBox.insertAdjacentHTML('beforeend', html);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    },
+
+    getStringColor(str) {
+        let hash = 0;
+        if (!str) return 'var(--accent-blue)';
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return `hsl(${Math.abs(hash) % 360}, 70%, 50%)`;
+    }
 };
 
 // =============================================================
