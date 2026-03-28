@@ -452,7 +452,7 @@ const MockData = {
         { id: 5, name: 'random', desc: 'Smalltalk', members: 21 },
     ],
     voiceChannels: [
-        { id: 'vc-1', name: 'voice-general', type: 'public', active: true, members: ['Alex', 'Du'], owner: 'Admin' },
+        { id: 'vc-1', name: 'voice-general', type: 'public', active: true, members: ['Du'], owner: 'Admin' },
         { id: 'vc-2', name: 'ops-room', type: 'private', active: false, members: [], owner: 'Admin' }
     ]
 };
@@ -1830,7 +1830,7 @@ Object.assign(App, {
             if (!activeCh) {
                 wtMemberList.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
             } else {
-                wtMemberList.innerHTML = activeCh.members.map(m => {
+                wtMemberList.innerHTML = activeCh.members.filter(m => m !== 'Alex').map(m => {
                     const isSpeaking = App.isSpeaking && m === 'Du';
                     const user = AuthService.getUser();
                     const isMe = m === 'Du';
@@ -1927,9 +1927,16 @@ Object.assign(App, {
     _VAD_THRESHOLD: 8,  // 0-255 — Lautstärke-Schwelle ab der gesendet wird
 
     async initPTTHandlers() {
-        this._staticLoop = new Audio('https://www.soundjay.com/communication/radio-static-1.mp3');
+        // Fallback: Wenn Soundjay nicht erreichbar ist, nutzen wir ein leeres Audio Objekt
+        this._staticLoop = new Audio();
+        this._staticLoop.src = 'https://www.soundjay.com/communication/radio-static-1.mp3';
         this._staticLoop.loop = true;
         this._staticLoop.volume = this.pttVolume * 0.1;
+        
+        this._staticLoop.onerror = () => {
+            console.warn('[PTT] Static noise could not be loaded - running in silent mode.');
+            this._staticLoop = null;
+        };
 
         try {
             await navigator.mediaDevices.getUserMedia({ audio: true });
