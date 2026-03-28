@@ -6,7 +6,7 @@
 
 const UpdateManager = (() => {
     // --- KONFIGURATION ---
-    let currentAppVersion = '1.0.0'; // Fallback
+    let currentAppVersion = '1.5.4'; // Fallback
     const CHECK_INTERVAL = 1000 * 60 * 60; // Alle 1 Stunde prüfen
 
     let isChecking = false;
@@ -15,13 +15,7 @@ const UpdateManager = (() => {
     // ─── INITIALISIERUNG ─────────────────────────────────────────
     async function init() {
         // Hol die echte Version vom Hauptprozess
-        // 1. Prio: Globaler Wert aus renderer.js (für sofortige Code-Updates)
-        if (window.CURRENT_VERSION) {
-            currentAppVersion = window.CURRENT_VERSION;
-            console.log(`[Update] Code-Version erkannt: ${currentAppVersion}`);
-        }
-        // 2. Prio: Hard-Coded Version vom Hauptprozess (Build)
-        if (currentAppVersion === '1.0.0' && window.electronAPI && window.electronAPI.getAppVersion) {
+        if (window.electronAPI && window.electronAPI.getAppVersion) {
             try {
                 currentAppVersion = await window.electronAPI.getAppVersion();
                 console.log(`[Update] System bereit. Aktuelle Version: ${currentAppVersion}`);
@@ -49,33 +43,33 @@ const UpdateManager = (() => {
             if (data && data.tag_name) {
                 const remoteVer = data.tag_name.replace('v', '');
                 
-                // Semantischer Vergleich statt nur Ungleichheit
-                const isNewer = (v1, v2) => {
-                    const a = v1.split('.').map(Number);
-                    const b = v2.split('.').map(Number);
-                    for (let i = 0; i < 3; i++) {
-                        if (a[i] > (b[i] || 0)) return true;
-                        if (a[i] < (b[i] || 0)) return false;
-                    }
-                    return false;
-                };
-
-                if (isNewer(remoteVer, currentAppVersion)) {
-                    console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
-                    
-                    window._lastUpdateInfo = {
-                        version: remoteVer,
-                        notes: data.body,
-                        url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
-                    };
-
-                    const notifier = document.getElementById('updateNotifier');
-                    if (notifier) notifier.classList.add('visible');
-                } else {
-                    console.log('[Update] App ist auf dem neuesten Stand oder lokal neuer.');
+                // Falls Version gleich -> notifier verstecken
+                if (remoteVer === currentAppVersion) {
+                    console.log('[Update] App ist auf dem neuesten Stand.');
                     const notifier = document.getElementById('updateNotifier');
                     if (notifier) notifier.classList.remove('visible');
+                    return;
                 }
+
+                // Prüfen ob der Nutzer diese Version bereits übersprungen hat
+                const skippedVer = localStorage.getItem('skipped_version');
+                if (skippedVer === remoteVer) {
+                    console.log(`[Update] Version ${remoteVer} wurde vom Nutzer übersprungen.`);
+                    return;
+                }
+
+                console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
+                
+                // Wir speichern die Info global für den Dialog
+                window._lastUpdateInfo = {
+                    version: remoteVer,
+                    notes: data.body,
+                    url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
+                };
+
+                // NEU: Nur das Icon einblenden statt dem fetten Banner!
+                const notifier = document.getElementById('updateNotifier');
+                if (notifier) notifier.classList.add('visible');
             }
         } catch (e) {
             console.error('[Update] Fehler beim GitHub Update-Check:', e.message);

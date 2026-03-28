@@ -977,13 +977,9 @@ svg { display: block; flex-shrink: 0; }
 /* ── Hero Banner — clean, no noise ───────────────────────── */
 .ov-hero {
     position: relative;
-    background: linear-gradient(90deg, var(--bg-base) 0%, rgba(19, 21, 30, 0.8) 40%, transparent 100%), 
-                url('assets/Emden_NEtwork_backround.png');
-    background-size: cover;
-    background-position: center;
+    background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    overflow: hidden;
 }
 /* Hidden decorative elements */
 .ov-hero-mesh { display: none; }
@@ -1527,27 +1523,19 @@ svg { display: block; flex-shrink: 0; }
 
 /* ── DISCORD-STYLE VOICE CHANNELS ───────────────────────── */
 .vc-participants-discord {
-    margin-top: 5px;
+    margin-top: 8px;
+    padding-left: 24px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
-/* USER LIST WITHIN CHANNEL */
-.v-user-list {
-    margin-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Mehr Platz zwischen den Zeilen */
-    padding-left: 10px;
-}
 .v-user {
     display: flex;
     align-items: center;
-    gap: 12px; /* MEHR ABSTAND (Fix für Screenshot 1116) */
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 2px 0;
+    gap: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
     transition: background 0.2s;
 }
 
@@ -1757,51 +1745,3 @@ svg { display: block; flex-shrink: 0; }
     font-weight: 600;
     color: #fff;
 }
-
-/* PTT Button locked State */
-.ptt-btn.locked {
-    border-color: #ff8800 !important;
-    box-shadow: 0 0 0 3px rgba(255,136,0,0.3) !important;
-}
-
-/* Modal */
-.modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 9999;
-}
-.modal-box {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    width: 480px; max-width: 90%; padding: 0;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    overflow: hidden;
-    animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes modalScaleIn { from { scale: 0.9; opacity: 0; } to { scale: 1; opacity: 1; } }
-
-.modal-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 20px 24px; border-bottom: 1px solid var(--border);
-}
-.modal-header h3 { margin: 0; font-size: 16px; color: #fff; }
-.modal-close {
-    background: none; border: none; color: var(--text-muted);
-    font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px;
-    transition: all 0.2s;
-}
-.modal-close:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-.modal-body { padding: 20px 24px; color: var(--text-sub); }
-.modal-footer {
-    display: flex; justify-content: flex-end; gap: 10px;
-    padding: 16px 24px; border-top: 1px solid var(--border);
-    background: rgba(0,0,0,0.1);
-}
-.btn-icon-sm {
-    width: 24px; height: 24px; border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-}
-.btn-icon-sm:hover { background: rgba(255,68,68,0.1) !important; }

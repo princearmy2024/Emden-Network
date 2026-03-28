@@ -1,6 +1,6 @@
 {
-    "version": "1.2.9",
+    "version": "1.5.4",
     "releaseDate": "2026-03-28",
-    "notes": "Pro Radio Suite: Globaler Funk-Hotkey (V), echtes Mic-Monitoring & Layout-Optimierung.",
+    "notes": "v1.5.4: Stabilisierung der Audio-Engine & Fix für Roblox PTT-Indicator.",
     "forceUpdate": true
 }
