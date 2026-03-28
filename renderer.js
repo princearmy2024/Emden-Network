@@ -13,7 +13,7 @@
 
 'use strict';
 
-window.CURRENT_VERSION = '1.2.8'; // Stand: 28.03.2026 (Audio-Engine: Mic, Volume, Roblox PTT-Indicator)
+window.CURRENT_VERSION = '1.2.9'; // Stand: 28.03.2026 (Pro Radio: Global PTT, Mic-Direct Monitoring)
 
 // =============================================================
 // CONFIG — Bot-API

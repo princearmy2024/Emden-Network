@@ -1,6 +1,6 @@
 {
-    "version": "1.2.8",
+    "version": "1.2.9",
     "releaseDate": "2026-03-28",
-    "notes": "Audio Engine: Mic-Auswahl, Lautstärkeregler & Roblox Overlay Funk-Anzeige integriert.",
+    "notes": "Pro Radio Suite: Globaler Funk-Hotkey (V), echtes Mic-Monitoring & Layout-Optimierung.",
     "forceUpdate": true
 }
