@@ -42,28 +42,26 @@ jobs:
         run: |
           # Wir erstellen eine JSON-Datei für den Premium-Embed
           CHANGELOG=$(git log -1 --pretty=format:"%s")
+          if [ -z "$CHANGELOG" ]; then CHANGELOG="Wartungsarbeiten und Systemstabilität."; fi
           LOG_ICON="https://cdn.discordapp.com/icons/1214227914041303100/a_66f07ead24647306236b3d16962f9011.gif"
           
-          # Wir nutzen eine Platzhalter-URL für das Bild, da das lokale Bild erst gehostet werden müsste.
-          # Aber wir machen das Embed trotzdem 'and MORE' professionell!
           cat <<EOF > discord_msg.json
           {
             "username": "Nexus Updates 🚀",
             "avatar_url": "${LOG_ICON}",
             "embeds": [{
-              "title": "💎 Emden Network | Control Center — v${GITHUB_REF_NAME}",
-              "description": "Das Dashboard wurde erfolgreich auf die neueste Version aktualisiert! ✨\n\n> **Systemstatus**: Alle Systeme laufen im stabilen Bereich. ✅",
-              "url": "https://github.com/princearmy2024/Emden-Network/releases/latest",
+              "title": "💎 Emden Network | Control Center — ${GITHUB_REF_NAME}",
+              "description": "Das Dashboard wurde erfolgreich auf die neueste Version aktualisiert! ✨\n\n> **Status**: Alle Systeme stabil. ✅",
               "color": 53671,
               "thumbnail": { "url": "${LOG_ICON}" },
               "fields": [
                 { "name": "📦 Version", "value": "`${GITHUB_REF_NAME}`", "inline": true },
-                { "name": "⚙️ Release-Typ", "value": "🚀 Stabil", "inline": true },
-                { "name": "🧬 Repository", "value": "[Emden-Network](https://github.com/princearmy2024/Emden-Network)", "inline": true },
-                { "name": "🛠️ Was ist neu?", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
+                { "name": "⚙️ Release", "value": "🚀 Stabil", "inline": true },
+                { "name": "🧬 Repository", "value": "Emden-Network (GitHub)", "inline": true },
+                { "name": "🛠️ Änderungen", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
               ],
               "footer": {
-                "text": "Automatisches Release-System — Emden Network 🧬 | $(date +'%d.%m.%Y')",
+                "text": "Emden Network 🧬 | $(date +'%d.%m.%Y')",
                 "icon_url": "${LOG_ICON}"
               },
               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
