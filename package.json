@@ -1,6 +1,6 @@
 {
     "name": "emden-network",
-    "version": "1.3.8",
+    "version": "1.5.0",
     "description": "Emden Network - Control Center",
     "main": "main.js",
     "scripts": {
@@ -24,7 +24,7 @@
             "target": [
                 "nsis"
             ],
-            "icon": "icon.ico",
+            "icon": "assets/icon.ico",
             "publisherName": "Emden Network",
             "legalTrademarks": "Emden Network",
             "requestedExecutionLevel": "asInvoker"

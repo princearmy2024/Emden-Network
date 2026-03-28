@@ -272,16 +272,6 @@ ipcMain.on('start-app-update', (event, { url }) => {
                 file.close(() => {
                     console.log('[Update] Download abgeschlossen:', tempPath);
                     event.sender.send('update_downloaded');
-                    
-                    setTimeout(() => {
-                        console.log('[Update] Starte Installer und beende App...');
-                        shell.openPath(tempPath).then(() => {
-                            // Hartes Beenden, um Dateisperren sofort aufzuheben
-                            app.exit(0);
-                        }).catch(err => {
-                            console.error('[Update] Installer konnte nicht gestartet werden:', err);
-                        });
-                    }, 500);
                 });
             });
 
@@ -297,6 +287,30 @@ ipcMain.on('start-app-update', (event, { url }) => {
     }
 
     downloadFile(url);
+});
+
+ipcMain.on('restart_app', () => {
+    const tempPath = path.join(os.tmpdir(), 'EmdenNetworkSetup_Update.exe');
+    if (fs.existsSync(tempPath)) {
+        shell.openPath(tempPath).then(() => {
+            app.exit(0);
+        });
+    } else {
+        app.relaunch();
+        app.exit(0);
+    }
+});
+
+ipcMain.on('restart_app', () => {
+    const tempPath = path.join(os.tmpdir(), 'EmdenNetworkSetup_Update.exe');
+    if (fs.existsSync(tempPath)) {
+        shell.openPath(tempPath).then(() => {
+            app.exit(0);
+        });
+    } else {
+        app.relaunch();
+        app.exit(0);
+    }
 });
 
 // Startet den temporären localhost OAuth-Callback-Server für Roblox

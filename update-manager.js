@@ -49,33 +49,33 @@ const UpdateManager = (() => {
             if (data && data.tag_name) {
                 const remoteVer = data.tag_name.replace('v', '');
                 
-                // Falls Version gleich -> notifier verstecken
-                if (remoteVer === currentAppVersion) {
-                    console.log('[Update] App ist auf dem neuesten Stand.');
-                    const notifier = document.getElementById('updateNotifier');
-                    if (notifier) notifier.classList.remove('visible');
-                    return;
-                }
-
-                // Prüfen ob der Nutzer diese Version bereits übersprungen hat
-                const skippedVer = localStorage.getItem('skipped_version');
-                if (skippedVer === remoteVer) {
-                    console.log(`[Update] Version ${remoteVer} wurde vom Nutzer übersprungen.`);
-                    return;
-                }
-
-                console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
-                
-                // Wir speichern die Info global für den Dialog
-                window._lastUpdateInfo = {
-                    version: remoteVer,
-                    notes: data.body,
-                    url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
+                // Semantischer Vergleich statt nur Ungleichheit
+                const isNewer = (v1, v2) => {
+                    const a = v1.split('.').map(Number);
+                    const b = v2.split('.').map(Number);
+                    for (let i = 0; i < 3; i++) {
+                        if (a[i] > (b[i] || 0)) return true;
+                        if (a[i] < (b[i] || 0)) return false;
+                    }
+                    return false;
                 };
 
-                // NEU: Nur das Icon einblenden statt dem fetten Banner!
-                const notifier = document.getElementById('updateNotifier');
-                if (notifier) notifier.classList.add('visible');
+                if (isNewer(remoteVer, currentAppVersion)) {
+                    console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
+                    
+                    window._lastUpdateInfo = {
+                        version: remoteVer,
+                        notes: data.body,
+                        url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
+                    };
+
+                    const notifier = document.getElementById('updateNotifier');
+                    if (notifier) notifier.classList.add('visible');
+                } else {
+                    console.log('[Update] App ist auf dem neuesten Stand oder lokal neuer.');
+                    const notifier = document.getElementById('updateNotifier');
+                    if (notifier) notifier.classList.remove('visible');
+                }
             }
         } catch (e) {
             console.error('[Update] Fehler beim GitHub Update-Check:', e.message);

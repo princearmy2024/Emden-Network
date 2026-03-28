@@ -44,7 +44,7 @@
                 <div class="splash-wordmark">
                     <span class="w-emden">Emden</span><span class="w-network"> Network</span>
                 </div>
-                <div class="splash-sub" id="splashVersion">Control Center v1.3.3</div>
+                <div class="splash-sub" id="splashVersion">Control Center v1.5.0</div>
             </div>
             <div class="splash-loader">
                 <div class="loader-track">
@@ -566,20 +566,13 @@
                     <div class="view-header">
                         <h2>Walkie-Talkie</h2>
                         <button class="btn btn-primary" style="width:auto;padding:9px 18px;"
-                            onclick="App.showModal('createVoice')">+ Kanal erstellen</button>
+                            onclick="WalkieTalkie.showCreateModal()">+ Kanal erstellen</button>
                     </div>
                     <div class="walkie-layout">
-                        <div class="voice-channels">
-                            <div class="section-title">Sprachkanäle</div>
-                            <div class="voice-channel-item active" id="vc-general">
-                                <div class="vc-info">
-                                    <div class="vc-icon">🔊</div>
-                                    <div class="vc-name">#voice-general</div>
-                                </div>
-                                <div class="vc-members">
-                                    <div class="vc-member-avatar">A</div>
-                                </div>
-                            </div>
+                        <div class="voice-channels" id="walkieChannelList">
+                            <div class="section-title">Funkkanäle</div>
+                            <!-- Kanäle werden dynamisch geladen -->
+                        </div>
                             <div class="voice-channel-item" id="vc-ops">
                                 <div class="vc-info">
                                     <div class="vc-icon">🔇</div>
@@ -937,7 +930,35 @@
         </div><!-- /main-content -->
     </div><!-- /dashboardScreen -->
 
-    <!-- ======================== MODAL ======================== -->
+    <!-- WALKIE CHANNEL MODAL -->
+    <div class="modal-overlay hidden" id="walkieCreateModal" onclick="WalkieTalkie.hideCreateModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>Neuen Funkkanal erstellen</h3>
+                <button class="modal-close" onclick="WalkieTalkie.hideCreateModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div>
+                        <label style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-muted);">Kanal-Name</label>
+                        <input type="text" id="walkieNewName" class="input-field" style="width:100%" placeholder="z.B. Einsatzleitung">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <input type="checkbox" id="walkieNewPrivate" onchange="document.getElementById('walkiePassWrap').classList.toggle('hidden', !this.checked)">
+                        <label for="walkieNewPrivate" style="font-size:13px; cursor:pointer;">Privat (Passwortgeschützt)</label>
+                    </div>
+                    <div id="walkiePassWrap" class="hidden">
+                        <label style="display:block; font-size:12px; margin-bottom:6px; color:var(--text-muted);">Passwort</label>
+                        <input type="password" id="walkieNewPass" class="input-field" style="width:100%" placeholder="••••••">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="WalkieTalkie.hideCreateModal()">Abbrechen</button>
+                <button class="btn btn-primary" style="width:auto; padding:8px 20px;" onclick="WalkieTalkie.createChannel()">Erstellen</button>
+            </div>
+        </div>
+    </div>
     <div class="modal-overlay hidden" id="modalOverlay" onclick="App.closeModal()">
         <div class="modal-box" onclick="event.stopPropagation()">
             <div class="modal-header">
