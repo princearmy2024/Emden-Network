@@ -41,18 +41,24 @@ jobs:
         shell: bash
         run: |
           # Wir erstellen eine JSON-Datei, um Flucht-Fehler (Quoting) zu vermeiden
+          # Wir ziehen uns die Commit-Message als Changelog-Vorschau
+          CHANGELOG=$(git log -1 --pretty=format:"%s")
+          
           cat <<EOF > discord_msg.json
           {
             "embeds": [{
-              "title": "🚀 Neues Emden Network Update!",
-              "description": "Ein neues Control Center-Update wurde erfolgreich veröffentlicht! ✨🚀",
-              "color": 3447003,
+              "title": "💎 Emden Network Control Center — System-Update",
+              "description": "Das Dashboard wurde erfolgreich aktualisiert und steht nun in der neuesten Version bereit! ✨🚀",
+              "color": 53671,
               "fields": [
                 {"name": "📦 Version", "value": "`${GITHUB_REF_NAME}`", "inline": true},
-                {"name": "🌐 Repository", "value": "Emden-Network", "inline": true},
-                {"name": "📦 Download", "value": "[Dashboard herunterladen](https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe)"}
+                {"name": "⚙️ Status", "value": "✅ Live & Stabil", "inline": true},
+                {"name": "🛠️ Änderungen", "value": ">>> ${CHANGELOG}", "inline": false}
               ],
-              "footer": {"text": "Automatisches System by Antigravity 🤖"},
+              "footer": {
+                "text": "Automatisches Release-System — Emden Network 🧬",
+                "icon_url": "https://cdn.discordapp.com/icons/1214227914041303100/a_66f07ead24647306236b3d16962f9011.gif"
+              },
               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             }]
           }

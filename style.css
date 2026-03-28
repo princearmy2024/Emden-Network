@@ -1206,11 +1206,26 @@ svg { display: block; flex-shrink: 0; }
 /* User entry in live panel */
 .ovn-node {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 10px; border-radius: var(--radius-sm);
+    padding: 10px 12px; border-radius: var(--radius-sm);
     border: 1px solid transparent;
-    transition: background 0.15s, border-color 0.15s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    margin-bottom: 2px;
 }
-.ovn-node:hover { background: var(--bg-card); border-color: var(--border); }
+.ovn-node:hover { 
+    background: rgba(255, 255, 255, 0.03); 
+    border-color: rgba(255, 255, 255, 0.05); 
+    transform: translateX(4px);
+}
+.ovn-node.active {
+    background: rgba(0, 209, 167, 0.1);
+    border-color: var(--brand-blue-2);
+    box-shadow: 0 4px 15px rgba(0, 209, 167, 0.15);
+}
+.ovn-node.active .ovn-name {
+    color: var(--brand-blue);
+    font-weight: 600;
+}
 .ovn-info { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
 
 .ovn-dot {

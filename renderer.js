@@ -733,7 +733,9 @@ const App = {
             : sorted.map(u => {
                 const isOnline = onlineIds.has(u.discordId);
                 return `
-            <div class="ovn-node ${isOnline ? '' : 'offline'}" style="${isOnline ? '' : 'opacity: 0.6; filter: grayscale(0.5);'}">
+            <div class="ovn-node ${isOnline ? '' : 'offline'} ${App.currentChat === '@' + u.username ? 'active' : ''}" 
+                 style="${isOnline ? '' : 'opacity: 0.6; filter: grayscale(0.5);'} cursor: pointer;"
+                 onclick="App.selectChat('@${u.username}')">
                 <div class="ovn-info">
                     <div class="ovn-dot ${isOnline ? 'online' : ''}" style="background: ${isOnline ? 'var(--status-online)' : '#666'}"></div>
                     ${avatarEl(u)}
@@ -800,9 +802,32 @@ const App = {
     // --- MESSAGES ---
     selectChat(name) {
         this.currentChat = name;
-        document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
-        document.querySelector(`[onclick="App.selectChat('${name}')"]`)?.classList.add('active');
-        document.getElementById('activeChatName').textContent = '#' + name;
+        
+        // UI im Header aktualisieren
+        const headTitle = document.getElementById('activeChatName');
+        if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
+        
+        const headSub = document.getElementById('chatHeaderOnlineText');
+        if (headSub) {
+            if (name.startsWith('@')) {
+                headSub.textContent = 'Privatchat mit ' + name.substring(1);
+            } else {
+                // Standard-Handling...
+            }
+        }
+        
+        // Aktiven User in der Liste highlighten
+        document.querySelectorAll('.ovn-node').forEach(node => {
+            const userNameNode = node.querySelector('.ovn-name');
+            if (userNameNode && userNameNode.textContent.includes(name.substring(1))) {
+                node.classList.add('active');
+            } else {
+                node.classList.remove('active');
+            }
+        });
+        
+        // Chat-Verlauf könnte hier je nach "name" gefiltert werden
+        // (Für Demo lassen wir den globalen Verlauf oder filtern lokal)
     },
 
     sendMessage() {
@@ -817,7 +842,8 @@ const App = {
             text,
             userId: user.discordId,
             username: user.username,
-            avatar: user.avatar,
+            avatar: user.avatar || user.PFB || user.pfb,
+            to: this.currentChat, // Ziel hinzufügen (@Name oder #Channel)
             timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
         };
 
