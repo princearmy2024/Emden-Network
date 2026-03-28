@@ -488,7 +488,7 @@ const App = {
             if (AuthService.loadSession() && AuthService.isLoggedIn()) {
                 this.showDashboard(AuthService.getUser());
                 this.renderActiveVoiceCard(); // Active Voice Card beim Start laden
-                this.syncHotkeyUI(); // Key in UI laden
+                this.syncSoundUI(); // Key & Audio in UI laden
             } else {
                 this.showScreen('loginScreen');
                 this.initLoginHandlers();
@@ -595,7 +595,7 @@ const App = {
         this.renderServers();
         this.renderVoiceChannels();
         this.renderActiveVoiceCard(); // Active Voice Card beim Login zeigen
-        this.syncHotkeyUI(); // Key in UI laden
+        this.syncSoundUI(); // Key & Audio in UI laden
         this.selectVoiceChannel('vc-1'); // Standard auf General setzen
         this.showScreen('dashboardScreen');
         this.navigate('overview');
@@ -1823,14 +1823,25 @@ Object.assign(App, {
     isSpeaking: false,
     pttKey: localStorage.getItem('ptt_key') || 'v', // Gespeicherter Key oder 'V'
     pttSoundUrl: localStorage.getItem('ptt_sound_url') || './walkie-talkie-start.mp3.wav',
+    pttVolume: parseFloat(localStorage.getItem('ptt_volume') || '0.5'),
+    selectedMicId: localStorage.getItem('selected_mic') || 'default',
     isMonitoring: false, // Mic abhören
     _staticLoop: null,
+    _micStream: null,
 
-    initPTTHandlers() {
+    async initPTTHandlers() {
         // Audio vorbereiten
         this._staticLoop = new Audio('https://www.soundjay.com/communication/radio-static-1.mp3');
         this._staticLoop.loop = true;
-        this._staticLoop.volume = 0.05;
+        this._staticLoop.volume = this.pttVolume * 0.1;
+
+        // Mic Berechtigung & Liste laden
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.refreshMicList();
+        } catch (e) {
+            console.error('[Mic] Zugriff verweigert:', e);
+        }
 
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
@@ -1864,12 +1875,17 @@ Object.assign(App, {
         NotificationService.show('Sound aktualisiert', 'Dein neuer Funk-Sound ist aktiv.', 'success');
     },
 
-    syncHotkeyUI() {
+    syncSoundUI() {
         const hInp = document.getElementById('pttKeyInput');
         if (hInp) hInp.value = this.pttKey.toUpperCase();
         
         const sInp = document.getElementById('pttSoundInput');
         if (sInp) sInp.value = this.pttSoundUrl;
+
+        const vInp = document.querySelector('.volume-slider');
+        if (vInp) vInp.value = this.pttVolume;
+
+        this.refreshMicList();
     },
 
     toggleMonitoring() {
@@ -1882,12 +1898,42 @@ Object.assign(App, {
         NotificationService.show('Mic-Monitor', this.isMonitoring ? 'Eigenstimme wird wiedergegeben.' : 'Eigenstimme stummgeschaltet.', 'info');
     },
 
+    async refreshMicList() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter(d => d.kind === 'audioinput');
+        const sel = document.getElementById('micSelect');
+        if (sel) {
+            sel.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === this.selectedMicId ? 'selected' : ''}>${m.label || 'Mikrofon'}</option>`).join('');
+        }
+    },
+
+    setMic(id) {
+        this.selectedMicId = id;
+        localStorage.setItem('selected_mic', id);
+        NotificationService.show('Audio-Input', 'Mikrofon wurde gewechselt.', 'info');
+    },
+
+    setVolume(v) {
+        this.pttVolume = parseFloat(v);
+        localStorage.setItem('ptt_volume', v);
+        if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
+    },
+
     startPTT() {
         if (this.isSpeaking) return;
         this.isSpeaking = true;
         this.playRadioStatic(true);
         this.renderVoiceChannels();
         this.renderActiveVoiceCard();
+
+        // Overlay-Signal
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        window.electronAPI?.updateOverlayState?.({
+            type: 'voice_ptt',
+            active: true,
+            user: AuthService.getUser()?.username || 'User',
+            channel: activeCh ? activeCh.name : 'Funk'
+        });
         
         const btn = document.getElementById('pttBtn');
         if (btn) btn.classList.add('active');
@@ -1900,6 +1946,10 @@ Object.assign(App, {
         this.isSpeaking = false;
         this.playRadioStatic(false);
         this.renderVoiceChannels();
+        this.renderActiveVoiceCard();
+
+        // Overlay-Stop
+        window.electronAPI?.updateOverlayState?.({ type: 'voice_ptt', active: false });
         
         const btn = document.getElementById('pttBtn');
         if (btn) btn.classList.remove('active');

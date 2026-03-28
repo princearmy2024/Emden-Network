@@ -43,6 +43,24 @@ const Overlay = (() => {
         if (window.electronAPI?.onToggleRobloxCmd) {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
+
+        // --- NEW: VOICE PTT OVERLAY SYNC ---
+        if (window.electronAPI?.onUpdateOverlayState) {
+            window.electronAPI.onUpdateOverlayState((state) => {
+                if (state.type === 'voice_ptt') {
+                    const area = document.getElementById('voice-status-area');
+                    if (!area) return;
+                    
+                    if (state.active) {
+                        document.getElementById('voice-username').textContent = state.user || 'Unbekannt';
+                        document.getElementById('voice-channel-name').textContent = '#' + (state.channel || 'Funk');
+                        area.classList.add('visible');
+                    } else {
+                        area.classList.remove('visible');
+                    }
+                }
+            });
+        }
     }
 
     // ─── OVERLAY VISIBILITY ─────────────────────────────────────

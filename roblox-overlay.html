@@ -186,6 +186,32 @@ body {
   transition: all 0.2s;
 }
 .cmd-esc:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); }
+
+/* ── VOICE STATUS AREA (bottom-right) ── */
+#voice-status-area {
+  position: fixed; bottom: 32px; right: 32px;
+  z-index: 100; opacity: 0; transform: translateX(30px);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#voice-status-area.visible { opacity: 1; transform: translateX(0); }
+
+.voice-status-card {
+  background: rgba(35, 165, 89, 0.75); /* Discord Green Glow */
+  backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px; padding: 12px 20px;
+  display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 30px rgba(35, 165, 89, 0.2);
+}
+.voice-icon { 
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; animation: speaking-pulse 1.5s infinite;
+}
+.voice-icon svg { width: 22px; height: 22px; }
+.voice-user { font-size: 14px; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
+.voice-channel { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; margin-top: 1px; }
+
+@keyframes speaking-pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
 </style>
 </head>
 <body>
@@ -226,6 +252,17 @@ body {
     <input id="cmd-input" type="text" placeholder="Command eingeben…  /kick  /tp  /announce" autocomplete="off" spellcheck="false" />
     <span class="cmd-badge">Admin F3</span>
     <span class="cmd-esc" onclick="Overlay.toggleCmd()">ESC</span>
+  </div>
+</div>
+
+<!-- VOICE STATUS AREA -->
+<div id="voice-status-area">
+  <div class="voice-status-card">
+    <div class="voice-icon"><i data-lucide="mic"></i></div>
+    <div class="voice-info">
+      <div class="voice-channel" id="voice-channel-name">FUNK</div>
+      <div class="voice-user" id="voice-username">USER</div>
+    </div>
   </div>
 </div>
 
