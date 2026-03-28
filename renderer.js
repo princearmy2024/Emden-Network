@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.0.0'; // Fallback
+let CURRENT_VERSION = '1.1.9'; // Stand: 28.03.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -448,7 +448,7 @@ const App = {
     // --- INIT ---
     async init() {
         if (window.electronAPI && window.electronAPI.getAppVersion) {
-            try { CURRENT_VERSION = await window.electronAPI.getAppVersion(); } catch(e){}
+            try { CURRENT_VERSION = await window.electronAPI.getAppVersion(); } catch (e) { }
         }
         console.log(`[App] Initialisiere Dashboard v${CURRENT_VERSION}...`);
         try {
