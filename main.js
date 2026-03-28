@@ -179,8 +179,41 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
     console.log('[Discord] Sende Webhook für Version:', version);
     
+    // Professionelles Embed-Design (kein Emoji-Spam, Fokus auf Premium Look)
     const data = JSON.stringify({
-        content: `🚀 **Benachrichtigung aus dem Dashboard**\n\n**Titel:** ${version}\n\n**Nachricht:**\n${notes}\n\n[Download von GitHub](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe)`
+        embeds: [{
+            title: `🚀 Update: ${version}`,
+            description: `Es wurde eine neue Benachrichtigung aus dem **Emden Network Control Center** gesendet.`,
+            color: 0x00D1A7, // Emden Teal
+            fields: [
+                {
+                    name: "📋 WAS WURDE GEÄNDERT?",
+                    value: notes || "System-Optimierungen und Stabilitätsverbesserungen.",
+                    inline: false
+                }
+            ],
+            thumbnail: {
+                url: 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'
+            },
+            footer: {
+                text: "Emden Network — Automated Update Service",
+                icon_url: 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'
+            },
+            timestamp: new Date().toISOString()
+        }],
+        components: [
+            {
+                type: 1,
+                components: [
+                    {
+                        type: 2,
+                        label: "Dashboard herunterladen",
+                        style: 5,
+                        url: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe`
+                    }
+                ]
+            }
+        ]
     });
 
     try {
@@ -197,7 +230,6 @@ ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
 
         const req = https.request(options, (res) => {
             console.log(`[Discord] Status: ${res.statusCode}`);
-            res.on('data', (d) => process.stdout.write(d));
         });
 
         req.on('error', (e) => {
