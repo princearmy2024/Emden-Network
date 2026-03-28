@@ -190,28 +190,47 @@ body {
 /* ── VOICE STATUS AREA (bottom-right) ── */
 #voice-status-area {
   position: fixed; bottom: 32px; right: 32px;
-  z-index: 100; opacity: 0; transform: translateX(30px);
+  z-index: 100; opacity: 0; transform: translateX(30px) scale(0.95);
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
 }
-#voice-status-area.visible { opacity: 1; transform: translateX(0); }
+#voice-status-area.visible { opacity: 1; transform: translateX(0) scale(1); }
 
+/* Discord / Premium Walkie-Talkie Style */
 .voice-status-card {
-  background: rgba(35, 165, 89, 0.75); /* Discord Green Glow */
-  backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px; padding: 12px 20px;
+  background: rgba(18, 18, 27, 0.85);
+  backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--accent-blue);
+  border-radius: 12px; padding: 12px 18px 12px 12px;
   display: flex; align-items: center; gap: 14px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 30px rgba(35, 165, 89, 0.2);
 }
-.voice-icon { 
+.voice-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; animation: speaking-pulse 1.5s infinite;
+  border: 2px solid transparent;
 }
-.voice-icon svg { width: 22px; height: 22px; }
-.voice-user { font-size: 14px; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
-.voice-channel { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; margin-top: 1px; }
+.voice-avatar img {
+  width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
+}
+.voice-avatar .voice-icon {
+  position: absolute; bottom: -4px; right: -4px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #12121b; display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.voice-avatar .voice-icon svg { width: 10px; height: 10px; }
 
-@keyframes speaking-pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+.voice-user { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
+.voice-channel { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.05em; }
+
+@keyframes speak-ring-pulse {
+  0% { box-shadow: 0 0 0 0px var(--ring-color); transform: scale(1); }
+  50% { box-shadow: 0 0 0 4px rgba(0,0,0,0); transform: scale(1.05); }
+  100% { box-shadow: 0 0 0 0px rgba(0,0,0,0); transform: scale(1); }
+}
 </style>
 </head>
 <body>
@@ -258,7 +277,9 @@ body {
 <!-- VOICE STATUS AREA -->
 <div id="voice-status-area">
   <div class="voice-status-card">
-    <div class="voice-icon"><i data-lucide="mic"></i></div>
+    <div class="voice-avatar" id="voice-avatar-container">
+      <div class="voice-icon"><i data-lucide="mic"></i></div>
+    </div>
     <div class="voice-info">
       <div class="voice-channel" id="voice-channel-name">FUNK</div>
       <div class="voice-user" id="voice-username">USER</div>

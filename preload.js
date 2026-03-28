@@ -44,4 +44,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     overlayRequestFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
     updateOverlayState: (state) => ipcRenderer.send('update-overlay-state', state),
     onUpdateOverlayState: (callback) => ipcRenderer.on('update-overlay-state', (event, state) => callback(state)),
+
+    // ── GLOBALES PTT SYSTEM ───────────────────────────────────────
+    // Main-Prozess sendet diese Events wenn die globale V-Taste gedrückt wird
+    onOverlayPTTStart: (cb) => ipcRenderer.on('overlay-ptt-start', () => cb()),
+    onOverlayPTTStop:  (cb) => ipcRenderer.on('overlay-ptt-stop',  () => cb()),
+    // Overlay sendet Keepalive während V gedrückt (da globalShortcut kein keyup kennt)
+    pttKeepalive: () => ipcRenderer.send('ptt-keepalive'),
+    pttStop:      () => ipcRenderer.send('ptt-stop'),
+    setPTTKey:    (key) => ipcRenderer.send('set-ptt-key', key),
+    pttStart:     () => ipcRenderer.send('ptt-start'),
 });

@@ -5,38 +5,68 @@
 
 'use strict';
 
-// CONFIG (wird auch aus URL-Parametern gelesen)
+// CONFIG
 const OVL_CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
     EMDEN_PLACE_ID: 12716055617,
-    // TODO: Hier deine Discord Rollen-IDs eintragen
     ON_DUTY_ROLE_ID: 'PLACEHOLDER_ON_DUTY_ROLE_ID',
 };
 
 const Overlay = (() => {
-    let socket     = null;
-    let discordId  = '';
-    let robloxId   = '';
-    let isAdmin    = false;
-    let cmdVisible = false;
-    let playtimeStart   = null;
-    let playtimeTimer   = null;
-    let bigAnnTimeout   = null;
+    let socket         = null;
+    let discordId      = '';
+    let robloxId       = '';
+    let isAdmin        = false;
+    let cmdVisible     = false;
+    let playtimeStart  = null;
+    let playtimeTimer  = null;
+    let bigAnnTimeout  = null;
+
+    // ─── VOICE STATE ────────────────────────────────────────────
+    let voiceChannelId    = 'vc-1';
+    let voiceUsername     = 'User';
+    let voiceDiscordId    = '';
+    let voiceAvatar       = '';
+    let voiceMimeType     = 'audio/webm;codecs=opus';
+    let isPTTHeld         = false;   // V-Taste gedrückt?
+    let isActuallySending = false;   // Wir senden gerade aktiv?
+    let micStream         = null;
+    let mediaRecorder     = null;
+    let keepaliveInterval = null;
+    let activeSpeakers    = {};      // { username: timestamp }
+
+    // VAD (Voice Activity Detection) — Audio-Level-Check
+    let vadContext    = null;
+    let vadAnalyser   = null;
+    let vadBuffer     = null;
+    let vadInterval   = null;
+    const VAD_THRESHOLD = 8; // 0–255, je höher desto strenger
 
     // ─── INIT ───────────────────────────────────────────────────
     function init() {
-        const p = new URLSearchParams(window.location.search);
-        discordId = p.get('discordId') || '';
-        robloxId  = p.get('robloxId')  || '';
-        isAdmin   = p.get('admin') === '1';
+        const p    = new URLSearchParams(window.location.search);
+        discordId  = p.get('discordId') || '';
+        robloxId   = p.get('robloxId')  || '';
+        isAdmin    = p.get('admin') === '1';
+        voiceDiscordId = discordId;
 
-        document.body.style.opacity = '1'; // Body immer sichtbar, Inhalte werden ein/ausgeblendet
+        // User-Info aus dem Dashboard localStorage lesen
+        try {
+            const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+            if (session?.user) {
+                voiceUsername = session.user.username || 'User';
+                voiceAvatar   = session.user.avatar   || '';
+            }
+        } catch(_) {}
+
+        document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
         startClock();
         connectSocket();
         setupKeys();
         startRandomTips();
+        initOverlayPTT();
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
@@ -44,22 +74,285 @@ const Overlay = (() => {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
 
-        // --- NEW: VOICE PTT OVERLAY SYNC ---
+        // Voice PTT State vom Dashboard (Sync wenn beide Fenster offen)
         if (window.electronAPI?.onUpdateOverlayState) {
             window.electronAPI.onUpdateOverlayState((state) => {
                 if (state.type === 'voice_ptt') {
-                    const area = document.getElementById('voice-status-area');
-                    if (!area) return;
-                    
-                    if (state.active) {
-                        document.getElementById('voice-username').textContent = state.user || 'Unbekannt';
-                        document.getElementById('voice-channel-name').textContent = '#' + (state.channel || 'Funk');
-                        area.classList.add('visible');
-                    } else {
-                        area.classList.remove('visible');
-                    }
+                    showSpeakingIndicator(state.active, state.user || 'User', state.channel || 'Funk', true, voiceAvatar);
                 }
             });
+        }
+    }
+
+    // ─── PTT IM OVERLAY ─────────────────────────────────────────
+    function initOverlayPTT() {
+        if (!window.electronAPI) return;
+
+        // V-Taste gedrückt (globaler Shortcut aus main.js)
+        window.electronAPI.onOverlayPTTStart(() => {
+            if (!isPTTHeld) {
+                isPTTHeld = true;
+                openMic();
+            }
+        });
+
+        // V-Taste losgelassen (via Keepalive-Timeout aus main.js)
+        window.electronAPI.onOverlayPTTStop(() => {
+            isPTTHeld = false;
+            closeMic();
+        });
+    }
+
+    // Mikrofon öffnen + VAD starten
+    async function openMic() {
+        if (micStream) return;
+
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 16000,
+                }
+            });
+        } catch(e) {
+            console.error('[Overlay PTT] Mikrofon-Fehler:', e.message);
+            micStream = null;
+            return;
+        }
+
+        // VAD: AnalyserNode messen ob Sprache vorhanden
+        vadContext  = new (window.AudioContext || window.webkitAudioContext)();
+        const src   = vadContext.createMediaStreamSource(micStream);
+        vadAnalyser = vadContext.createAnalyser();
+        vadAnalyser.fftSize = 512;
+        vadBuffer   = new Uint8Array(vadAnalyser.frequencyBinCount);
+        src.connect(vadAnalyser);
+
+        // Alle 80ms Audio-Level prüfen
+        vadInterval = setInterval(() => {
+            if (!isPTTHeld) return;
+
+            vadAnalyser.getByteFrequencyData(vadBuffer);
+            const avg = vadBuffer.reduce((a, b) => a + b, 0) / vadBuffer.length;
+
+            if (avg > VAD_THRESHOLD) {
+                // Sprache erkannt → falls noch nicht am senden, anfangen
+                if (!isActuallySending) startSending();
+            } else {
+                // Stille → falls am senden, stoppen
+                if (isActuallySending) pauseSending();
+            }
+        }, 80);
+
+        console.log('[Overlay PTT] 🎙 Kanal offen, warte auf Sprache...');
+    }
+
+    // Mikrofon schließen + alles aufräumen
+    function closeMic() {
+        clearInterval(vadInterval);
+        vadInterval = null;
+
+        stopSending(); // MediaRecorder stoppen falls aktiv
+
+        if (micStream) {
+            micStream.getTracks().forEach(t => t.stop());
+            micStream = null;
+        }
+        if (vadContext) {
+            vadContext.close().catch(() => {});
+            vadContext  = null;
+            vadAnalyser = null;
+            vadBuffer   = null;
+        }
+
+        isPTTHeld      = false;
+        isActuallySending = false;
+
+        window.electronAPI?.pttStop();
+        console.log('[Overlay PTT] 🔕 Kanal geschlossen.');
+    }
+
+    // MediaRecorder starten wenn Sprache erkannt
+    function startSending() {
+        if (isActuallySending || !micStream) return;
+        isActuallySending = true;
+
+        voiceMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+        mediaRecorder = new MediaRecorder(micStream, {
+            mimeType: voiceMimeType,
+            audioBitsPerSecond: 32000,
+        });
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0 && socket?.connected) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    socket.emit('voice_audio_chunk', {
+                        channelId: voiceChannelId,
+                        username:  voiceUsername,
+                        discordId: voiceDiscordId,
+                        avatar:    voiceAvatar,
+                        mimeType:  voiceMimeType,
+                        data:      reader.result.split(',')[1],
+                    });
+                };
+                reader.readAsDataURL(e.data);
+            }
+            // Keepalive für main.js damit er weiß V ist noch gedrückt
+            window.electronAPI?.pttKeepalive();
+        };
+
+        mediaRecorder.start(150);
+
+        // PTT-Start an Channel senden
+        if (socket?.connected) {
+            socket.emit('voice_ptt_start', {
+                channelId: voiceChannelId,
+                username:  voiceUsername,
+                discordId: voiceDiscordId,
+                avatar:    voiceAvatar,
+            });
+        }
+
+        showSpeakingIndicator(true, voiceUsername, voiceChannelId, true, voiceAvatar);
+
+        // Keepalive-Intervall
+        keepaliveInterval = setInterval(() => {
+            window.electronAPI?.pttKeepalive();
+        }, 100);
+
+        console.log('[Overlay PTT] 🔴 Sprache erkannt — sende...');
+    }
+
+    // MediaRecorder pausieren wenn Stille
+    function pauseSending() {
+        if (!isActuallySending) return;
+        isActuallySending = false;
+
+        clearInterval(keepaliveInterval);
+        keepaliveInterval = null;
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder = null;
+        }
+
+        // PTT-Stop an Channel senden (kurze Stille = Pause)
+        if (socket?.connected) {
+            socket.emit('voice_ptt_stop', {
+                channelId: voiceChannelId,
+                username:  voiceUsername,
+                discordId: voiceDiscordId,
+            });
+        }
+
+        showSpeakingIndicator(false, voiceUsername, voiceChannelId, true);
+        console.log('[Overlay PTT] ⏸ Stille erkannt — pausiert.');
+    }
+
+    // Wenn V losgelassen: Alles sauber stoppen
+    function stopSending() {
+        isActuallySending = false;
+
+        clearInterval(keepaliveInterval);
+        keepaliveInterval = null;
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder = null;
+        }
+
+        if (socket?.connected) {
+            socket.emit('voice_ptt_stop', {
+                channelId: voiceChannelId,
+                username:  voiceUsername,
+                discordId: voiceDiscordId,
+            });
+        }
+
+        showSpeakingIndicator(false, voiceUsername, voiceChannelId, true);
+    }
+
+    // ─── EINGEHENDE AUDIO CHUNKS ABSPIELEN ──────────────────────
+    function playIncomingAudio(base64data, mimeType) {
+        try {
+            const binary = atob(base64data);
+            const bytes  = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioCtx();
+            ctx.decodeAudioData(bytes.buffer, (decoded) => {
+                const src  = ctx.createBufferSource();
+                const gain = ctx.createGain();
+                gain.gain.value = 1.5;
+                src.buffer = decoded;
+                src.connect(gain);
+                gain.connect(ctx.destination);
+                src.start(0);
+                src.onended = () => ctx.close();
+            }, () => ctx.close());
+        } catch(_) {}
+    }
+
+    // ─── SPEAKING INDICATOR UI ──────────────────────────────────
+    function showSpeakingIndicator(active, username, channel, isSelf = false, avatarUrl = "") {
+        const area   = document.getElementById('voice-status-area');
+        const nameEl = document.getElementById('voice-username');
+        const chanEl = document.getElementById('voice-channel-name');
+        const card   = document.querySelector('.voice-status-card');
+        const avatarCont = document.getElementById('voice-avatar-container');
+        if (!area) return;
+
+        if (active) {
+            if (nameEl) nameEl.textContent = username;
+            if (chanEl) chanEl.textContent = '#' + channel;
+            
+            // Set Color 🔴 (Senden) vs 🟢 (Empfangen)
+            const speakingColor = isSelf ? '#ef4444' : '#10b981';
+            
+            if (card) {
+                card.style.borderLeftColor = speakingColor;
+            }
+            if (avatarCont) {
+                avatarCont.style.borderColor = speakingColor;
+                avatarCont.style.setProperty('--ring-color', speakingColor);
+                avatarCont.style.animation = 'speak-ring-pulse 1.5s infinite cubic-bezier(0.16, 1, 0.3, 1)';
+                
+                let micIconHtml = `<div class="voice-icon"><i data-lucide="mic"></i></div>`;
+                if (avatarUrl) {
+                    avatarCont.innerHTML = `<img src="${avatarUrl}" />` + micIconHtml;
+                } else {
+                    avatarCont.innerHTML = `<span style="color:#fff;font-weight:700;font-size:16px;">${username[0].toUpperCase()}</span>` + micIconHtml;
+                }
+                if (window.lucide) lucide.createIcons();
+            }
+            
+            area.classList.add('visible');
+        } else {
+            const others = Object.keys(activeSpeakers).filter(u => u !== username);
+            if (others.length === 0) {
+                area.classList.remove('visible');
+            } else {
+                const nextUser = others[0];
+                if (nameEl) nameEl.textContent = nextUser;
+                const speakingColor = '#10b981';
+                
+                if (card) card.style.borderLeftColor = speakingColor;
+                if (avatarCont) {
+                    avatarCont.style.borderColor = speakingColor;
+                    avatarCont.style.setProperty('--ring-color', speakingColor);
+                    
+                    // We don't have the avatar of other active speakers cached directly here easily, 
+                    // so we revert to initials for the fallback overlay
+                    let micIconHtml = `<div class="voice-icon"><i data-lucide="mic"></i></div>`;
+                    avatarCont.innerHTML = `<span style="color:#fff;font-weight:700;font-size:16px;">${nextUser[0].toUpperCase()}</span>` + micIconHtml;
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
         }
     }
 
@@ -79,9 +372,9 @@ const Overlay = (() => {
     // ─── CLOCK ──────────────────────────────────────────────────
     function startClock() {
         const tick = () => {
-            const d   = new Date();
-            const hh  = String(d.getHours()).padStart(2,'0');
-            const mm  = String(d.getMinutes()).padStart(2,'0');
+            const d  = new Date();
+            const hh = String(d.getHours()).padStart(2,'0');
+            const mm = String(d.getMinutes()).padStart(2,'0');
             document.getElementById('clock').textContent = `${hh}:${mm} Uhr`;
         };
         tick();
@@ -111,21 +404,20 @@ const Overlay = (() => {
 
     // ─── SUPPORTER COUNT ────────────────────────────────────────
     function setSupporter(count) {
-        document.getElementById('supporter-count').textContent =
-            `Supporter: ${count}`;
+        document.getElementById('supporter-count').textContent = `Supporter: ${count}`;
     }
 
     // ─── SMALL NOTIFICATIONS ────────────────────────────────────
     const MAX_NOTIFS = 3;
 
     function notify({ title, text, type = 'announce', duration = 7000 }) {
-        const area = document.getElementById('notif-area');
+        const area    = document.getElementById('notif-area');
         const current = area.querySelectorAll('.notif-card:not(.out)');
         if (current.length >= MAX_NOTIFS) dismiss(current[current.length - 1]);
 
-        const icons = { ticket: 'ticket', admin: 'shield', announce: 'megaphone' };
+        const icons   = { ticket: 'ticket', admin: 'shield', announce: 'megaphone' };
         const icoName = icons[type] || 'megaphone';
-        const time  = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        const time    = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 
         const el = document.createElement('div');
         el.className = `notif-card ${type}`;
@@ -155,7 +447,6 @@ const Overlay = (() => {
         if (bigAnnTimeout) clearTimeout(bigAnnTimeout);
         bigAnnTimeout = setTimeout(() =>
             document.getElementById('big-ann').classList.remove('visible'), duration);
-        // Also show small notif
         notify({ title, text, type: 'announce', duration: 5000 });
     }
 
@@ -163,8 +454,8 @@ const Overlay = (() => {
     const TIPS = [
         { title: 'Discord Announcement', text: 'Neues Event startet heute Abend! Schau im Kanal vorbei.' },
         { title: 'Team-Suche', text: 'Bewirb dich jetzt im Discord für das Taxi-Team.' },
-        { title: 'Social Media', text: 'Willst du coole Events und Streams sehen? Dann schau auf dem Discord vorbei.' },
-        { title: 'Support', text: 'Probleme im Spiel? Eröffne ein Ticket auf unserem Discord Server.' }
+        { title: 'Social Media', text: 'Willst du coole Events sehen? Dann schau auf dem Discord vorbei.' },
+        { title: 'Support', text: 'Probleme im Spiel? Eröffne ein Ticket auf unserem Discord.' }
     ];
 
     function startRandomTips() {
@@ -172,7 +463,7 @@ const Overlay = (() => {
             if (!isGameRunning) return;
             const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
             notify(tip);
-        }, 1000 * 60 * 8); // Alle 8 Minuten ein Tipp
+        }, 1000 * 60 * 8);
     }
 
     // ─── F3 COMMAND BAR ─────────────────────────────────────────
@@ -180,23 +471,19 @@ const Overlay = (() => {
         if (!isAdmin) return;
         cmdVisible = !cmdVisible;
         document.getElementById('cmd-bar').classList.toggle('visible', cmdVisible);
-        
-        // Electron Fenster in den Fokus holen, damit Klicken/Tippen geht
         if (window.electronAPI?.overlayRequestFocus) {
             window.electronAPI.overlayRequestFocus(cmdVisible);
         }
-
         if (cmdVisible)
             setTimeout(() => document.getElementById('cmd-input').focus(), 360);
     }
 
     function setupKeys() {
         document.addEventListener('keydown', e => {
-            // F3 wird nun systemweit via IPC (main.js) gefeuert 
             if (e.key === 'Escape' && cmdVisible) toggleCmd();
-            if (e.key === 'Enter' && cmdVisible) execCmd();
-            
-            // DEV-DEBUG: F4 simuliert Spiel-Erkennung manuell!
+            if (e.key === 'Enter'  && cmdVisible) execCmd();
+
+            // F4 = Debug: Spiel-Erkennung simulieren
             if (e.key === 'F4') {
                 e.preventDefault();
                 setGameRunning(!isGameRunning);
@@ -207,7 +494,6 @@ const Overlay = (() => {
     function execCmd() {
         const val = document.getElementById('cmd-input').value.trim();
         if (!val) return;
-        // TODO: Anbindung an Admin-Command-System
         console.log('[CMD]', val);
         document.getElementById('cmd-input').value = '';
         toggleCmd();
@@ -224,40 +510,51 @@ const Overlay = (() => {
         socket.on('connect', () => {
             console.log('[Overlay] Socket verbunden');
             if (discordId) socket.emit('overlay_client_connect', { discordId, robloxId, isAdmin });
+
+            // Voice Channel beitreten
+            socket.emit('voice_channel_join', {
+                channelId: voiceChannelId,
+                username:  voiceUsername,
+                discordId: voiceDiscordId,
+            });
         });
 
-        // On-Duty Supporter Count
         socket.on('overlay_supporter_count', ({ count }) => setSupporter(count));
 
-        // Spiel erkannt — API feuert dieses Event!
         socket.on(`overlay_game_start_${discordId}`, ({ startTime }) => setGameRunning(true, startTime));
         socket.on(`overlay_game_end_${discordId}`,   ()               => setGameRunning(false));
 
-        // Test-Modus (via Main-Prozess Forwarding)
         if (window.electronAPI) {
-            // Fake-Event vom Dashboard-Test-Button
             socket.on('overlay_game_start_test', (data) => setGameRunning(true, data.startTime));
         }
 
-        // Initiale Meldung
         notify({ title: 'Emden Network', text: 'Overlay aktiv & bereit.', type: 'info' });
 
-        // Kleine Notification (global oder user)
-        socket.on('overlay_notification',                 handleNotif);
-        socket.on(`overlay_notification_${discordId}`,   handleNotif);
-
-        // Großes Announcement
+        socket.on('overlay_notification',               handleNotif);
+        socket.on(`overlay_notification_${discordId}`, handleNotif);
         socket.on('overlay_big_announcement', bigAnnounce);
 
-        // Neues Discord Ticket (nur Admins)
         socket.on('overlay_new_ticket', ({ ticketId, reason }) => {
             if (!isAdmin) return;
-            notify({
-                title: `Neues Ticket #${ticketId}`,
-                text:  reason || 'Kein Grund angegeben',
-                type:  'ticket',
-                duration: 15000,
-            });
+            notify({ title: `Neues Ticket #${ticketId}`, text: reason || 'Kein Grund angegeben', type: 'ticket', duration: 15000 });
+        });
+
+        // ── VOICE EVENTS ──────────────────────────────────────
+        socket.on('voice_ptt_start', (data) => {
+            if (data.username === voiceUsername) return;
+            activeSpeakers[data.username] = Date.now();
+            showSpeakingIndicator(true, data.username, data.channelId, false, data.avatar || '');
+        });
+
+        socket.on('voice_ptt_stop', (data) => {
+            if (data.username === voiceUsername) return;
+            delete activeSpeakers[data.username];
+            showSpeakingIndicator(false, data.username, data.channelId, false);
+        });
+
+        socket.on('voice_audio_chunk', (data) => {
+            if (data.username === voiceUsername) return;
+            playIncomingAudio(data.data, data.mimeType);
         });
     }
 
@@ -274,7 +571,6 @@ const Overlay = (() => {
             .replace(/>/g,'&gt;');
     }
 
-    // Public API
     return { init, toggleCmd };
 })();
 

@@ -193,6 +193,8 @@ const WebSocketService = {
                 announceOnline();
                 // Nach Socket-Verbindung sofort Status neu holen (für frische User-Liste)
                 setTimeout(() => this._fetchStatus(), 800);
+                // ── VOICE EVENTS registrieren (nach jeder Verbindung) ──
+                App.initVoiceSocketEvents(this.socket);
             });
 
             // Alle 20s nochmal melden
@@ -596,12 +598,16 @@ const App = {
         this.renderVoiceChannels();
         this.renderActiveVoiceCard(); // Active Voice Card beim Login zeigen
         this.syncSoundUI(); // Key & Audio in UI laden
-        this.selectVoiceChannel('vc-1'); // Standard auf General setzen
         this.showScreen('dashboardScreen');
         this.navigate('overview');
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
+
+        // Auto-Join Standard-Kanal nach Socket-Verbindung
+        setTimeout(() => {
+            this.selectVoiceChannel('vc-1'); // Standard auf General setzen
+        }, 1500);
 
         // Demo: Notifications nach kurzer Zeit
         setTimeout(() => {
@@ -1043,18 +1049,7 @@ const App = {
     },
 
     // --- WALKIE TALKIE ---
-    startPTT() {
-        document.getElementById('pttBtn').classList.add('active');
-        document.getElementById('pttStatus').textContent = 'SENDE...';
-        document.querySelector('.part-avatar.you + .part-name + .part-status')?.classList.replace('muted', 'speaking');
-        // TODO: MediaRecorder + WebSocket Audio-Stream starten
-    },
-
-    stopPTT() {
-        document.getElementById('pttBtn').classList.remove('active');
-        document.getElementById('pttStatus').textContent = 'Verbunden · #voice-general';
-        // TODO: Audio-Stream stoppen
-    },
+    // (Actual PTT logic is further down in initPTTHandlers/startPTT/stopPTT)
 
     // --- NOTIFICATIONS VIEW ---
     clearNotifications() {
@@ -1750,7 +1745,6 @@ Object.assign(App, {
         const listContainer = document.querySelector('.voice-channels');
         if (!listContainer) return;
 
-        const title = '<div class="section-title">Sprachkanäle</div>';
         const html = MockData.voiceChannels.map(vc => `
             <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
                 <div class="vc-info">
@@ -1758,24 +1752,47 @@ Object.assign(App, {
                     <div class="vc-name">#${escHtml(vc.name)}</div>
                     ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
                 </div>
-                <div class="vc-participants-discord">
-                    ${vc.members.map(m => {
-                        const isSpeaking = App.isSpeaking && m === 'Du';
-                        const user = AuthService.getUser();
-                        const img = (m === 'Du' && user.avatar) ? `<img src="${user.avatar}" class="v-avatar-mini" style="border-radius:50%; object-fit:cover;">` : `<div class="v-avatar-mini">${m[0].toUpperCase()}</div>`;
-                        return `
-                            <div class="v-user ${isSpeaking ? 'is-speaking' : ''}">
-                                ${img}
-                                <span class="v-username">${m}</span>
-                                ${m === (vc.owner || 'Admin') ? '<span class="v-tag owner">OWNER</span>' : '<span class="v-tag">STAFF</span>'}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
             </div>
         `).join('');
 
-        listContainer.innerHTML = title + html;
+        listContainer.innerHTML = html;
+
+        // Render Right Sidebar (Participants)
+        const wtMemberList = document.getElementById('wtMemberList');
+        if (wtMemberList) {
+            const activeCh = MockData.voiceChannels.find(vc => vc.active);
+            if (!activeCh) {
+                wtMemberList.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
+            } else {
+                wtMemberList.innerHTML = activeCh.members.map(m => {
+                    const isSpeaking = App.isSpeaking && m === 'Du';
+                    const user = AuthService.getUser();
+                    const isMe = m === 'Du';
+                    const speakClass = isSpeaking ? 'is-me transmitting' : '';
+                    const avatarContent = (isMe && user.avatar) 
+                        ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` 
+                        : m[0].toUpperCase();
+
+                    return `
+                        <div class="wt-member-item ${speakClass}">
+                            <div class="wt-member-avatar">${avatarContent}</div>
+                            <div class="wt-member-info">
+                                <div class="wt-member-name">${m}</div>
+                                <div class="wt-member-role">${m === (activeCh.owner || 'Admin') ? 'OWNER' : (isMe ? 'Du' : 'Mitglied')}</div>
+                            </div>
+                            <div class="wt-member-mic">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
     },
 
     selectVoiceChannel(id) {
@@ -1797,7 +1814,12 @@ Object.assign(App, {
 
         // SYNC: Signal an den Server senden (Falls verbunden)
         if (WebSocketService.socket?.connected) {
-             WebSocketService.socket.emit('voice_channel_join', { channelId: id });
+            const user = AuthService.getUser();
+            WebSocketService.socket.emit('voice_channel_join', {
+                channelId: id,
+                username:  user?.username  || 'User',
+                discordId: user?.discordId || '',
+            });
         }
 
         MockData.voiceChannels.forEach(vc => {
@@ -1820,22 +1842,29 @@ Object.assign(App, {
     },
 
     // --- PTT HOTKEY LOGIK ---
-    isSpeaking: false,
-    pttKey: localStorage.getItem('ptt_key') || 'v', // Gespeicherter Key oder 'V'
+    isSpeaking: false,          // V-Taste gedrückt (Kanal offen)
+    isActuallySending: false,   // Nur wenn Sprache erkannt
+    pttKey: localStorage.getItem('ptt_key') || 'v',
     pttSoundUrl: localStorage.getItem('ptt_sound_url') || './walkie-talkie-start.mp3.wav',
     pttVolume: parseFloat(localStorage.getItem('ptt_volume') || '0.5'),
     selectedMicId: localStorage.getItem('selected_mic') || 'default',
-    isMonitoring: false, // Mic abhören
+    isMonitoring: false,
     _staticLoop: null,
     _micStream: null,
+    _mediaRecorder: null,
+    _activeSpeakers: {},
+    // VAD (Voice Activity Detection)
+    _vadContext: null,
+    _vadAnalyser: null,
+    _vadBuffer: null,
+    _vadInterval: null,
+    _VAD_THRESHOLD: 8,  // 0-255 — Lautstärke-Schwelle ab der gesendet wird
 
     async initPTTHandlers() {
-        // Audio vorbereiten
         this._staticLoop = new Audio('https://www.soundjay.com/communication/radio-static-1.mp3');
         this._staticLoop.loop = true;
         this._staticLoop.volume = this.pttVolume * 0.1;
 
-        // Mic Berechtigung & Liste laden
         try {
             await navigator.mediaDevices.getUserMedia({ audio: true });
             this.refreshMicList();
@@ -1843,6 +1872,7 @@ Object.assign(App, {
             console.error('[Mic] Zugriff verweigert:', e);
         }
 
+        // V-Taste DRÜCKEN → Kanal öffnen
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
                 const active = document.activeElement;
@@ -1850,11 +1880,29 @@ Object.assign(App, {
                 this.startPTT();
             }
         });
+        // V-Taste LOSLASSEN → Kanal schließen
         document.addEventListener('keyup', (e) => {
             if (e.key.toLowerCase() === this.pttKey) {
                 this.stopPTT();
             }
         });
+
+        // IPC: Globaler PTT (z.B. wenn Focus im Overlay-Fenster ist)
+        if (window.electronAPI?.onOverlayPTTStart) {
+            window.electronAPI.onOverlayPTTStart(() => this.startPTT());
+        }
+        if (window.electronAPI?.onOverlayPTTStop) {
+            window.electronAPI.onOverlayPTTStop(() => this.stopPTT());
+        }
+
+        // Initiale Sync mit main.js
+        if (window.electronAPI?.setPTTKey) {
+            window.electronAPI.setPTTKey(this.pttKey.toUpperCase());
+        }
+        
+        // PTT Hint im UI updaten
+        const pttKeyHint = document.getElementById('wt-ptt-key-hint');
+        if (pttKeyHint) pttKeyHint.textContent = `[ ${this.pttKey.toUpperCase()} ]`;
     },
 
     setPTTKey(k) {
@@ -1864,6 +1912,13 @@ Object.assign(App, {
         
         const inp = document.getElementById('pttKeyInput');
         if (inp) inp.value = this.pttKey.toUpperCase();
+        
+        const pttKeyHint = document.getElementById('wt-ptt-key-hint');
+        if (pttKeyHint) pttKeyHint.textContent = `[ ${this.pttKey.toUpperCase()} ]`;
+
+        if (window.electronAPI?.setPTTKey) {
+            window.electronAPI.setPTTKey(this.pttKey.toUpperCase());
+        }
         
         NotificationService.show('Hotkey geändert', `Neuer Funk-Key: ${this.pttKey.toUpperCase()}`, 'info');
     },
@@ -1914,52 +1969,340 @@ Object.assign(App, {
         if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
     },
 
-    startPTT() {
+    async startPTT() {
         if (this.isSpeaking) return;
+
+        // ── 1. Mikrofon öffnen ────────────────────────────────────
+        try {
+            this._micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    deviceId: this.selectedMicId !== 'default' ? { exact: this.selectedMicId } : undefined,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 16000,
+                }
+            });
+        } catch (e) {
+            console.error('[Voice] Mikrofon-Fehler:', e);
+            NotificationService.show('Mikrofon-Fehler', 'Konnte Mikrofon nicht öffnen: ' + e.message, 'error');
+            return;
+        }
+
         this.isSpeaking = true;
         this.playRadioStatic(true);
-        this.renderVoiceChannels();
-        this.renderActiveVoiceCard();
+
+        // ── 2. VAD: AnalyserNode messen ───────────────────────────
+        this._vadContext  = new (window.AudioContext || window.webkitAudioContext)();
+        const src          = this._vadContext.createMediaStreamSource(this._micStream);
+        this._vadAnalyser  = this._vadContext.createAnalyser();
+        this._vadAnalyser.fftSize = 512;
+        this._vadBuffer    = new Uint8Array(this._vadAnalyser.frequencyBinCount);
+        src.connect(this._vadAnalyser);
+
+        // UI: Kanal geöffnet (aber noch kein Senden)
+        const btn = document.getElementById('pttBtn');
+        if (btn) btn.classList.add('active');
+        const rings = document.getElementById('wt-ptt-rings');
+        if (rings) rings.classList.add('listening');
+
+        const status = document.getElementById('pttStatus');
+        if (status) {
+            status.textContent = '🟡 WARTE AUF SPRACHE...';
+            status.style.color = '#ffcc00';
+            status.style.textShadow = '0 0 10px rgba(255,204,0,0.5)';
+        }
+        document.getElementById('wt-signal')?.classList.add('active');
+
+        // ── 3. VAD-Loop: alle 80ms Audio-Level prüfen ─────────────
+        this._vadInterval = setInterval(() => {
+            if (!this.isSpeaking) return;
+            this._vadAnalyser.getByteFrequencyData(this._vadBuffer);
+            const avg = this._vadBuffer.reduce((a, b) => a + b, 0) / this._vadBuffer.length;
+
+            if (avg > this._VAD_THRESHOLD) {
+                if (!this.isActuallySending) this._startVoiceSend();
+            } else {
+                if (this.isActuallySending) this._pauseVoiceSend();
+            }
+        }, 80);
 
         // Overlay-Signal
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        const user     = AuthService.getUser();
         window.electronAPI?.updateOverlayState?.({
-            type: 'voice_ptt',
-            active: true,
-            user: AuthService.getUser()?.username || 'User',
+            type: 'voice_ptt', active: true,
+            user: user?.username || 'User',
             channel: activeCh ? activeCh.name : 'Funk'
         });
-        
-        const btn = document.getElementById('pttBtn');
-        if (btn) btn.classList.add('active');
+
+        this.renderVoiceChannels();
+        this.renderActiveVoiceCard();
+    },
+
+    // Startet den MediaRecorder wenn Sprache erkannt ──────────────
+    _startVoiceSend() {
+        if (this.isActuallySending || !this._micStream) return;
+        this.isActuallySending = true;
+
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        const user     = AuthService.getUser();
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+        this._mediaRecorder = new MediaRecorder(this._micStream, { mimeType, audioBitsPerSecond: 32000 });
+
+        this._mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0 && WebSocketService.socket?.connected) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    WebSocketService.socket.emit('voice_audio_chunk', {
+                        channelId: activeCh?.id || 'vc-1',
+                        username:  user?.username || 'User',
+                        discordId: user?.discordId || '',
+                        avatar:    user?.avatar    || '',
+                        mimeType,
+                        data: reader.result.split(',')[1],
+                    });
+                };
+                reader.readAsDataURL(e.data);
+            }
+        };
+
+        this._mediaRecorder.start(150);
+
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('voice_ptt_start', {
+                channelId: activeCh?.id || 'vc-1',
+                username:  user?.username || 'User',
+                discordId: user?.discordId || '',
+                avatar:    user?.avatar    || '',
+            });
+        }
+
         const status = document.getElementById('pttStatus');
-        if (status) status.textContent = '🔊 SENDEN...';
+        if (status) {
+            status.textContent = '🔴 SENDE...';
+            status.style.color = '#ff3c3c';
+            status.style.textShadow = '0 0 14px rgba(255,60,60,0.6)';
+        }
+        const btn = document.getElementById('pttBtn');
+        if (btn) btn.classList.add('transmitting');
+        const rings = document.getElementById('wt-ptt-rings');
+        if (rings) rings.classList.add('transmitting');
+        
+        // Lokales Mic Update
+        this.renderVoiceChannels();
+    },
+
+    // Pausiert den MediaRecorder bei Stille ───────────────────────
+    _pauseVoiceSend() {
+        if (!this.isActuallySending) return;
+        this.isActuallySending = false;
+
+        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+            this._mediaRecorder.stop();
+            this._mediaRecorder = null;
+        }
+
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        const user     = AuthService.getUser();
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('voice_ptt_stop', {
+                channelId: activeCh?.id || 'vc-1',
+                username:  user?.username || 'User',
+                discordId: user?.discordId || '',
+            });
+        }
+
+        const status = document.getElementById('pttStatus');
+        if (status) {
+            status.textContent = '🟡 WARTE AUF SPRACHE...';
+            status.style.color = '#ffcc00';
+            status.style.textShadow = '0 0 10px rgba(255,204,0,0.5)';
+        }
+        const btn = document.getElementById('pttBtn');
+        if (btn) btn.classList.remove('transmitting');
+        const rings = document.getElementById('wt-ptt-rings');
+        if (rings) rings.classList.remove('transmitting');
+
+        // Lokales Mic Update
+        this.renderVoiceChannels();
     },
 
     stopPTT() {
         if (!this.isSpeaking) return;
-        this.isSpeaking = false;
+        this.isSpeaking        = false;
+        this.isActuallySending = false;
+
+        // VAD aufräumen
+        clearInterval(this._vadInterval);
+        this._vadInterval = null;
+        if (this._vadContext) {
+            this._vadContext.close().catch(() => {});
+            this._vadContext = this._vadAnalyser = this._vadBuffer = null;
+        }
+
+        // MediaRecorder stoppen
+        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+            this._mediaRecorder.stop();
+            this._mediaRecorder = null;
+        }
+        if (this._micStream) {
+            this._micStream.getTracks().forEach(t => t.stop());
+            this._micStream = null;
+        }
+
+        // PTT-Stop Signal
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        const user     = AuthService.getUser();
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('voice_ptt_stop', {
+                channelId: activeCh?.id || 'vc-1',
+                username:  user?.username || 'User',
+                discordId: user?.discordId || '',
+            });
+        }
+
+        // UI
         this.playRadioStatic(false);
         this.renderVoiceChannels();
         this.renderActiveVoiceCard();
-
-        // Overlay-Stop
         window.electronAPI?.updateOverlayState?.({ type: 'voice_ptt', active: false });
-        
+
         const btn = document.getElementById('pttBtn');
-        if (btn) btn.classList.remove('active');
+        if (btn) { btn.classList.remove('active'); btn.classList.remove('transmitting'); }
+        const rings = document.getElementById('wt-ptt-rings');
+        if (rings) { rings.classList.remove('listening'); rings.classList.remove('transmitting'); }
+        document.getElementById('wt-signal')?.classList.remove('active');
+
         const status = document.getElementById('pttStatus');
-        const activeCh = MockData.voiceChannels.find(vc => vc.active);
-        if (status && activeCh) status.textContent = 'Frequenz: #' + activeCh.name;
+        if (status) {
+            const ch = MockData.voiceChannels.find(vc => vc.active);
+            status.textContent = ch?.name ? `VERBUNDEN · #${ch.name.toUpperCase()}` : 'NICHT VERBUNDEN';
+            status.style.color = 'var(--status-online)';
+            status.style.textShadow = 'none';
+        }
+    },
+
+    // ── EMPFÄNGER: Eingehende Audio-Chunks abspielen ────────────
+    _playIncomingAudio(base64data, mimeType) {
+        try {
+            // base64 → ArrayBuffer
+            const binary = atob(base64data);
+            const bytes  = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioCtx();
+            ctx.decodeAudioData(bytes.buffer, (decodedData) => {
+                const source = ctx.createBufferSource();
+
+                // Lautstärke
+                const gainNode = ctx.createGain();
+                gainNode.gain.value = this.pttVolume * 2.0;
+
+                source.buffer = decodedData;
+                source.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                source.start(0);
+                source.onended = () => ctx.close();
+            }, (err) => {
+                ctx.close();
+            });
+        } catch(e) {
+            // Leiser Fehler — kann bei kleinen/leeren Chunks passieren
+        }
+    },
+
+    // ── Wer-spricht-Anzeige updaten ──────────────────────────────
+    _setSpeakerActive(username, active) {
+        if (active) {
+            this._activeSpeakers[username] = Date.now();
+        } else {
+            delete this._activeSpeakers[username];
+        }
+        this._renderSpeakingOverlay();
+        this.renderVoiceChannels();
+        this.renderActiveVoiceCard();
+    },
+
+    _renderSpeakingOverlay() {
+        const speakers = Object.keys(this._activeSpeakers);
+        const pttStatus = document.getElementById('pttStatus');
+        const waveform = document.getElementById('wt-waveform');
+
+        if (speakers.length > 0 && !this.isSpeaking) {
+            if (pttStatus) {
+                pttStatus.textContent = '🔊 ' + speakers.join(', ').toUpperCase() + ' SPRICHT...';
+                pttStatus.style.color = '#00ff88';
+                pttStatus.style.textShadow = '0 0 10px rgba(0,255,136,0.6)';
+            }
+            if (waveform) waveform.classList.add('active');
+        } else if (!this.isSpeaking) {
+            if (waveform) waveform.classList.remove('active');
+        }
+    },
+
+    // ── Socket.IO Voice Events registrieren ─────────────────────
+    initVoiceSocketEvents(socket) {
+        // Eingehende Audio-Chunks
+        socket.on('voice_audio_chunk', (data) => {
+            const me = AuthService.getUser();
+            if (data.username === me?.username) return; // Kein Echo
+            this._playIncomingAudio(data.data, data.mimeType);
+        });
+
+        // Anderer User drückt PTT
+        socket.on('voice_ptt_start', (data) => {
+            const me = AuthService.getUser();
+            if (data.username === me?.username) return;
+
+            console.log('[Voice] 🔊', data.username, 'sendet...');
+            this._setSpeakerActive(data.username, true);
+
+            // Toast nur beim ersten Mal (nicht bei jedem Chunk)
+            this.playBlip(800, 0.05);
+        });
+
+        // Anderer User lässt PTT los
+        socket.on('voice_ptt_stop', (data) => {
+            const me = AuthService.getUser();
+            if (data.username === me?.username) return;
+
+            console.log('[Voice] ⏹', data.username, 'hat aufgehört.');
+            this._setSpeakerActive(data.username, false);
+
+            // Refresh Status-Text
+            const status = document.getElementById('pttStatus');
+            const waveform = document.getElementById('wt-waveform');
+            const activeCh = MockData.voiceChannels.find(vc => vc.active);
+            
+            if (!this.isSpeaking && Object.keys(this._activeSpeakers).length === 0) {
+                if (status) {
+                    status.textContent = activeCh?.name ? `VERBUNDEN · #${activeCh.name.toUpperCase()}` : 'NICHT VERBUNDEN';
+                    status.style.color = 'var(--status-online)';
+                    status.style.textShadow = 'none';
+                }
+                if (waveform) waveform.classList.remove('active');
+            }
+
+            this.playBlip(600, 0.05);
+        });
+
+        // Kanal-Mitglieder-Update (wer ist wo)
+        socket.on('voice_channel_members', (channels) => {
+            if (channels) MockData.voiceChannels = channels;
+            this.renderVoiceChannels();
+            this.renderActiveVoiceCard();
+        });
     },
 
     playRadioStatic(active) {
         if (active) {
-            // "Kkrschhh" beim Öffnen (Deine URL oder Default)
+            // "Kkrschhh" beim Öffnen
             const openSound = new Audio(this.pttSoundUrl);
             openSound.volume = 0.15;
             openSound.play().catch(() => {});
-            
             // Loop starten
             if (this._staticLoop) this._staticLoop.play().catch(() => {});
         } else {
@@ -1968,8 +2311,7 @@ Object.assign(App, {
                 this._staticLoop.pause();
                 this._staticLoop.currentTime = 0;
             }
-            
-            // "Roger that" / End-Beep
+            // End-Beep
             this.playBlip(500, 0.1);
             setTimeout(() => this.playBlip(400, 0.05), 100);
         }

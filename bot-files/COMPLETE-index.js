@@ -596,6 +596,73 @@ io.on("connection", (socket) => {
         // An ALLE anderen Dashboards senden
         socket.broadcast.emit("receive_message", msgData);
     });
+
+    // ================================================================
+    // 🎙️ WALKIE-TALKIE VOICE SYSTEM
+    // ================================================================
+
+    // User tritt einem Sprachkanal bei → socket.io "room" beitreten
+    socket.on("voice_channel_join", ({ channelId, username, discordId }) => {
+        // Alle alten Voice-Rooms verlassen
+        for (const room of socket.rooms) {
+            if (room.startsWith("voice:") && room !== socket.id) {
+                socket.leave(room);
+            }
+        }
+        const room = `voice:${channelId}`;
+        socket.join(room);
+        socket.currentVoiceChannel = channelId;
+        socket.voiceUsername = username || "User";
+        socket.voiceDiscordId = discordId || "";
+
+        console.log(`[Voice] ${username} → #${channelId}`);
+
+        // Allen im Raum sagen wer da ist
+        io.to(room).emit("voice_user_joined", { channelId, username, discordId });
+    });
+
+    // Kanal erstellen → an alle broadcasten
+    socket.on("voice_create_channel", (newVC) => {
+        socket.broadcast.emit("voice_created", newVC);
+    });
+
+    // PTT Start → nur an Leute im selben Voice-Channel
+    socket.on("voice_ptt_start", (data) => {
+        const room = `voice:${data.channelId}`;
+        socket.to(room).emit("voice_ptt_start", data);
+        console.log(`[Voice] 🔴 ${data.username} sendet in #${data.channelId}`);
+    });
+
+    // PTT Stop → nur an Leute im selben Voice-Channel
+    socket.on("voice_ptt_stop", (data) => {
+        const room = `voice:${data.channelId}`;
+        socket.to(room).emit("voice_ptt_stop", data);
+        console.log(`[Voice] ⏹ ${data.username} stoppt in #${data.channelId}`);
+    });
+
+    // Audio-Chunk → nur an Leute im selben Voice-Channel weiterschicken
+    socket.on("voice_audio_chunk", (data) => {
+        const room = `voice:${data.channelId}`;
+        // Broadcast: NICHT zurück an den Sender
+        socket.to(room).emit("voice_audio_chunk", data);
+    });
+
+    // Beim Disconnect: PTT-Stop senden falls noch aktiv
+    socket.on("disconnect", () => {
+        overlayClients.delete(socket.id);
+        if (socket.currentVoiceChannel && socket.voiceUsername) {
+            const room = `voice:${socket.currentVoiceChannel}`;
+            io.to(room).emit("voice_ptt_stop", {
+                channelId: socket.currentVoiceChannel,
+                username: socket.voiceUsername,
+                discordId: socket.voiceDiscordId || "",
+            });
+            io.to(room).emit("voice_user_left", {
+                channelId: socket.currentVoiceChannel,
+                username: socket.voiceUsername,
+            });
+        }
+    });
 });
 
 apiServer.listen(API_PORT, "0.0.0.0", () => {

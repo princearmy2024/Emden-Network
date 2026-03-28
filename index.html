@@ -564,65 +564,90 @@
                 <!-- ===== WALKIE-TALKIE ===== -->
                 <div class="view" id="view-walkie">
                     <div class="view-header">
-                        <h2>Walkie-Talkie</h2>
-                        <button class="btn btn-primary" style="width:auto;padding:9px 18px;"
-                            onclick="App.showModal('createVoice')">+ Kanal erstellen</button>
+                        <div>
+                            <h2 style="margin:0">Walkie-Talkie</h2>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;letter-spacing:.06em;">SPRACHKOMMUNIKATION</div>
+                        </div>
+                        <button class="btn btn-primary" style="width:auto;padding:9px 18px;" onclick="App.showModal('createVoice')">+ Kanal erstellen</button>
                     </div>
-                    <div class="walkie-layout">
-                        <div class="voice-channels">
-                            <div class="section-title">Sprachkanäle</div>
-                            <div class="voice-channel-item active" id="vc-general">
-                                <div class="vc-info">
-                                    <div class="vc-icon">🔊</div>
-                                    <div class="vc-name">#voice-general</div>
-                                </div>
-                                <div class="vc-members">
-                                    <div class="vc-member-avatar">A</div>
-                                </div>
-                            </div>
-                            <div class="voice-channel-item" id="vc-ops">
-                                <div class="vc-info">
-                                    <div class="vc-icon">🔇</div>
-                                    <div class="vc-name">#ops-room</div>
-                                </div>
-                                <div class="vc-members"></div>
+
+                    <div class="wt-layout">
+
+                        <!-- LEFT: Channel list -->
+                        <div class="wt-sidebar">
+                            <div class="wt-sidebar-label">FREQUENZEN</div>
+                            <div class="voice-channels" id="voiceChannelList">
+                                <!-- rendered by JS -->
                             </div>
                         </div>
-                        <div class="walkie-controls">
-                            <div class="ptt-area">
-                                <div class="ptt-status" id="pttStatus">Nicht verbunden</div>
-                                <button class="ptt-btn" id="pttBtn" onmousedown="App.startPTT()"
-                                    onmouseup="App.stopPTT()" ontouchstart="App.startPTT()"
-                                    ontouchend="App.stopPTT()">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                                        width="32" height="32">
-                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                        <line x1="12" y1="19" x2="12" y2="23" />
-                                        <line x1="8" y1="23" x2="16" y2="23" />
-                                    </svg>
-                                    <span>Push to Talk</span>
+
+                        <!-- CENTER: Main PTT area -->
+                        <div class="wt-main">
+
+                            <!-- Frequency header -->
+                            <div class="wt-freq-bar">
+                                <div class="wt-freq-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path d="M8.5 6.5a6 6 0 0 1 7 0M5.5 4a10 10 0 0 1 13 0M2.5 1.5a14 14 0 0 1 19 0"/><circle cx="12" cy="13" r="2"/><line x1="12" y1="15" x2="12" y2="20"/></svg>
+                                </div>
+                                <div class="wt-freq-text">
+                                    <span class="wt-freq-label">EMPFANGSFREQUENZ</span>
+                                    <span class="wt-freq-value" id="pttStatus">Nicht verbunden</span>
+                                </div>
+                                <div class="wt-signal-bars" id="wt-signal">
+                                    <div class="wt-bar b1"></div>
+                                    <div class="wt-bar b2"></div>
+                                    <div class="wt-bar b3"></div>
+                                    <div class="wt-bar b4"></div>
+                                    <div class="wt-bar b5"></div>
+                                </div>
+                            </div>
+
+                            <!-- PTT Giant Button -->
+                            <div class="wt-ptt-zone">
+                                <div class="wt-ptt-rings" id="wt-ptt-rings">
+                                    <div class="wt-ring r1"></div>
+                                    <div class="wt-ring r2"></div>
+                                    <div class="wt-ring r3"></div>
+                                </div>
+                                <button class="wt-ptt-btn" id="pttBtn"
+                                    onmousedown="App.startPTT()" onmouseup="App.stopPTT()"
+                                    ontouchstart="App.startPTT()" ontouchend="App.stopPTT()">
+                                    <div class="wt-ptt-inner">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                            <line x1="12" y1="19" x2="12" y2="23"/>
+                                            <line x1="8" y1="23" x2="16" y2="23"/>
+                                        </svg>
+                                        <span class="wt-ptt-label">PUSH TO TALK</span>
+                                        <span class="wt-ptt-key" id="wt-ptt-key-hint">[ V ]</span>
+                                    </div>
                                 </button>
-                                <div class="ptt-hint">Gedrückt halten zum Sprechen</div>
+                                <div class="wt-waveform" id="wt-waveform">
+                                    <div class="wt-wave-bar"></div><div class="wt-wave-bar"></div><div class="wt-wave-bar"></div>
+                                    <div class="wt-wave-bar"></div><div class="wt-wave-bar"></div><div class="wt-wave-bar"></div>
+                                    <div class="wt-wave-bar"></div><div class="wt-wave-bar"></div><div class="wt-wave-bar"></div>
+                                    <div class="wt-wave-bar"></div><div class="wt-wave-bar"></div><div class="wt-wave-bar"></div>
+                                </div>
+                                <div class="wt-ptt-hint">Gedrückt halten oder <kbd>V</kbd> zum Sprechen</div>
                             </div>
-                            <div class="vc-participants">
-                                <div class="section-title">Teilnehmer</div>
-                                <div class="participant-list" id="participantList">
-                                    <div class="participant-item">
-                                        <div class="part-avatar">A</div>
-                                        <div class="part-name">Alex</div>
-                                        <div class="part-status speaking">🎙️</div>
-                                    </div>
-                                    <div class="participant-item">
-                                        <div class="part-avatar you" id="walkieOwnAvatar">U</div>
-                                        <div class="part-name">Du</div>
-                                        <div class="part-status muted">🔇</div>
-                                    </div>
+
+                        </div>
+
+                        <!-- RIGHT: Participants -->
+                        <div class="wt-participants">
+                            <div class="wt-sidebar-label">TEILNEHMER</div>
+                            <div class="wt-member-list" id="wtMemberList">
+                                <!-- rendered by JS via renderVoiceChannels / renderWTMembers -->
+                                <div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">
+                                    Keinem Kanal beigetreten
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
+
 
                 <!-- ===== SERVERS ===== -->
                 <div class="view" id="view-servers">

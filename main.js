@@ -21,6 +21,7 @@ const { spawn } = require('child_process');
 let mainWindow;
 let overlayWindow;
 let robloxOverlayWin = null;
+let globalPTTActive  = false; // Verhindert doppeltes Feuern
 
 function createOverlayWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -395,6 +396,86 @@ app.whenReady().then(() => {
             mainWindow.focus();
         } catch (e) {
             console.error('F2 Shortcut Error:', e.message);
+        }
+    });
+
+    // ==========================================
+    // GLOBALER PTT SHORTCUT (V-Taste über Roblox)
+    // Funktioniert auch wenn das Dashboard im Hintergrund ist
+    // ==========================================
+    let currentPttKey = 'V';
+
+    function registerPTT(key) {
+        if (!key) return;
+        try {
+            globalShortcut.unregister(currentPttKey);
+        } catch(e){}
+        
+        currentPttKey = key.toUpperCase();
+        
+        try {
+            globalShortcut.register(currentPttKey, () => {
+                if (globalPTTActive) return; // Kein Dauerfeuer
+                globalPTTActive = true;
+                console.log('[PTT] Start — Global Shortcut');
+
+                if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                    robloxOverlayWin.webContents.send('overlay-ptt-start');
+                }
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('overlay-ptt-start');
+                }
+            });
+            console.log('[PTT] Global Shortcut registriert auf:', currentPttKey);
+        } catch(e) {
+            console.error('[PTT] Fehler bei Shortcut-Registrierung:', e);
+        }
+    }
+
+    // Default registrieren
+    registerPTT('V');
+
+    // Dynamisch updaten, wenn Client es ändert
+    ipcMain.on('set-ptt-key', (e, newKey) => {
+        registerPTT(newKey);
+    });
+
+    // PTT LOSLASSEN — Leider kann globalShortcut kein keyup, deshalb nutzen wir
+    // einen Fallback: Nach 3s automatisch stoppen wenn kein Re-Fire kommt
+    // Der Overlay sendet 'ptt-keepalive' während gedrückt, Main resetzt den Timer
+    let pttReleaseTimer = null;
+    ipcMain.on('ptt-keepalive', () => {
+        clearTimeout(pttReleaseTimer);
+        pttReleaseTimer = setTimeout(() => {
+            if (globalPTTActive) {
+                globalPTTActive = false;
+                if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                    robloxOverlayWin.webContents.send('overlay-ptt-stop');
+                }
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('overlay-ptt-stop');
+                }
+            }
+        }, 200); // 200ms nach letztem keepalive → PTT stopp
+    });
+
+    ipcMain.on('ptt-stop', () => {
+        if (!globalPTTActive) return;
+        globalPTTActive = false;
+        clearTimeout(pttReleaseTimer);
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.webContents.send('overlay-ptt-stop');
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('overlay-ptt-stop');
+        }
+    });
+
+    ipcMain.on('ptt-start', () => {
+        if (globalPTTActive) return;
+        globalPTTActive = true;
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.webContents.send('overlay-ptt-start');
         }
     });
 
