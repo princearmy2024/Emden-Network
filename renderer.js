@@ -13,7 +13,7 @@
 
 'use strict';
 
-window.CURRENT_VERSION = '1.3.0'; // Stand: 28.03.2026 (Pro Radio: Global PTT, Mic-Direct Monitoring)
+window.CURRENT_VERSION = '1.3.1'; // Stand: 28.03.2026 (Pro Radio: Global PTT, Mic-Direct Monitoring)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1892,8 +1892,11 @@ Object.assign(App, {
         // --- GLOBAL HOTKEY IPC LISTENER ---
         if (window.electronAPI && window.electronAPI.onGlobalPTT) {
             window.electronAPI.onGlobalPTT((active) => {
-                if (active) this.startPTT();
-                else this.stopPTT();
+                if (active) {
+                    // Da globalShortcut nur KeyDown feuert, nutzen wir es als Toggle
+                    if (this.isSpeaking) this.stopPTT();
+                    else this.startPTT();
+                }
             });
         }
     },

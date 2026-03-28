@@ -182,22 +182,18 @@ ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
     // Professionelles Embed-Design (kein Emoji-Spam, Fokus auf Premium Look)
     const data = JSON.stringify({
         embeds: [{
-            title: `🚀 Update: ${version}`,
-            description: `Es wurde eine neue Benachrichtigung aus dem **Emden Network Control Center** gesendet.`,
+            title: `Dashboard Update: ${version}`,
+            description: `Eine neue Benachrichtigung aus dem **Emden Network Control Center**.`,
             color: 0x00D1A7, // Emden Teal
             fields: [
                 {
-                    name: "📋 WAS WURDE GEÄNDERT?",
+                    name: "Änderungen",
                     value: notes || "System-Optimierungen und Stabilitätsverbesserungen.",
                     inline: false
                 }
             ],
-            thumbnail: {
-                url: 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'
-            },
             footer: {
-                text: "Emden Network — Automated Update Service",
-                icon_url: 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'
+                text: "Emden Network — Automated Update Service"
             },
             timestamp: new Date().toISOString()
         }],
@@ -207,7 +203,7 @@ ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
                 components: [
                     {
                         type: 2,
-                        label: "Dashboard herunterladen",
+                        label: "Download (exe)",
                         style: 5,
                         url: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe`
                     }

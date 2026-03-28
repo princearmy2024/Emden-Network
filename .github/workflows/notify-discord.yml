@@ -36,35 +36,37 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Send Premium Discord Notification
+      - name: Send Professional Discord Notification
         if: success()
         shell: bash
         run: |
-          # Wir erstellen eine JSON-Datei für den Premium-Embed
           CHANGELOG=$(git log -1 --pretty=format:"%s")
           if [ -z "$CHANGELOG" ]; then CHANGELOG="Wartungsarbeiten und Systemstabilität."; fi
-          LOG_ICON="https://cdn.discordapp.com/icons/1214227914041303100/a_66f07ead24647306236b3d16962f9011.gif"
           
           cat <<EOF > discord_msg.json
           {
-            "username": "Emden Network Updates 📻",
-            "avatar_url": "${LOG_ICON}",
             "embeds": [{
-              "title": "💎 Emden Network | Control Center — ${GITHUB_REF_NAME}",
-              "description": "Das Dashboard wurde erfolgreich auf die neueste Version aktualisiert! ✨\n\n> **Status**: Alle Systeme stabil. ✅",
+              "title": "Control Center Update — ${GITHUB_REF_NAME}",
+              "description": "Das Dashboard wurde erfolgreich auf die neueste Version aktualisiert.",
               "color": 53671,
-              "thumbnail": { "url": "${LOG_ICON}" },
               "fields": [
-                { "name": "📦 Version", "value": "`${GITHUB_REF_NAME}`", "inline": true },
-                { "name": "⚙️ Release", "value": "🚀 Stabil", "inline": true },
-                { "name": "🧬 Repository", "value": "Emden-Network (GitHub)", "inline": true },
-                { "name": "🛠️ Änderungen", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
+                { "name": "Version", "value": "`${GITHUB_REF_NAME}`", "inline": true },
+                { "name": "Status", "value": "Stabil", "inline": true },
+                { "name": "Changelog", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
               ],
               "footer": {
-                "text": "Emden Network 🧬 | $(date +'%d.%m.%Y')",
-                "icon_url": "${LOG_ICON}"
+                "text": "Emden Network | $(date +'%d.%m.%Y')"
               },
               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }],
+            "components": [{
+              "type": 1,
+              "components": [{
+                "type": 2,
+                "label": "Direkt-Download",
+                "style": 5,
+                "url": "https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe"
+              }]
             }]
           }
           EOF
