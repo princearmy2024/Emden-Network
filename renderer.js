@@ -1,6 +1,6 @@
 'use strict';
 
-window.CURRENT_VERSION = '1.5.0';
+window.CURRENT_VERSION = '1.5.1';
 
 const CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
@@ -149,7 +149,7 @@ const App = {
     isMonitoring: false,
 
     async init() {
-        console.log('[App] Starte v1.5.0...');
+        console.log('[App] Starte v1.5.1...');
         this.initBackgroundParallax();
         this.startClock();
         this.initPTTHandlers();
@@ -172,6 +172,13 @@ const App = {
                 NotificationService.show('Update bereit!', 'Bitte neu starten.', 'success');
             });
         }
+
+        // FIX: Saved Settings laden
+        const savedAccent = localStorage.getItem('accent_color');
+        if (savedAccent) this.setAccent(savedAccent);
+
+        const savedAnimations = localStorage.getItem('setting_animations');
+        if (savedAnimations === 'false') document.body.classList.add('no-animations');
     },
 
     initLoginHandlers() {
@@ -270,6 +277,82 @@ const App = {
     showUpdateDialog() {
         const banner = document.getElementById('updateBanner');
         if (banner) banner.classList.remove('hidden');
+    },
+
+    // FIX: App.setAccent — wird in index.html bei Farbauswahl aufgerufen
+    setAccent(color) {
+        const colors = {
+            blue:  { primary: '#0066CC', gradient: 'linear-gradient(135deg, #0066CC, #003D7A)' },
+            cyan:  { primary: '#00d4ff', gradient: 'linear-gradient(135deg, #00d4ff, #7b2fff)' },
+            green: { primary: '#56ab2f', gradient: 'linear-gradient(135deg, #56ab2f, #a8e063)' },
+            pink:  { primary: '#f857a6', gradient: 'linear-gradient(135deg, #f857a6, #ff5858)' },
+        };
+        const c = colors[color] || colors.blue;
+        document.documentElement.style.setProperty('--brand-blue', c.primary);
+        document.documentElement.style.setProperty('--brand-gradient', c.gradient);
+        localStorage.setItem('accent_color', color);
+        // Aktiven Button markieren
+        document.querySelectorAll('.accent-opt').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.accent-opt[onclick*="${color}"]`)?.classList.add('active');
+    },
+
+    // FIX: App.toggleSetting — wird bei Animations/Sound/Notification Toggles aufgerufen
+    toggleSetting(key, value) {
+        localStorage.setItem('setting_' + key, value);
+        if (key === 'animations') {
+            document.body.classList.toggle('no-animations', !value);
+        }
+        if (key === 'sound') {
+            App.soundEnabled = value;
+        }
+    },
+
+    // FIX: App.robloxBack — Zurück-Button im Roblox Verify Flow
+    robloxBack() {
+        this.showScreenPart('rblxStep1', true);
+        this.showScreenPart('rblxStep2', false);
+    },
+
+    // FIX: App.cancelRobloxVerify — Abbrechen-Button im Roblox Verify Flow
+    cancelRobloxVerify() {
+        this.showScreenPart('rblxStateVerifying', false);
+        this.showScreenPart('rblxStateDisconnected', true);
+    },
+
+    // FIX: App.sendAdminWebhook — Admin Panel Webhook senden
+    sendAdminWebhook() {
+        const title = document.getElementById('webhookTitle')?.value?.trim();
+        const message = document.getElementById('webhookMessage')?.value?.trim();
+        if (!title || !message) {
+            NotificationService.show('Fehler', 'Titel und Nachricht ausfüllen!', 'error');
+            return;
+        }
+        const user = AuthService.getUser();
+        ApiService.post('/api/admin/announcement', {
+            title,
+            content: message,
+            author: user?.username
+        }).then(res => {
+            if (res?.success) {
+                NotificationService.show('Gesendet', 'Ankündigung wurde veröffentlicht!', 'success');
+                document.getElementById('webhookTitle').value = '';
+                document.getElementById('webhookMessage').value = '';
+            } else {
+                NotificationService.show('Fehler', res?.error || 'Senden fehlgeschlagen', 'error');
+            }
+        });
+    },
+
+    // FIX: App.closeModal — Modal schließen Button
+    closeModal() {
+        const modal = document.getElementById('modalOverlay');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    // FIX: App.loadLiveNews — News-Cache leeren Button im Settings
+    loadLiveNews() {
+        this.loadAnnouncements();
+        NotificationService.show('Cache geleert', 'News werden neu geladen.', 'info');
     },
 
     // --- RENDERERS ---
@@ -618,8 +701,10 @@ const App = {
         const container = document.getElementById('announcementList');
         if (!container) return;
         try {
-            // FIX: Nutze CONFIG.API_URL statt veralteter Subdomain
-            const res = await fetch(`${CONFIG.API_URL}/api/announcements`);
+            // FIX: Nutze CONFIG.API_URL & Header
+            const res = await fetch(`${CONFIG.API_URL}/api/announcements`, {
+                headers: { 'x-api-key': CONFIG.API_KEY }
+            });
             const data = await res.json();
             if (!data.announcements?.length) {
                 container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">Keine Ankündigungen.</div>';
