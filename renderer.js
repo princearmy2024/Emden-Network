@@ -2,12 +2,12 @@
  * EMDEN NETWORK DASHBOARD - renderer.js
  * Frontend-Logik (Renderer-Prozess)
  * 
- * Version: 1.3.7 (Discord System & UI Restoration)
+ * Version: 1.3.8 (Stabilitäts- & Funktions-Update)
  */
 
 'use strict';
 
-window.CURRENT_VERSION = '1.3.7';
+window.CURRENT_VERSION = '1.3.8';
 
 const CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
@@ -57,9 +57,19 @@ const ApiService = {
     async get(endpoint) {
         try {
             const res = await fetch(`${CONFIG.API_URL}${endpoint}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
-            return res.json();
+            return await res.json();
         } catch (e) { return null; }
     },
+    async post(endpoint, body) {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify(body)
+            });
+            return await res.json();
+        } catch (e) { return null; }
+    }
 };
 
 const WebSocketService = {
@@ -83,10 +93,18 @@ const WebSocketService = {
 
         this.socket.on('voice_audio_relay', (data) => {
             const user = AuthService.getUser();
-            if (data.user?.discordId !== (user?.id || user?.discordId)) {
+            const myId = user?.id || user?.discordId;
+            if (data.user?.discordId !== myId) {
                 VoiceEngine.playIncoming(data.user?.discordId, data.audioBlob);
             }
         });
+
+        // Roblox Integration Real-time
+        const myId = AuthService.getUser()?.discordId;
+        if (myId) {
+            this.socket.on(`roblox_connected_${myId}`, (profile) => App.finishRobloxVerify(profile));
+            this.socket.on(`roblox_error_${myId}`, (err) => NotificationService.show('Roblox Fehler', err.error || 'Verbindung fehlgeschlagen', 'error'));
+        }
     }
 };
 
@@ -98,7 +116,7 @@ const NotificationService = {
         toast.className = `toast ${type}`;
         toast.innerHTML = `<div><strong>${escHtml(title)}</strong><br>${escHtml(message)}</div>`;
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 4500);
+        setTimeout(() => toast.remove(), 5000);
         if (window.electronAPI?.sendOverlayNotification) window.electronAPI.sendOverlayNotification({ title, message, type });
     }
 };
@@ -109,14 +127,11 @@ const MockData = {
         { id: 2, name: 'Backup Node', status: 'online', ip: '91.98.124.213' }
     ],
     channels: [{ id: 1, name: 'general' }, { id: 2, name: 'support' }],
-    voiceChannels: [
-        { id: 'vc-1', name: 'general', members: [], active: true },
-        { id: 'vc-2', name: 'ops-room', members: [], active: false }
-    ]
+    voiceChannels: []
 };
 
 // =============================================================
-// APP LOGIC
+// MAIN APP OBJECT
 // =============================================================
 
 const App = {
@@ -124,12 +139,17 @@ const App = {
     currentChat: 'general',
     isSpeaking: false,
     pttKey: localStorage.getItem('ptt_key') || 'v',
+    pttVolume: parseFloat(localStorage.getItem('ptt_volume') || '0.5'),
+    pttSoundUrl: localStorage.getItem('ptt_sound_url') || '',
+    selectedMicId: localStorage.getItem('selected_mic') || 'default',
+    isMonitoring: false,
 
     async init() {
-        console.log('[App] Initialisiere v1.3.7...');
+        console.log('[App] Starte v1.3.8...');
         this.initBackgroundParallax();
         this.startClock();
         this.initPTTHandlers();
+        this.initSettingsUI();
         
         if (AuthService.loadSession() && AuthService.isLoggedIn()) {
             this.showDashboard(AuthService.getUser());
@@ -146,9 +166,13 @@ const App = {
 
         if (btnVerify && verifyInput) {
             btnVerify.onclick = async () => {
+                btnVerify.disabled = true;
                 const res = await AuthService.verify(verifyInput.value);
                 if (res.success) this.showDashboard(res.user);
-                else NotificationService.show('Fehler', res.error, 'error');
+                else {
+                    NotificationService.show('Verifizierung fehlgeschlagen', res.error, 'error');
+                    btnVerify.disabled = false;
+                }
             };
         }
         if (btnDiscord) {
@@ -160,8 +184,6 @@ const App = {
         this.applyUser(user);
         this.renderChannels();
         this.renderServers();
-        this.renderVoiceChannels();
-        this.renderActiveVoiceCard();
         this.showScreen('dashboardScreen');
         this.navigate('overview');
         WebSocketService.connect();
@@ -172,16 +194,18 @@ const App = {
 
     applyUser(user) {
         if (!user) return;
-        document.querySelectorAll('.username-field, #overviewUsername').forEach(el => el.textContent = user.username);
+        document.querySelectorAll('.username-field, #overviewUsername, #settingsUsername').forEach(el => el.textContent = user.username);
         const img = user.avatar ? `<img src="${user.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : user.username[0].toUpperCase();
-        document.querySelectorAll('.avatar-field, #sidebarAvatar, #topbarAvatar').forEach(el => el.innerHTML = img);
+        document.querySelectorAll('.avatar-field, #sidebarAvatar, #topbarAvatar, #settingsAvatar').forEach(el => el.innerHTML = img);
+        document.querySelectorAll('#settingsRole').forEach(el => el.textContent = user.role === 'admin' ? 'Administrator' : 'Benutzer');
         if (user.role === 'admin') document.querySelectorAll('.admin-only, #adminBadge').forEach(el => el.classList.remove('hidden'));
     },
 
     navigate(view) {
         this.currentView = view;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById('view-' + view)?.classList.add('active');
+        const target = document.getElementById('view-' + view);
+        if (target) target.classList.add('active');
         document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
         const breadcrumb = document.getElementById('topbarBreadcrumb');
         if (breadcrumb) breadcrumb.textContent = view.charAt(0).toUpperCase() + view.slice(1);
@@ -189,7 +213,8 @@ const App = {
 
     showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById(id)?.classList.add('active');
+        const target = document.getElementById(id);
+        if (target) target.classList.add('active');
     },
 
     // --- RENDERERS ---
@@ -213,7 +238,7 @@ const App = {
                     <div class="vc-name">#${vc.name}</div>
                 </div>
                 <div class="vc-members">
-                    ${vc.members.map(m => `<div class="vc-member-avatar" title="${m.username}">${m.username[0]}</div>`).join('')}
+                    ${vc.members.map(m => `<div class="vc-member-avatar" title="${m.username}" style="background:var(--brand-blue)">${m.username[0]}</div>`).join('')}
                 </div>
             </div>
         `).join('');
@@ -221,16 +246,16 @@ const App = {
 
     renderOnlineUsers(users) {
         const el = document.getElementById('chatOnlineUsersList');
-        const badge = document.getElementById('chatOnlineCountBadge');
         if (!el) return;
+        const badge = document.getElementById('chatOnlineCountBadge');
         if (badge) badge.textContent = users.length;
         el.innerHTML = users.map(u => `
-            <div class="online-user-item" style="display:flex; align-items:center; gap:10px; padding:6px; border-radius:8px; cursor:pointer;">
-                <div style="width:32px; height:32px; border-radius:50%; background:var(--brand-blue); overflow:hidden;">
-                    ${u.avatar ? `<img src="${u.avatar}" style="width:100%; height:100%; object-fit:cover;">` : u.username[0]}
+            <div class="online-user-item">
+                <div class="user-avatar-small" style="background:#2b2d31;">
+                    ${u.avatar ? `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover;">` : u.username[0]}
                 </div>
-                <div style="font-size:13px; font-weight:500;">${u.username}</div>
-                <div style="width:8px; height:8px; border-radius:50%; background:var(--status-online); margin-left:auto;"></div>
+                <span>${u.username}</span>
+                <div class="status-dot online"></div>
             </div>
         `).join('');
     },
@@ -240,12 +265,24 @@ const App = {
         const vc = MockData.voiceChannels.find(v => v.active);
         if (!el) return;
         if (!vc) { el.innerHTML = ''; return; }
+        
         el.innerHTML = `
             <div class="active-voice-card">
-                <div class="avc-head"><span>#${vc.name}</span> <button onclick="App.leaveVoiceChannel()">X</button></div>
+                <div class="avc-head">
+                    <span>${vc.name}</span>
+                    <button class="avc-leave" onclick="App.leaveVoiceChannel()">✕</button>
+                </div>
                 <div class="avc-participants">
-                    <div class="avc-p-item ${this.isSpeaking ? 'speaking' : ''}"><span>Du</span></div>
-                    ${vc.members.map(m => `<div class="avc-p-item ${m.isSpeaking ? 'speaking' : ''}">${m.username}</div>`).join('')}
+                    <div class="avc-p-item ${this.isSpeaking ? 'speaking' : ''}">
+                        <div class="p-avatar">Du</div>
+                        <span class="p-name">Du</span>
+                    </div>
+                    ${vc.members.filter(m => m.discordId !== (AuthService.getUser()?.id || AuthService.getUser()?.discordId)).map(m => `
+                        <div class="avc-p-item ${m.isSpeaking ? 'speaking' : ''}">
+                            <div class="p-avatar" style="background:var(--brand-blue)">${m.username[0]}</div>
+                            <span class="p-name">${m.username}</span>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
         `;
@@ -255,12 +292,14 @@ const App = {
     sendMessage() {
         const input = document.getElementById('chatInput');
         if (!input?.value.trim()) return;
+        const user = AuthService.getUser();
         const msg = {
-            username: AuthService.getUser()?.username,
-            avatar: AuthService.getUser()?.avatar,
+            username: user?.username,
+            avatar: user?.avatar,
             text: input.value.trim(),
-            userId: AuthService.getUser()?.id || AuthService.getUser()?.discordId,
-            to: this.currentChat
+            userId: user?.id || user?.discordId,
+            to: this.currentChat,
+            timestamp: Date.now()
         };
         this.appendChatMessage(msg);
         WebSocketService.socket?.emit('send_message', msg);
@@ -270,12 +309,14 @@ const App = {
     appendChatMessage(msg) {
         const container = document.getElementById('chatMessages');
         if (!container) return;
-        const isOwn = msg.userId === (AuthService.getUser()?.id || AuthService.getUser()?.discordId);
+        const user = AuthService.getUser();
+        const isOwn = msg.userId === (user?.id || user?.discordId);
+        const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}">
-                <div class="msg-avatar">${msg.avatar ? `<img src="${msg.avatar}" style="width:100%; height:100%; border-radius:50%;">` : (msg.username || 'U')[0]}</div>
+                <div class="msg-avatar">${msg.avatar ? `<img src="${msg.avatar}" style="width:100%;height:100%;border-radius:50%;">` : (msg.username || 'U')[0]}</div>
                 <div class="msg-body">
-                    <div class="msg-meta"><span class="msg-user">${escHtml(msg.username)}</span></div>
+                    <div class="msg-meta"><span class="msg-user">${escHtml(msg.username)}</span><span class="msg-time">${time}</span></div>
                     <div class="msg-text">${escHtml(msg.text)}</div>
                 </div>
             </div>
@@ -284,43 +325,70 @@ const App = {
         container.scrollTop = container.scrollHeight;
     },
 
-    // --- VOICE ---
+    // --- VOICE / PTT ---
     initPTTHandlers() {
         document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
+            if (e.key.toLowerCase() === this.pttKey.toLowerCase() && !this.isSpeaking) {
                 if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+                e.preventDefault();
                 this.startPTT();
             }
         });
         document.addEventListener('keyup', (e) => {
-            if (e.key.toLowerCase() === this.pttKey) this.stopPTT();
+            if (e.key.toLowerCase() === this.pttKey.toLowerCase()) {
+                this.stopPTT();
+            }
         });
     },
 
     startPTT() {
         const vc = MockData.voiceChannels.find(v => v.active);
         if (!vc || this.isSpeaking) return;
+        
         this.isSpeaking = true;
         this.renderActiveVoiceCard();
+        
+        // Funk Sound
+        if (this.pttSoundUrl) {
+            const audio = new Audio(this.pttSoundUrl);
+            audio.volume = this.pttVolume;
+            audio.play().catch(() => {});
+        }
+
         WebSocketService.socket?.emit('voice_speaking_state', { channelId: vc.id, isSpeaking: true });
-        VoiceEngine.startCapture(vc.id);
+        VoiceEngine.startCapture(vc.id, this.selectedMicId);
+        
+        // UI Updates
         const btn = document.getElementById('pttBtn');
         if (btn) btn.classList.add('active');
         const st = document.getElementById('pttStatus');
         if (st) st.textContent = '🔊 SENDEN...';
+        
+        // Overlay Update
+        if (window.electronAPI?.updateOverlayState) {
+            window.electronAPI.updateOverlayState({ type: 'voice_ptt', active: true, user: AuthService.getUser()?.username, channel: vc.name });
+        }
     },
 
     stopPTT() {
         if (!this.isSpeaking) return;
         this.isSpeaking = false;
         this.renderActiveVoiceCard();
+        
         const vc = MockData.voiceChannels.find(v => v.active);
         WebSocketService.socket?.emit('voice_speaking_state', { channelId: vc?.id, isSpeaking: false });
         VoiceEngine.stopCapture();
+
+        // UI Updates
         const btn = document.getElementById('pttBtn');
         if (btn) btn.classList.remove('active');
         const st = document.getElementById('pttStatus');
         if (st && vc) st.textContent = 'Frequenz: #' + vc.name;
+
+        // Overlay Update
+        if (window.electronAPI?.updateOverlayState) {
+            window.electronAPI.updateOverlayState({ type: 'voice_ptt', active: false });
+        }
     },
 
     selectVoiceChannel(id) {
@@ -328,6 +396,9 @@ const App = {
         this.renderVoiceChannels();
         this.renderActiveVoiceCard();
         WebSocketService.socket?.emit('voice_channel_join', { channelId: id, user: AuthService.getUser() });
+        const st = document.getElementById('pttStatus');
+        const name = MockData.voiceChannels.find(v => v.active)?.name;
+        if (st) st.textContent = 'Frequenz: #' + name;
     },
 
     leaveVoiceChannel() {
@@ -337,10 +408,132 @@ const App = {
             WebSocketService.socket?.emit('voice_channel_leave', { channelId: vc.id });
             this.renderVoiceChannels();
             this.renderActiveVoiceCard();
+            const st = document.getElementById('pttStatus');
+            if (st) st.textContent = 'Nicht verbunden';
         }
     },
 
-    // --- DATA & STATS ---
+    // --- SETTINGS ---
+    async initSettingsUI() {
+        // Mic Liste
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const mics = devices.filter(d => d.kind === 'audioinput');
+            const select = document.getElementById('micSelect');
+            if (select) {
+                select.innerHTML = mics.map(m => `<option value="${m.deviceId}" ${m.deviceId === this.selectedMicId ? 'selected' : ''}>${m.label || 'Mikrofon'}</option>`).join('');
+            }
+        } catch (e) {}
+
+        // Inputs füllen
+        const pttIn = document.getElementById('pttKeyInput');
+        if (pttIn) pttIn.value = this.pttKey.toUpperCase();
+        
+        const volSl = document.querySelector('.volume-slider');
+        if (volSl) volSl.value = this.pttVolume;
+
+        const sndIn = document.getElementById('pttSoundInput');
+        if (sndIn) sndIn.value = this.pttSoundUrl;
+    },
+
+    setMic(id) { this.selectedMicId = id; localStorage.setItem('selected_mic', id); },
+    setVolume(v) { this.pttVolume = parseFloat(v); localStorage.setItem('ptt_volume', v); },
+    setPTTKey(k) { if (k) { this.pttKey = k.toLowerCase(); localStorage.setItem('ptt_key', k.toLowerCase()); } },
+    setPTTSound(url) { this.pttSoundUrl = url; localStorage.setItem('ptt_sound_url', url); },
+    
+    toggleMonitoring() {
+        this.isMonitoring = !this.isMonitoring;
+        const btn = document.getElementById('btnMonitor');
+        if (btn) btn.innerHTML = `<span>🎧 Abhören: ${this.isMonitoring ? 'AN' : 'AUS'}</span>`;
+        if (btn) btn.classList.toggle('active', this.isMonitoring);
+        VoiceEngine.setMonitoring(this.isMonitoring);
+    },
+
+    // --- ROBLOX CONNECT ---
+    async startRobloxVerify() {
+        this.showScreenPart('rblxStateDisconnected', false);
+        this.showScreenPart('rblxStateVerifying', true);
+        this.showScreenPart('rblxStep1', true);
+        this.showScreenPart('rblxStep2', false);
+    },
+
+    async robloxStep1() {
+        const input = document.getElementById('rblxUsernameInput');
+        if (!input?.value) return;
+        const res = await ApiService.post('/api/roblox/start-verify', { discordId: AuthService.getUser().discordId, robloxUsername: input.value });
+        if (res && res.success) {
+            document.getElementById('rblxCodeBox').textContent = res.code;
+            this.showScreenPart('rblxStep1', false);
+            this.showScreenPart('rblxStep2', true);
+        } else {
+            NotificationService.show('Fehler', res?.error || 'Account konnte nicht gefunden werden', 'error');
+        }
+    },
+
+    async robloxStep2() {
+        const btn = document.getElementById('rblxConfirmBtn');
+        const txt = document.getElementById('rblxConfirmText');
+        if (btn) btn.disabled = true;
+        if (txt) txt.textContent = 'Prüfe...';
+        
+        const res = await ApiService.post('/api/roblox/confirm-verify', { discordId: AuthService.getUser().discordId });
+        // Falls Callback via Socket kommt, passiert das automatisch. 
+        // Falls API direkt antwortet:
+        if (res && res.success && res.profile) {
+            this.finishRobloxVerify(res.profile);
+        } else {
+            NotificationService.show('Nicht gefunden', 'Code wurde in der Bio nicht gefunden. Bitte warte ggf. 1-2 Minuten.', 'warn');
+            if (btn) btn.disabled = false;
+            if (txt) txt.textContent = 'Verifizieren';
+        }
+    },
+
+    finishRobloxVerify(profile) {
+        localStorage.setItem('rblx_profile', JSON.stringify(profile));
+        this.loadRobloxState();
+        NotificationService.show('Erfolg', 'Roblox Account erfolgreich verknüpft!', 'success');
+    },
+
+    disconnectRoblox() {
+        localStorage.removeItem('rblx_profile');
+        this.loadRobloxState();
+        NotificationService.show('Verbindung getrennt', 'Roblox Account entkoppelt.', 'info');
+    },
+
+    loadRobloxState() {
+        const profile = JSON.parse(localStorage.getItem('rblx_profile'));
+        if (profile) {
+            this.showScreenPart('rblxStateDisconnected', false);
+            this.showScreenPart('rblxStateVerifying', false);
+            this.showScreenPart('rblxStateConnected', true);
+            
+            document.getElementById('rblxDisplayName').textContent = profile.displayName;
+            document.getElementById('rblxUsername').textContent = '@' + profile.username;
+            document.getElementById('rblxUserId').textContent = profile.userId;
+            document.getElementById('rblxCreated').textContent = profile.created ? new Date(profile.created).toLocaleDateString('de-DE') : '—';
+            document.getElementById('rblxConnectedAt').textContent = new Date().toLocaleDateString('de-DE');
+            
+            const avatar = document.getElementById('rblxAvatar');
+            if (avatar) avatar.src = profile.avatar || '';
+            
+            if (window.electronAPI?.showRobloxOverlay) {
+                window.electronAPI.showRobloxOverlay(AuthService.getUser().discordId, profile.userId, AuthService.getUser().role === 'admin');
+            }
+        } else {
+            this.showScreenPart('rblxStateDisconnected', true);
+            this.showScreenPart('rblxStateVerifying', false);
+            this.showScreenPart('rblxStateConnected', false);
+        }
+    },
+
+    showScreenPart(id, show) {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', !show);
+        if (el && show && (id === 'rblxStep1' || id === 'rblxStep2')) el.style.display = 'block';
+        else if (el && !show && (id === 'rblxStep1' || id === 'rblxStep2')) el.style.display = 'none';
+    },
+
+    // --- DATA MONITORing ---
     async startStatsMonitor() {
         const update = async () => {
             const data = await ApiService.get('/api/status');
@@ -349,11 +542,16 @@ const App = {
                 document.querySelectorAll('#liveOnline').forEach(el => el.textContent = data.onlineMembers || '0');
                 document.querySelectorAll('#statDashboardUsers').forEach(el => el.textContent = data.dashboardOnline || '0');
                 const conn = document.getElementById('statDiscordConnected');
-                if (conn) conn.textContent = data.online ? 'Verbunden' : 'Gestreift';
+                if (conn) conn.textContent = data.online ? 'Verbunden' : 'Offline';
+                const dls = document.getElementById('discordLinkStatus');
+                if (dls) {
+                    dls.textContent = data.online ? 'Verbunden' : 'Getrennt';
+                    dls.classList.toggle('online', data.online);
+                }
             }
         };
         update();
-        setInterval(update, 30000);
+        setInterval(update, 20000);
     },
 
     async loadLiveNews() {
@@ -363,20 +561,7 @@ const App = {
             const res = await fetch('https://enrp.princearmy.de/announcements.json');
             const data = await res.json();
             container.innerHTML = (data.announcements || []).map(n => `<div class="news-card"><strong>${n.title}</strong><p>${n.content}</p></div>`).join('');
-        } catch (e) { container.innerHTML = '<div class="news-card">Keine Neuigkeiten verfügbar.</div>'; }
-    },
-
-    loadRobloxState() {
-        const profile = JSON.parse(localStorage.getItem('rblx_profile'));
-        if (profile && window.electronAPI?.showRobloxOverlay) {
-            window.electronAPI.showRobloxOverlay(AuthService.getUser().discordId, profile.userId, AuthService.getUser().role === 'admin');
-        }
-    },
-
-    renderServers() {
-        const grid = document.getElementById('serverGrid');
-        if (!grid) return;
-        grid.innerHTML = MockData.servers.map(s => `<div class="server-card online"><strong>${s.name}</strong><br>${s.ip}</div>`).join('');
+        } catch (e) { container.innerHTML = '<div class="news-card">Keine News verfügbar.</div>'; }
     },
 
     startClock() {
@@ -398,7 +583,18 @@ const App = {
     },
 
     showNotification(t, m, ty) { NotificationService.show(t, m, ty); },
-    logout() { AuthService.logout(); location.reload(); }
+    logout() { AuthService.logout(); location.reload(); },
+    openRobloxProfile(e) {
+        e.preventDefault();
+        const profile = JSON.parse(localStorage.getItem('rblx_profile'));
+        if (profile) window.open(`https://www.roblox.com/users/${profile.userId}/profile`, '_blank');
+    },
+    testRobloxOverlay() {
+        const profile = JSON.parse(localStorage.getItem('rblx_profile'));
+        if (profile && window.electronAPI?.showRobloxOverlay) {
+            window.electronAPI.showRobloxOverlay(AuthService.getUser().discordId, profile.userId, true);
+        }
+    }
 };
 
 // =============================================================
@@ -408,9 +604,14 @@ const App = {
 const VoiceEngine = {
     mediaRecorder: null,
     stream: null,
-    async startCapture(channelId) {
+    monitorNode: null,
+    audioCtx: null,
+
+    async startCapture(channelId, deviceId) {
         try {
-            if (!this.stream) this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+            if (!this.stream) {
+                this.stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: true, noiseSuppression: true } });
+            }
             this.mediaRecorder = new MediaRecorder(this.stream, { mimeType: 'audio/webm' });
             this.mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) WebSocketService.socket?.emit('voice_audio_relay', { channelId, audioBlob: e.data, user: AuthService.getUser() });
@@ -419,9 +620,27 @@ const VoiceEngine = {
         } catch (e) { console.error('[VoiceEngine] Capture Error:', e); }
     },
     stopCapture() { if (this.mediaRecorder?.state !== 'inactive') this.mediaRecorder?.stop(); },
+    
     playIncoming(userId, blob) {
         const url = URL.createObjectURL(new Blob([blob], { type: 'audio/webm' }));
-        new Audio(url).play().finally(() => URL.revokeObjectURL(url));
+        const a = new Audio(url);
+        a.volume = App.pttVolume;
+        a.play().finally(() => URL.revokeObjectURL(url));
+    },
+
+    setMonitoring(active) {
+        if (active) {
+            if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (!this.stream) return;
+            const source = this.audioCtx.createMediaStreamSource(this.stream);
+            this.monitorNode = this.audioCtx.createGain();
+            this.monitorNode.gain.value = 0.5;
+            source.connect(this.monitorNode);
+            this.monitorNode.connect(this.audioCtx.destination);
+        } else {
+            this.monitorNode?.disconnect();
+            this.monitorNode = null;
+        }
     }
 };
 
