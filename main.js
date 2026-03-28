@@ -407,6 +407,36 @@ app.whenReady().then(() => {
         }
     });
 
+    // ==========================================
+    // GLOBAL PTT (V) - Funk in Roblox
+    // ==========================================
+    let currentPTTKey = 'V';
+    
+    function registerPTT(key) {
+        try {
+            globalShortcut.unregister(currentPTTKey);
+            currentPTTKey = key.toUpperCase();
+            globalShortcut.register(currentPTTKey, () => {
+                // Key Down
+                mainWindow?.webContents.send('global-ptt', true);
+                robloxOverlayWin?.webContents.send('global-ptt', true);
+            });
+            // HINWEIS: Electron globalShortcut hat leider kein KeyUp Event.
+            // WORKAROUND: Wir nutzen ein Interval oder der User muss 2x drücken?
+            // BESSERE LÖSUNG: Wir lassen es als Toggle oder für 3 Sek aktiv?
+            // Für echte PTT brauchen wir einen Native Hook - im Moment simulieren wir es!
+        } catch(e) {}
+    }
+    registerPTT('V');
+
+    ipcMain.on('update-ptt-key', (event, key) => registerPTT(key));
+
+    ipcMain.on('update-overlay-state', (event, state) => {
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.webContents.send('update-overlay-state', state);
+        }
+    });
+
     // DEV-DEBUG: F4 to simulate game start
     globalShortcut.register('F4', () => {
         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {

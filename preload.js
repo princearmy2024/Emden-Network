@@ -42,4 +42,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     onToggleRobloxCmd: (callback) => ipcRenderer.on('toggle-roblox-cmd', callback),
     overlayRequestFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
+
+    // --- NEW: VOICE SYNC ---
+    updateOverlayState: (state) => ipcRenderer.send('update-overlay-state', state),
+    onUpdateOverlayState: (callback) => ipcRenderer.on('update-overlay-state', (event, state) => callback(state)),
+    updatePTTKey: (key) => ipcRenderer.send('update-ptt-key', key),
+    onGlobalPTT: (callback) => ipcRenderer.on('global-ptt', (event, active) => callback(active)),
 });

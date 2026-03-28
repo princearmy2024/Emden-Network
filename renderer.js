@@ -1827,7 +1827,9 @@ Object.assign(App, {
     selectedMicId: localStorage.getItem('selected_mic') || 'default',
     isMonitoring: false, // Mic abhören
     _staticLoop: null,
-    _micStream: null,
+    _audioCtx: null,
+    _micSource: null,
+    _monitorNode: null,
 
     async initPTTHandlers() {
         // Audio vorbereiten
@@ -1886,6 +1888,14 @@ Object.assign(App, {
         if (vInp) vInp.value = this.pttVolume;
 
         this.refreshMicList();
+
+        // --- GLOBAL HOTKEY IPC LISTENER ---
+        if (window.electronAPI && window.electronAPI.onGlobalPTT) {
+            window.electronAPI.onGlobalPTT((active) => {
+                if (active) this.startPTT();
+                else this.stopPTT();
+            });
+        }
     },
 
     toggleMonitoring() {
@@ -1895,7 +1905,48 @@ Object.assign(App, {
             btn.classList.toggle('active', this.isMonitoring);
             btn.innerHTML = this.isMonitoring ? '<span>🎧 Abhören: AN</span>' : '<span>🎧 Abhören: AUS</span>';
         }
+
+        if (this.isMonitoring) {
+            this.startMonitorStream();
+        } else {
+            this.stopMonitorStream();
+        }
+        
         NotificationService.show('Mic-Monitor', this.isMonitoring ? 'Eigenstimme wird wiedergegeben.' : 'Eigenstimme stummgeschaltet.', 'info');
+    },
+
+    async startMonitorStream() {
+        try {
+            if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { deviceId: this.selectedMicId ? { exact: this.selectedMicId } : undefined } 
+            });
+            
+            this._micSource = this._audioCtx.createMediaStreamSource(stream);
+            this._monitorNode = this._audioCtx.createGain();
+            this._monitorNode.gain.value = this.pttVolume;
+            
+            this._micSource.connect(this._monitorNode);
+            this._monitorNode.connect(this._audioCtx.destination);
+            
+            console.log('[Audio] Monitoring aktiv.');
+        } catch (e) {
+            console.error('[Audio] Monitoring Fehler:', e);
+            NotificationService.show('Audio-Fehler', 'Mikrofon konnte nicht geladen werden.', 'error');
+        }
+    },
+
+    stopMonitorStream() {
+        if (this._monitorNode) {
+            this._monitorNode.disconnect();
+            this._monitorNode = null;
+        }
+        if (this._micSource) {
+            const tracks = this._micSource.mediaStream.getTracks();
+            tracks.forEach(t => t.stop());
+            this._micSource = null;
+        }
+        console.log('[Audio] Monitoring gestoppt.');
     },
 
     async refreshMicList() {
