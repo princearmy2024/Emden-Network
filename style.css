@@ -1248,6 +1248,39 @@ svg { display: block; flex-shrink: 0; }
 .ovn-role-badge.admin { color: var(--brand-blue); border-color: rgba(37,99,235,0.2); background: rgba(37,99,235,0.06); }
 .ovn-role-badge.staff { color: var(--text-sub); }
 
+/* ── USER PREVIEW TOOLTIP ────────────────────────────────── */
+.ovn-node { position: relative; }
+.ovn-preview {
+    position: absolute; left: calc(100% + 12px); top: 50%;
+    transform: translateY(-50%) scale(0.9);
+    width: 200px; padding: 16px;
+    background: rgba(19, 21, 30, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-blue);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 1000;
+    opacity: 0; pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.ovn-node:hover .ovn-preview {
+    opacity: 1; transform: translateY(-50%) scale(1);
+    left: calc(100% + 8px);
+}
+.ovnp-avatar {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--bg-card); border: 2px solid var(--border);
+    object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.ovnp-name { font-size: 14px; font-weight: 700; color: #fff; }
+.ovnp-info { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px; }
+.ovnp-hint {
+    margin-top: 4px; padding: 4px 10px; border-radius: 6px;
+    background: var(--brand-blue); color: #fff;
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+}
+
 /* Panel divider label */
 .ovn-section-label {
     font-size: 9px; font-weight: 700; letter-spacing: 2px;

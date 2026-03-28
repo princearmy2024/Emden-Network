@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.2.0'; // Stand: 28.03.2026 (Sync)
+let CURRENT_VERSION = '1.2.3'; // Stand: 28.03.2026 (Walkie-Talkie & PM Filtering)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -430,6 +430,10 @@ const MockData = {
         { id: 4, name: 'dev-ops', desc: 'Technische Diskussionen', members: 6 },
         { id: 5, name: 'random', desc: 'Smalltalk', members: 21 },
     ],
+    voiceChannels: [
+        { id: 'vc-1', name: 'voice-general', type: 'public', active: true, members: ['Alex', 'Du'] },
+        { id: 'vc-2', name: 'ops-room', type: 'private', active: false, members: [] }
+    ]
 };
 
 // =============================================================
@@ -444,17 +448,19 @@ function escHtml(str) { return String(str).replace(/[&<>"']/g, c => ({ '&': '&am
 const App = {
     currentView: 'overview',
     currentChat: 'general',
+    messages: [], // Zentraler Speicher für Filterung
 
     // --- INIT ---
     async init() {
-        if (window.electronAPI && window.electronAPI.getAppVersion) {
-            try { CURRENT_VERSION = await window.electronAPI.getAppVersion(); } catch (e) { }
-        }
-        console.log(`[App] Initialisiere Dashboard v${CURRENT_VERSION}...`);
+        console.log(`[App] Initialisiere Dashboard v1.2.3...`);
+        
+        // Background Parallax Effekt für den High-End Look
+        this.initBackgroundParallax();
+        
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v${CURRENT_VERSION}`;
+            if (splashVer) splashVer.textContent = `Control Center v1.2.3`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -573,6 +579,8 @@ const App = {
         this.applyUser(user);
         this.renderChannels();
         this.renderServers();
+        this.renderVoiceChannels();
+        this.selectVoiceChannel('vc-1'); // Standard auf General setzen
         this.showScreen('dashboardScreen');
         this.navigate('overview');
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
@@ -739,9 +747,17 @@ const App = {
                 <div class="ovn-info">
                     <div class="ovn-dot ${isOnline ? 'online' : ''}" style="background: ${isOnline ? 'var(--status-online)' : '#666'}"></div>
                     ${avatarEl(u)}
-                    <span class="ovn-name">${escHtml(u.username)} ${isOnline ? '' : '<small style="font-size:9px; opacity:0.5;">(Offline)</small>'}</span>
+                    <span class="ovn-name">${escHtml(u.username)} ${isOnline ? '' : '<small style="font-size:9px; opacity:0.5;">(Off)</small>'}</span>
                 </div>
                 ${badgeEl(u)}
+                
+                <!-- Profi-Preview Tooltip -->
+                <div class="ovn-preview">
+                    <img src="${u.avatar || u.PFB || 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'}" class="ovnp-avatar">
+                    <div class="ovnp-name">${escHtml(u.username)}</div>
+                    <div class="ovnp-info">${u.role ? u.role.toUpperCase() : 'USER'} · ${isOnline ? 'LIVE' : 'OFFLINE'}</div>
+                    <div class="ovnp-hint">Privat schreiben 🖱️</div>
+                </div>
             </div>`;
             }).join('');
 
@@ -826,44 +842,76 @@ const App = {
             }
         });
         
-        // Chat-Verlauf könnte hier je nach "name" gefiltert werden
-        // (Für Demo lassen wir den globalen Verlauf oder filtern lokal)
+        // Sound-Feedback (Walkie-Talkie Vibe)
+        this.playBlip(700, 0.05);
+
+        // Chat-Verlauf neu rendern
+        this.renderCurrentChat();
     },
 
-    sendMessage() {
-        const input = document.getElementById('chatInput');
-        const text = input.value.trim();
-        if (!text) return;
-        input.value = '';
-
+    renderCurrentChat() {
+        const msgs = document.getElementById('chatMessages');
+        if (!msgs) return;
+        msgs.innerHTML = '';
+        
         const user = AuthService.getUser();
-        const msgData = {
-            id: Date.now() + Math.random().toString(36).substr(2, 5),
-            text,
-            userId: user.discordId,
-            username: user.username,
-            avatar: user.avatar || user.PFB || user.pfb,
-            to: this.currentChat, // Ziel hinzufügen (@Name oder #Channel)
-            timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-        };
+        const filtered = this.messages.filter(m => {
+            if (this.currentChat.startsWith('@')) {
+                // PN Logik: (An @User und von mir) ODER (An mich und von @User)
+                const targetName = this.currentChat.substring(1);
+                return (m.to === this.currentChat && m.userId === user.discordId) || 
+                       (m.to === '@' + user.username && m.username === targetName);
+            } else {
+                // Global/Channel Logik
+                return m.to === this.currentChat || (!m.to && this.currentChat === 'general');
+            }
+        });
 
-        // Sofort lokal rendern
-        this.appendChatMessage(msgData);
-
-        // Über WebSockets an den Server senden
-        if (WebSocketService.socket) {
-            WebSocketService.socket.emit("send_message", msgData);
-        }
+        // Die letzten 50 Nachrichten rendern
+        filtered.slice(-50).forEach(m => this._renderSingleMessage(m));
+        msgs.scrollTop = msgs.scrollHeight;
     },
 
     appendChatMessage(msg) {
+        // In Speicher ablegen
+        const isExists = this.messages.some(m => m.id === msg.id);
+        if (!isExists) {
+            this.messages.push(msg);
+            // Retention: Nur Nachrichten von heute behalten (ca. 24h)
+            const oneDay = 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            this.messages = this.messages.filter(m => {
+                const msgTime = typeof m.id === 'number' ? m.id : now;
+                return (now - msgTime) < oneDay;
+            });
+        }
+
+        // Falls Nachricht für aktuellen Chat bestimmt ist -> sofort anzeigen
+        const user = AuthService.getUser();
+        let shouldShow = false;
+        if (this.currentChat.startsWith('@')) {
+            const targetName = this.currentChat.substring(1);
+            shouldShow = (msg.to === this.currentChat && msg.userId === user.discordId) || 
+                         (msg.to === '@' + user.username && msg.username === targetName);
+        } else {
+            shouldShow = (msg.to === this.currentChat || (!msg.to && this.currentChat === 'general'));
+        }
+
+        if (shouldShow) {
+            this._renderSingleMessage(msg);
+            // Sound bei fremden Nachrichten
+            if (msg.username !== user.username) this.playBlip(900, 0.08);
+        }
+    },
+
+    _renderSingleMessage(msg) {
         const msgs = document.getElementById('chatMessages');
         if (!msgs) return;
         const user = AuthService.getUser();
         const isOwn = user?.discordId === msg.userId;
 
-        // Vermeiden, dass eigene Nachrichten doppelt auftauchen
-        if (isOwn && msgs.querySelector(`[data-msgid="${msg.id}"]`)) return;
+        // Vermeiden, dass Nachrichten doppelt im DOM auftauchen
+        if (msgs.querySelector(`[data-msgid="${msg.id}"]`)) return;
 
         const initial = (msg.username || 'U')[0].toUpperCase();
         const el = document.createElement('div');
@@ -874,11 +922,13 @@ const App = {
         const avatarHtml = imgUrl
             ? `<img src="${imgUrl}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\'>${initial}</div>';">`
             : `<div class="avatar-fallback-inner">${initial}</div>`;
+        
+        const timestamp = msg.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
         if (isOwn) {
             el.innerHTML = `
               <div class="msg-body">
-                <div class="msg-meta"><span class="msg-user">Du</span><span class="msg-time">${msg.timestamp}</span></div>
+                <div class="msg-meta"><span class="msg-user">Du</span><span class="msg-time">${timestamp}</span></div>
                 <div class="msg-text">${escHtml(msg.text)}</div>
               </div>
               <div class="msg-avatar you">${avatarHtml}</div>
@@ -887,13 +937,37 @@ const App = {
             el.innerHTML = `
               <div class="msg-avatar">${avatarHtml}</div>
               <div class="msg-body">
-                <div class="msg-meta"><span class="msg-user">${escHtml(msg.username)}</span><span class="msg-time">${msg.timestamp}</span></div>
+                <div class="msg-meta"><span class="msg-user">${escHtml(msg.username)}</span><span class="msg-time">${timestamp}</span></div>
                 <div class="msg-text">${escHtml(msg.text)}</div>
               </div>
             `;
         }
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
+    },
+
+    // --- SOUND ENGINE (Walkie-Talkie Effects) ---
+    playBlip(freq = 800, duration = 0.1) {
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, context.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(freq / 2, context.currentTime + duration);
+            
+            gain.gain.setValueAtTime(0.05, context.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + duration);
+            
+            osc.connect(gain);
+            gain.connect(context.destination);
+            
+            osc.start();
+            osc.stop(context.currentTime + duration);
+        } catch (e) {
+            console.warn('[Sound] AudioContext blockiert oder nicht verfügbar.');
+        }
     },
 
     // --- CHANNELS ---
@@ -1014,16 +1088,29 @@ const App = {
           <button class="btn btn-ghost" style="width:auto;flex:1" onclick="App.closeModal()">Abbrechen</button>
         </div>`;
         } else if (type === 'createVoice') {
-            title.textContent = 'Sprachkanal erstellen';
+            title.textContent = '🔊 Sprachkanal erstellen';
             body.innerHTML = `
-        <div class="input-group">
-          <label class="input-label">KANAL-NAME</label>
-          <input type="text" id="newVoiceName" class="input-field" placeholder="z.B. team-call" />
-        </div>
-        <div style="display:flex;gap:10px;margin-top:8px;">
-          <button class="btn btn-primary" onclick="App.createVoiceChannel()">Erstellen</button>
-          <button class="btn btn-ghost" style="width:auto;flex:1" onclick="App.closeModal()">Abbrechen</button>
-        </div>`;
+                <div class="input-group">
+                    <label class="input-label">KANAL-NAME</label>
+                    <input type="text" id="newVoiceName" class="input-field" placeholder="z.B. team-call">
+                </div>
+                <div class="input-group" style="margin-top:15px;">
+                    <label class="input-label">KANAL-TYP</label>
+                    <div style="display:flex; gap:10px; margin-top:8px;">
+                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='public'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active')">
+                            <div class="v-type-opt active" style="padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center; font-size:12px; transition:0.2s;">🌐 Öffentlich</div>
+                        </label>
+                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='private'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active')">
+                            <div class="v-type-opt" style="padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center; font-size:12px; transition:0.2s;">🔒 Privat</div>
+                        </label>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button class="btn btn-primary" onclick="App.createVoiceChannel()">Erstellen</button>
+                    <button class="btn btn-ghost" style="width:auto;flex:1" onclick="App.closeModal()">Abbrechen</button>
+                </div>
+            `;
+            App._tempVoiceType = 'public';
         }
     },
 
@@ -1052,15 +1139,65 @@ const App = {
     },
 
     createVoiceChannel() {
-        const name = document.getElementById('newVoiceName')?.value.trim().replace(/\s+/g, '-').toLowerCase();
+        const nameInput = document.getElementById('newVoiceName');
+        const name = nameInput?.value.trim().replace(/\s+/g, '-').toLowerCase();
         if (!name) return;
-        const list = document.querySelector('.voice-channels');
-        const item = document.createElement('div');
-        item.className = 'voice-channel-item';
-        item.innerHTML = `<div class="vc-info"><div class="vc-icon">🔇</div><div class="vc-name">#${escHtml(name)}</div></div><div class="vc-members"></div>`;
-        list.appendChild(item);
+
+        const newCh = {
+            id: 'vc-' + Date.now(),
+            name: name,
+            type: App._tempVoiceType || 'public',
+            active: false,
+            members: []
+        };
+
+        MockData.voiceChannels.push(newCh);
+        this.renderVoiceChannels();
         this.closeModal();
+        this.playBlip(600, 0.1);
         NotificationService.show('Sprachkanal erstellt', `#${name} ist jetzt verfügbar.`, 'success');
+    },
+
+    renderVoiceChannels() {
+        const listContainer = document.querySelector('.voice-channels');
+        if (!listContainer) return;
+
+        const title = '<div class="section-title">Sprachkanäle</div>';
+        const html = MockData.voiceChannels.map(vc => `
+            <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
+                <div class="vc-info">
+                    <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
+                    <div class="vc-name">#${escHtml(vc.name)}</div>
+                </div>
+                <div class="vc-members">
+                    ${vc.members.map(m => `<div class="vc-member-avatar">${m[0].toUpperCase()}</div>`).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        listContainer.innerHTML = title + html;
+    },
+
+    selectVoiceChannel(id) {
+        // Sound-Effekt (Frequenzwechsel)
+        this.playBlip(700, 0.08);
+
+        MockData.voiceChannels.forEach(vc => {
+            vc.active = (vc.id === id);
+            // Mock: "Du" wechselt den Kanal
+            vc.members = vc.members.filter(m => m !== 'Du');
+            if (vc.active) vc.members.push('Du');
+        });
+
+        this.renderVoiceChannels();
+
+        const status = document.getElementById('pttStatus');
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        if (status && activeCh) {
+            status.textContent = 'Verbunden mit #' + activeCh.name;
+            status.style.color = 'var(--status-online)';
+            status.style.fontWeight = '700';
+        }
     },
 
     // --- SETTINGS ---
@@ -1554,6 +1691,70 @@ Object.assign(App, {
     showUpdateDialog() {
         if (typeof UpdateManager !== 'undefined') {
             UpdateManager.showUpdateDialog();
+        }
+    },
+
+    // --- HIGH-END EFFECTS ───
+    initBackgroundParallax() {
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 20;
+            const y = (e.clientY / window.innerHeight - 0.5) * 20;
+            
+            // Grid-Bewegung
+            const grids = document.querySelectorAll('.splash-grid');
+            grids.forEach(grid => {
+                grid.style.transform = `translate(${x}px, ${y}px)`;
+            });
+            
+            // Orbs-Bewegung (etwas stärker für Tiefe)
+            const orbs = document.querySelectorAll('.splash-orb');
+            orbs.forEach(orb => {
+                const speed = orb.classList.contains('orb1') ? 40 : 60;
+                orb.style.transform = `translate(${x * (speed/20)}px, ${y * (speed/20)}px)`;
+            });
+        });
+    },
+    // --- VOICE (Walkie-Talkie) ───
+    renderVoiceChannels() {
+        const listContainer = document.querySelector('.voice-channels');
+        if (!listContainer) return;
+
+        const title = '<div class="section-title">Sprachkanäle</div>';
+        const html = MockData.voiceChannels.map(vc => `
+            <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
+                <div class="vc-info">
+                    <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
+                    <div class="vc-name">#${escHtml(vc.name)}</div>
+                </div>
+                <div class="vc-members">
+                    ${vc.members.map(m => `<div class="vc-member-avatar">${m[0].toUpperCase()}</div>`).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        listContainer.innerHTML = title + html;
+    },
+
+    selectVoiceChannel(id) {
+        // Sound-Effekt (Frequenzwechsel)
+        this.playBlip(700, 0.08);
+
+        MockData.voiceChannels.forEach(vc => {
+            vc.active = (vc.id === id);
+            // Mock: "Du" wechselt den Kanal
+            vc.members = vc.members.filter(m => m !== 'Du');
+            if (vc.active) vc.members.push('Du');
+        });
+
+        this.renderVoiceChannels();
+
+        const status = document.getElementById('pttStatus');
+        const activeCh = MockData.voiceChannels.find(vc => vc.active);
+        if (status && activeCh) {
+            status.textContent = 'Verbunden mit #' + activeCh.name;
+            status.style.color = 'var(--status-online)';
+            status.style.fontWeight = '700';
+            status.style.textShadow = '0 0 10px var(--status-online)';
         }
     },
 });

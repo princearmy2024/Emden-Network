@@ -43,9 +43,11 @@ const UpdateManager = (() => {
             if (data && data.tag_name) {
                 const remoteVer = data.tag_name.replace('v', '');
                 
-                // Falls Version gleich -> nichts tun
+                // Falls Version gleich -> notifier verstecken
                 if (remoteVer === currentAppVersion) {
                     console.log('[Update] App ist auf dem neuesten Stand.');
+                    const notifier = document.getElementById('updateNotifier');
+                    if (notifier) notifier.classList.remove('visible');
                     return;
                 }
 
