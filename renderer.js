@@ -277,10 +277,9 @@ const App = {
         NotificationService.show('Info', `"${type}" noch nicht implementiert.`, 'info');
     },
 
-    // FIX: showUpdateDialog hinzugefügt — wurde in index.html aufgerufen aber fehlte
+    // FIX: showUpdateDialog — nutzt jetzt den neuen UpdateManager
     showUpdateDialog() {
-        const banner = document.getElementById('updateBanner');
-        if (banner) banner.classList.remove('hidden');
+        if (window.UpdateManager) window.UpdateManager.showUpdateDialog();
     },
 
     // FIX: App.setAccent — wird in index.html bei Farbauswahl aufgerufen
