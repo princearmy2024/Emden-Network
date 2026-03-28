@@ -697,6 +697,37 @@
                             </div>
                         </div>
                         <div class="settings-section">
+                            <h3 class="settings-title">Audio & Mikrofon</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Eingabegerät</div>
+                                    <div class="setting-desc">Wähle dein Mikrofon aus</div>
+                                </div>
+                                <select id="micSelect" class="input-field" style="width:200px; font-size:12px;" onchange="App.setMic(this.value)">
+                                    <option value="default">Standard Mikrofon</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Funk-Lautstärke</div>
+                                    <div class="setting-desc">Lautstärke der Funk-Sounds & Static</div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px; flex:1; max-width:200px;">
+                                    <input type="range" class="volume-slider" min="0" max="1" step="0.05" value="0.5" oninput="App.setVolume(this.value)">
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Mic-Monitoring (Abhören)</div>
+                                    <div class="setting-desc">Höre dich selbst inkl. Funk-Effekt</div>
+                                </div>
+                                <button class="btn btn-ghost" id="btnMonitor" style="width:auto; padding:6px 15px; font-size:12px;" onclick="App.toggleMonitoring()">
+                                    <span>🎧 Abhören: AUS</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
                             <h3 class="settings-title">Walkie-Talkie</h3>
                             <div class="setting-row">
                                 <div class="setting-info">
