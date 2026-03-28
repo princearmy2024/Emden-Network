@@ -215,9 +215,12 @@ const UpdateManager = (() => {
         }
     }
 
-    // Public API
-    return { init, checkForUpdates, fetchChangelog };
+    // Public API erweitert
+    return { init, checkForUpdates, fetchChangelog, showUpdateDialog };
 })();
+
+// Explizit global verfügbar machen (für renderer.js und inline events)
+window.UpdateManager = UpdateManager;
 
 // Startet beim Laden
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
