@@ -36,23 +36,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Send Professional Discord Notification
+      - name: Send Premium Dashboard Notification
         if: success()
         shell: bash
         run: |
           CHANGELOG=$(git log -1 --pretty=format:"%s")
-          if [ -z "$CHANGELOG" ]; then CHANGELOG="Wartungsarbeiten und Systemstabilität."; fi
+          if [ -z "$CHANGELOG" ] || [ "$CHANGELOG" == "Build: Bump"* ]; then 
+            CHANGELOG="System-Optimierungen und Stabilitätsverbesserungen."
+          fi
           
+          # Wir erstellen eine JSON-Datei für den Premium-Embed
           cat <<EOF > discord_msg.json
           {
             "embeds": [{
-              "title": "Control Center Update — ${GITHUB_REF_NAME}",
-              "description": "Das Dashboard wurde erfolgreich auf die neueste Version aktualisiert.",
+              "title": "Control Center — Update v${GITHUB_REF_NAME#v}",
+              "description": "Das Dashboard wurde erfolgreich aktualisiert und steht nun in einer neuen Version zur Verfügung.",
               "color": 53671,
               "fields": [
-                { "name": "Version", "value": "`${GITHUB_REF_NAME}`", "inline": true },
-                { "name": "Status", "value": "Stabil", "inline": true },
-                { "name": "Changelog", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
+                { "name": "📦 Version", "value": "`${GITHUB_REF_NAME}`", "inline": true },
+                { "name": "✅ Status", "value": "Stabil", "inline": true },
+                { "name": "🚀 Release", "value": "Produktion", "inline": true },
+                { "name": "📋 Änderungen", "value": "```fix\n${CHANGELOG}\n```", "inline": false }
               ],
               "footer": {
                 "text": "Emden Network | $(date +'%d.%m.%Y')"
@@ -61,12 +65,20 @@ jobs:
             }],
             "components": [{
               "type": 1,
-              "components": [{
-                "type": 2,
-                "label": "Direkt-Download",
-                "style": 5,
-                "url": "https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe"
-              }]
+              "components": [
+                {
+                  "type": 2,
+                  "label": "💾 Jetzt Herunterladen (.exe)",
+                  "style": 5,
+                  "url": "https://github.com/princearmy2024/Emden-Network/releases/latest/download/EmdenNetworkSetup.exe"
+                },
+                {
+                  "type": 2,
+                  "label": "🧬 GitHub Repo",
+                  "style": 5,
+                  "url": "https://github.com/princearmy2024/Emden-Network"
+                }
+              ]
             }]
           }
           EOF

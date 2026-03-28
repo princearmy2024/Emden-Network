@@ -13,7 +13,7 @@
 
 'use strict';
 
-window.CURRENT_VERSION = '1.3.1'; // Stand: 28.03.2026 (Pro Radio: Global PTT, Mic-Direct Monitoring)
+window.CURRENT_VERSION = '1.3.2'; // Stand: 28.03.2026 (Pro Radio: Global PTT, Mic-Direct Monitoring)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -461,7 +461,7 @@ const App = {
 
     // --- INIT ---
     async init() {
-        console.log(`[App] Initialisiere Dashboard v1.2.3...`);
+        console.log(`[App] Initialisiere Dashboard v1.3.2...`);
         
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
@@ -469,7 +469,7 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.2.3`;
+            if (splashVer) splashVer.textContent = `Control Center v1.3.2`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
