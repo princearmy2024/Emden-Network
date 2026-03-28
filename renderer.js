@@ -1,6 +1,6 @@
 'use strict';
 
-window.CURRENT_VERSION = '1.5.1';
+window.CURRENT_VERSION = '1.5.2';
 
 const CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
@@ -149,7 +149,7 @@ const App = {
     isMonitoring: false,
 
     async init() {
-        console.log('[App] Starte v1.5.1...');
+        console.log('[App] Starte v1.5.2...');
         this.initBackgroundParallax();
         this.startClock();
         this.initPTTHandlers();
@@ -173,12 +173,16 @@ const App = {
             });
         }
 
-        // FIX: Saved Settings laden
+        // Gespeicherte Einstellungen laden
         const savedAccent = localStorage.getItem('accent_color');
-        if (savedAccent) this.setAccent(savedAccent);
+        if (savedAccent) setTimeout(() => this.setAccent(savedAccent), 100);
 
-        const savedAnimations = localStorage.getItem('setting_animations');
-        if (savedAnimations === 'false') document.body.classList.add('no-animations');
+        const savedAnim = localStorage.getItem('setting_animations');
+        if (savedAnim === 'false') document.body.classList.add('no-animations');
+
+        const savedSound = localStorage.getItem('setting_sound');
+        const soundToggle = document.getElementById('toggleSound');
+        if (soundToggle && savedSound !== null) soundToggle.checked = savedSound === 'true';
     },
 
     initLoginHandlers() {
@@ -674,9 +678,15 @@ const App = {
     },
 
     // FIX: Konsistente Methode — nur classList, kein style.display Mix
+    // showScreenPart ersetzen:
     showScreenPart(id, show) {
         const el = document.getElementById(id);
-        if (el) el.classList.toggle('hidden', !show);
+        if (!el) return;
+        if (id === 'rblxStep1' || id === 'rblxStep2') {
+            el.style.display = show ? 'block' : 'none';
+        } else {
+            el.classList.toggle('hidden', !show);
+        }
     },
 
     // --- DATA & STATS ---
@@ -948,13 +958,10 @@ const WalkieTalkie = {
         if (!ch) return;
         if (this.currentChannel?.id === id) return;
 
+        // NEU — nutze Password-Modal für private Kanäle:
         if (ch.isPrivate) {
-            const pass = prompt('Bitte Passwort für #' + ch.name + ' eingeben:');
-            if (!pass) return;
-            const ok = await new Promise(resolve => {
-                WebSocketService.socket.emit('walkie_check_password', { channelId: id, password: pass }, resolve);
-            });
-            if (!ok) return NotificationService.show('Fehler', 'Falsches Passwort!', 'error');
+            WalkieTalkie.showPasswordModal(id);
+            return;
         }
 
         if (this.currentChannel) this.leaveChannel();
@@ -963,6 +970,58 @@ const WalkieTalkie = {
         this.renderChannels();
         this.updateUIStatus();
         NotificationService.show('Funk verbunden', '#' + ch.name + ' beigetreten.', 'success');
+    },
+
+    showPasswordModal(channelId) {
+        const ch = this.channels.find(c => c.id === channelId);
+        const old = document.getElementById('pwModalWT');
+        if (old) old.remove();
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'pwModalWT';
+        overlay.innerHTML = `
+            <div class="modal-box" style="max-width:360px;">
+                <div class="modal-header">
+                    <h3>🔒 Privater Kanal</h3>
+                    <button class="modal-close" onclick="document.getElementById('pwModalWT').remove()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color:var(--text-muted);margin-bottom:12px;">#${escHtml(ch.name)} ist passwortgeschützt.</p>
+                    <input type="password" id="pwInputWT" class="input-field" placeholder="Passwort..." autofocus />
+                    <div id="pwErrorWT" style="color:#ff4444;font-size:12px;margin-top:6px;display:none;">Falsches Passwort!</div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-ghost" onclick="document.getElementById('pwModalWT').remove()">Abbrechen</button>
+                    <button class="btn btn-primary" style="width:auto;padding:9px 20px;" onclick="WalkieTalkie.checkPw('${channelId}')">Beitreten</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        document.getElementById('pwInputWT').addEventListener('keydown', e => {
+            if (e.key === 'Enter') WalkieTalkie.checkPw(channelId);
+        });
+    },
+
+    checkPw(channelId) {
+        const input = document.getElementById('pwInputWT');
+        if (!input) return;
+        WebSocketService.socket?.emit('walkie_check_password', { channelId, password: input.value }, (correct) => {
+            if (correct) {
+                document.getElementById('pwModalWT')?.remove();
+                const ch = this.channels.find(c => c.id === channelId);
+                if (ch) ch._unlocked = true;
+                if (this.currentChannel) this.leaveChannel();
+                this.currentChannel = ch;
+                WebSocketService.socket?.emit('walkie_join', { channelId, user: AuthService.getUser() });
+                this.renderChannels();
+                this.updateUIStatus();
+            } else {
+                const err = document.getElementById('pwErrorWT');
+                if (err) err.style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
+        });
     },
 
     leaveChannel() {
@@ -1006,6 +1065,78 @@ const WalkieTalkie = {
         document.getElementById('walkieNewName').value = '';
         document.getElementById('walkieNewPass').value = '';
     }
+};
+
+// =============================================================
+// App.* FUNCTIONS (Missing Hooks)
+// =============================================================
+
+// 1. App.setAccent — Akzentfarbe
+App.setAccent = function(color) {
+    const colors = {
+        blue:  '#0066CC',
+        cyan:  '#00d4ff',
+        green: '#56ab2f',
+        pink:  '#f857a6',
+    };
+    const c = colors[color] || colors.blue;
+    document.documentElement.style.setProperty('--brand-blue', c);
+    localStorage.setItem('accent_color', color);
+    document.querySelectorAll('.accent-opt').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.accent-opt[onclick*="${color}"]`)?.classList.add('active');
+};
+
+// 2. App.toggleSetting — Animations/Sound Toggle
+App.toggleSetting = function(key, value) {
+    localStorage.setItem('setting_' + key, value);
+    if (key === 'animations') document.body.classList.toggle('no-animations', !value);
+};
+
+// 3. App.robloxBack — Zurück Button im Verify Flow
+App.robloxBack = function() {
+    App.showScreenPart('rblxStep1', true);
+    App.showScreenPart('rblxStep2', false);
+};
+
+// 4. App.cancelRobloxVerify — Abbrechen Button
+App.cancelRobloxVerify = function() {
+    App.showScreenPart('rblxStateVerifying', false);
+    App.showScreenPart('rblxStateDisconnected', true);
+};
+
+// 5. App.sendAdminWebhook — Admin Webhook senden
+App.sendAdminWebhook = function() {
+    const title = document.getElementById('webhookTitle')?.value?.trim();
+    const message = document.getElementById('webhookMessage')?.value?.trim();
+    if (!title || !message) {
+        NotificationService.show('Fehler', 'Titel und Nachricht ausfüllen!', 'error');
+        return;
+    }
+    const user = AuthService.getUser();
+    ApiService.post('/api/admin/announcement', {
+        title, content: message,
+        author: user?.username
+    }).then(res => {
+        if (res?.success) {
+            NotificationService.show('Gesendet', 'Ankündigung veröffentlicht!', 'success');
+            document.getElementById('webhookTitle').value = '';
+            document.getElementById('webhookMessage').value = '';
+        } else {
+            NotificationService.show('Fehler', res?.error || 'Senden fehlgeschlagen', 'error');
+        }
+    });
+};
+
+// 6. App.closeModal — Modal schließen
+App.closeModal = function() {
+    const modal = document.getElementById('modalOverlay');
+    if (modal) modal.classList.add('hidden');
+};
+
+// 7. App.loadLiveNews — News Cache leeren Button
+App.loadLiveNews = function() {
+    App.loadAnnouncements();
+    NotificationService.show('Cache geleert', 'News werden neu geladen.', 'info');
 };
 
 // =============================================================
