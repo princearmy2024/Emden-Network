@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.2.7'; // Stand: 28.03.2026 (Walkie-Talkie Pro: Owner, Pass, Custom Audio)
+let CURRENT_VERSION = '1.2.8'; // Stand: 28.03.2026 (Audio-Engine: Mic, Volume, Roblox PTT-Indicator)
 
 // =============================================================
 // CONFIG — Bot-API

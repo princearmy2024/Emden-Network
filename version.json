@@ -1,6 +1,6 @@
 {
-    "version": "1.2.7",
+    "version": "1.2.8",
     "releaseDate": "2026-03-28",
-    "notes": "Walkie-Talkie Pro: Owner-Ränge, Passwort-Kanäle, Monitoring & Custom Audio-Engine integriert.",
+    "notes": "Audio Engine: Mic-Auswahl, Lautstärkeregler & Roblox Overlay Funk-Anzeige integriert.",
     "forceUpdate": true
 }
