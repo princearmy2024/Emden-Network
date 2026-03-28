@@ -1,21 +1,31 @@
 /**
  * EMDEN NETWORK UPDATE MANAGER
  * Live-Update-System via GitHub API
+ * Optimiert für User-Experience & Design
  */
 
 const UpdateManager = (() => {
     // --- KONFIGURATION ---
-    const CURRENT_VERSION = '1.0.0'; 
-    const CHECK_INTERVAL = 1000 * 60 * 15; 
+    let currentAppVersion = '1.0.0'; // Fallback
+    const CHECK_INTERVAL = 1000 * 60 * 60; // Alle 1 Stunde prüfen
 
     let isChecking = false;
+    let updateToastActive = false;
 
     // ─── INITIALISIERUNG ─────────────────────────────────────────
-    function init() {
-        console.log(`[Update] System via GitHub aktiviert. Aktuelle Version: ${CURRENT_VERSION}`);
+    async function init() {
+        // Hol die echte Version vom Hauptprozess
+        if (window.electronAPI && window.electronAPI.getAppVersion) {
+            try {
+                currentAppVersion = await window.electronAPI.getAppVersion();
+                console.log(`[Update] System bereit. Aktuelle Version: ${currentAppVersion}`);
+            } catch (e) {
+                console.warn('[Update] Konnte App-Version nicht abrufen, nutze Fallback.');
+            }
+        }
         
-        // Beim Start prüfen
-        setTimeout(() => checkForUpdates(), 2000);
+        // Beim Start prüfen (kurze Verzögerung für smoothes Laden)
+        setTimeout(() => checkForUpdates(), 3000);
 
         // Periodische Prüfung
         setInterval(() => checkForUpdates(), CHECK_INTERVAL);
@@ -23,7 +33,7 @@ const UpdateManager = (() => {
 
     // ─── UPDATE-CHECK (GITHUB) ──────────────────────────────────
     async function checkForUpdates() {
-        if (isChecking || !window.electronAPI) return;
+        if (isChecking || !window.electronAPI || updateToastActive) return;
         isChecking = true;
 
         try {
@@ -32,21 +42,31 @@ const UpdateManager = (() => {
             
             if (data && data.tag_name) {
                 const remoteVer = data.tag_name.replace('v', '');
-                if (remoteVer !== CURRENT_VERSION) {
-                    console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
-                    
-                    // Suche automatisch nach dem Asset, das auf .exe endet
-                    const exeAsset = data.assets.find(a => a.name.endsWith('.exe'));
-                    const downloadUrl = exeAsset ? exeAsset.browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`;
-                    
-                    showUpdateToast({
-                        version: remoteVer,
-                        notes: data.body,
-                        url: downloadUrl
-                    });
-                } else {
-                    console.log('[Update] App ist auf dem neuesten Stand (GitHub).');
+                
+                // Falls Version gleich -> nichts tun
+                if (remoteVer === currentAppVersion) {
+                    console.log('[Update] App ist auf dem neuesten Stand.');
+                    return;
                 }
+
+                // Prüfen ob der Nutzer diese Version bereits übersprungen hat
+                const skippedVer = localStorage.getItem('skipped_version');
+                if (skippedVer === remoteVer) {
+                    console.log(`[Update] Version ${remoteVer} wurde vom Nutzer übersprungen.`);
+                    return;
+                }
+
+                console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
+                
+                // Suche automatisch nach dem Asset, das auf .exe endet
+                const exeAsset = data.assets && data.assets.find(a => a.name.endsWith('.exe'));
+                const downloadUrl = exeAsset ? exeAsset.browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`;
+                
+                showUpdateToast({
+                    version: remoteVer,
+                    notes: data.body,
+                    url: downloadUrl
+                });
             }
         } catch (e) {
             console.error('[Update] Fehler beim GitHub Update-Check:', e.message);
@@ -91,7 +111,8 @@ const UpdateManager = (() => {
             document.body.appendChild(container);
         }
 
-        const notes = updateInfo.notes || 'Fehlerbehebungen und Optimierungen.';
+        updateToastActive = true;
+        const notes = updateInfo.notes || 'Fehlerbehebungen und System-Optimierungen.';
         
         container.innerHTML = `
             <div class="update-toast">
@@ -99,53 +120,88 @@ const UpdateManager = (() => {
                     <div class="ut-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                     </div>
-                    <div class="ut-title">Update verfügbar! (v${updateInfo.version})</div>
+                    <div class="ut-title-group">
+                        <div class="ut-title">Update verfügbar!</div>
+                        <div class="ut-version-tag">Version ${updateInfo.version}</div>
+                    </div>
                 </div>
                 <div class="ut-text">${notes}</div>
+                
+                <!-- Download Progress (Initially Hidden) -->
                 <div class="download-bar-container hidden" id="updateProgressContainer">
                     <div class="download-bar-fill" id="updateProgressBar"></div>
-                    <div class="download-text" id="updateProgressText">Lade herunter: 0%</div>
+                    <div class="download-text" id="updateProgressText">Bereite Download vor...</div>
                 </div>
+
                 <div class="ut-footer" id="updateFooter">
-                    <button class="btn-update-now" id="btnUpdateNow">Update installieren</button>
+                    <button class="btn-update-now" id="btnUpdateNow">Jetzt installieren</button>
                     <button class="btn-update-later" id="btnUpdateLater">Später</button>
                 </div>
             </div>
         `;
 
-        requestAnimationFrame(() => container.classList.add('active'));
+        // Animation anzeigen
+        setTimeout(() => container.classList.add('active'), 100);
 
+        // Buttons
         document.getElementById('btnUpdateNow').onclick = () => performUpdate(updateInfo.url);
-        document.getElementById('btnUpdateLater').onclick = () => container.classList.remove('active');
+        
+        document.getElementById('btnUpdateLater').onclick = () => {
+            // Version überspringen (Wird erst bei nächster Version wieder gezeigt)
+            localStorage.setItem('skipped_version', updateInfo.version);
+            closeToast();
+        };
 
-        // Listener für Fortschritt
+        // Helper zum Schließen
+        function closeToast() {
+            container.classList.remove('active');
+            setTimeout(() => {
+                updateToastActive = false;
+                container.innerHTML = '';
+            }, 800);
+        }
+
+        // Listener für Fortschritt vom Hauptprozess
         if (window.electronAPI && window.electronAPI.onUpdateProgress) {
             window.electronAPI.onUpdateProgress((pct) => {
                 const bar = document.getElementById('updateProgressBar');
                 const txt = document.getElementById('updateProgressText');
                 if (bar) bar.style.width = pct + '%';
-                if (txt) txt.textContent = `Lade herunter: ${pct}%`;
-                if (pct >= 100 && txt) txt.textContent = 'Bereite Installation vor...';
+                if (txt) txt.textContent = `Fortschritt: ${pct}%`;
+                
+                if (pct >= 100 && txt) {
+                    txt.textContent = 'Starte Installation...';
+                    txt.style.color = '#4ade80';
+                }
             });
             
             window.electronAPI.onUpdateError((err) => {
                 const txt = document.getElementById('updateProgressText');
                 if (txt) {
-                   txt.textContent = 'Fehler beim Download!';
-                   txt.style.color = '#ff4b4b';
+                    txt.textContent = 'Download-Fehler!';
+                    txt.style.color = '#ff4b4b';
                 }
-                document.getElementById('updateFooter').classList.remove('hidden');
+                const footer = document.getElementById('updateFooter');
+                if (footer) footer.classList.remove('hidden');
+                
+                // Nach 5 Sekunden Toast schließen bei Fehler
+                setTimeout(closeToast, 5000);
             });
         }
     }
 
     // ─── DURCHFÜHRUNG ──────────────────────────────────────────
     function performUpdate(url) {
+        const progContainer = document.getElementById('updateProgressContainer');
+        const footer = document.getElementById('updateFooter');
+        
+        if (progContainer) progContainer.classList.remove('hidden');
+        if (footer) footer.classList.add('hidden');
+
         if (window.electronAPI && window.electronAPI.startAppUpdate) {
-            document.getElementById('updateProgressContainer').classList.remove('hidden');
-            document.getElementById('updateFooter').classList.add('hidden');
             window.electronAPI.startAppUpdate(url);
         } else {
+            console.warn('[Update] startAppUpdate nicht verfügbar, öffne Browser...');
             window.open(url, '_blank');
         }
     }
@@ -154,7 +210,7 @@ const UpdateManager = (() => {
     return { init, checkForUpdates, fetchChangelog };
 })();
 
-// Startet automagisch
+// Startet beim Laden
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     UpdateManager.init();
 } else {

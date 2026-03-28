@@ -13,7 +13,7 @@
 
 'use strict';
 
-const CURRENT_VERSION = '1.0.0'; 
+let CURRENT_VERSION = '1.0.0'; // Fallback
 
 // =============================================================
 // CONFIG — Bot-API
@@ -39,10 +39,10 @@ const AuthService = {
         if (CONFIG.DEMO_MODE) {
             await sleep(900);
             const demo = {
-                'NEXUS-DEMO': { username: 'DemoUser', role: 'user',  discordId: '000000000' },
-                'NEXUS-ADMIN':{ username: 'Admin',    role: 'admin', discordId: '111111111' },
-                'EN-DEMO':    { username: 'DemoUser', role: 'user',  discordId: '000000000' },
-                'EN-ADMIN':   { username: 'Admin',    role: 'admin', discordId: '111111111' },
+                'NEXUS-DEMO': { username: 'DemoUser', role: 'user', discordId: '000000000' },
+                'NEXUS-ADMIN': { username: 'Admin', role: 'admin', discordId: '111111111' },
+                'EN-DEMO': { username: 'DemoUser', role: 'user', discordId: '000000000' },
+                'EN-ADMIN': { username: 'Admin', role: 'admin', discordId: '111111111' },
             };
             const d = demo[code.trim().toUpperCase()];
             if (d) {
@@ -141,17 +141,17 @@ const ApiService = {
 // =============================================================
 const UserRegistry = {
     get() {
-        try { return JSON.parse(localStorage.getItem('nexus_members') || '{}'); } catch(e) { return {}; }
+        try { return JSON.parse(localStorage.getItem('nexus_members') || '{}'); } catch (e) { return {}; }
     },
     update(users) {
         const registry = this.get();
         users.forEach(u => {
             const id = u.discordId || u.id || u.username; // Fallback auf Username
             if (id) {
-                registry[id] = { 
-                    ...u, 
+                registry[id] = {
+                    ...u,
                     discordId: id,
-                    lastSeen: Date.now() 
+                    lastSeen: Date.now()
                 };
             }
         });
@@ -171,7 +171,7 @@ const WebSocketService = {
         this._sendHeartbeat();
 
         // Alle 30 Sekunden Status + Heartbeat
-        this._pollInterval     = setInterval(() => this._fetchStatus(),    30000);
+        this._pollInterval = setInterval(() => this._fetchStatus(), 30000);
         this._heartbeatInterval = setInterval(() => this._sendHeartbeat(), 30000);
 
         // Socket.IO für Live-Chat initialisieren
@@ -183,9 +183,9 @@ const WebSocketService = {
                 if (user && this.socket?.connected) {
                     this.socket.emit('client_online', {
                         discordId: user.discordId,
-                        username:  user.username,
-                        avatar:    user.avatar,
-                        role:      user.role,
+                        username: user.username,
+                        avatar: user.avatar,
+                        role: user.role,
                     });
                 }
             };
@@ -203,10 +203,10 @@ const WebSocketService = {
             this.socket.on('chat_history', (msgs) => {
                 const chatBox = document.getElementById('chatMessages');
                 if (chatBox) chatBox.innerHTML = '';
-                
+
                 const now = Date.now();
                 const oneDay = 24 * 60 * 60 * 1000;
-                
+
                 // 24h FILTER: Nur Nachrichten der letzten 24 Stunden anzeigen
                 const freshMsgs = msgs.filter(m => {
                     const msgTime = (m.id && !isNaN(m.id)) ? parseInt(m.id) : now;
@@ -249,17 +249,17 @@ const WebSocketService = {
             const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
 
             // Metric-Karten — mehrere mögliche Feldnamen abfangen
-            const totalMembers   = data.members        ?? data.memberCount      ?? '—';
-            const onlineMembers  = data.onlineMembers   ?? data.online_members   ?? data.onlineCount ?? '—';
-            const dashOnline     = data.dashboardOnline ?? data.dashboard_online ?? '0';
+            const totalMembers = data.members ?? data.memberCount ?? '—';
+            const onlineMembers = data.onlineMembers ?? data.online_members ?? data.onlineCount ?? '—';
+            const dashOnline = data.dashboardOnline ?? data.dashboard_online ?? '0';
 
-            setEl('statMembersTotal',     totalMembers);
-            setEl('statDashboardUsers',   dashOnline);
+            setEl('statMembersTotal', totalMembers);
+            setEl('statDashboardUsers', dashOnline);
             setEl('statDiscordConnected', 'Verbunden');
 
             // Live-Panel rechts
-            setEl('liveMembers',          totalMembers);
-            setEl('liveOnline',           onlineMembers);
+            setEl('liveMembers', totalMembers);
+            setEl('liveOnline', onlineMembers);
             setEl('dashboardOnlineCount', dashOnline);
 
             // User-Liste rendern — IMMER versuchen, auch wenn dashboardUsers leer ist
@@ -297,7 +297,7 @@ const WebSocketService = {
         (this.listeners[event] || []).forEach(cb => cb(data));
     },
     disconnect() {
-        if (this._pollInterval)      clearInterval(this._pollInterval);
+        if (this._pollInterval) clearInterval(this._pollInterval);
         if (this._heartbeatInterval) clearInterval(this._heartbeatInterval);
         this._pollInterval = this._heartbeatInterval = null;
     },
@@ -339,13 +339,13 @@ const NotificationService = {
 
         // Desktop Notifications (Immer feuern lassen fürs Testing)
         const isDesktopEnabled = document.getElementById('toggleDesktopNotif')?.checked !== false;
-        
+
         if (isDesktopEnabled && window.electronAPI) {
             // 1) CUSTOM OVERLAY: Feuert immer an das transparente Overlay (wie Discord Popup)
             if (window.electronAPI.sendOverlayNotification) {
                 window.electronAPI.sendOverlayNotification({ title, message, type });
             }
-            
+
             // 2) NATIVE WINDOWS: 
             if (window.electronAPI.showNativeNotification) {
                 window.electronAPI.showNativeNotification(title, message);
@@ -362,21 +362,21 @@ const NotificationService = {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) return;
             const ctx = new AudioContext();
-            
+
             const playNote = (freq, startTime, duration, volume = 0.1) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                
+
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, startTime);
-                
+
                 gain.gain.setValueAtTime(0, startTime);
                 gain.gain.linearRampToValueAtTime(volume, startTime + 0.01);
                 gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-                
+
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                
+
                 osc.start(startTime);
                 osc.stop(startTime + duration);
             };
@@ -447,6 +447,9 @@ const App = {
 
     // --- INIT ---
     async init() {
+        if (window.electronAPI && window.electronAPI.getAppVersion) {
+            try { CURRENT_VERSION = await window.electronAPI.getAppVersion(); } catch(e){}
+        }
         console.log(`[App] Initialisiere Dashboard v${CURRENT_VERSION}...`);
         try {
             // Version auf Splash Screen setzen
@@ -565,7 +568,7 @@ const App = {
             this.logout();
             return;
         }
-        
+
         console.log('[App] Lade Dashboard für:', user.username);
         this.applyUser(user);
         this.renderChannels();
@@ -607,7 +610,7 @@ const App = {
         if (sidebarUserEl) sidebarUserEl.textContent = user.username;
         const sidebarRoleEl = document.getElementById('sidebarRole');
         if (sidebarRoleEl) sidebarRoleEl.textContent = user.role === 'admin' ? '⚡ Administrator' : 'Mitglied';
-        
+
         setAvatar('sidebarAvatar');
         // Topbar
         setAvatar('topbarAvatar');
@@ -620,7 +623,7 @@ const App = {
         const sRole = document.getElementById('settingsRole');
         if (sRole) sRole.textContent = user.role === 'admin' ? 'Administrator' : 'Standard-Nutzer';
         setAvatar('settingsAvatar');
-        
+
         // Overview hero
         const ovUser = document.getElementById('overviewUsername');
         if (ovUser) ovUser.textContent = user.username;
@@ -677,7 +680,7 @@ const App = {
         console.log('[Presence] Online Users vom Server:', onlineUsers);
 
         const registry = UserRegistry.get();
-        
+
         // 1. Online-User in die Registry aufnehmen (falls sie noch nicht da sind)
         onlineUsers.forEach(u => {
             const id = u.discordId || u.id || u.username;
@@ -689,10 +692,10 @@ const App = {
 
         // 2. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
         const allMembers = Object.values(registry);
-        
+
         // 3. Online-IDs für den grünen Punkt sammeln
         const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
-        
+
         // Zähler nur für ECHTE online Leute
         const onlineCount = onlineUsers.length;
         const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
@@ -700,13 +703,13 @@ const App = {
         setEl('dashboardOnlineCount', onlineCount);
         setEl('chatOnlineCountBadge', onlineCount);
         setEl('chatHeaderOnlineText', onlineCount + ' online');
-        
+
         // Sortieren: Online zuerst, dann nach Rang (Admin > Staff > User)
         const sorted = allMembers.sort((a, b) => {
             const aOn = onlineIds.has(a.discordId);
             const bOn = onlineIds.has(b.discordId);
             if (aOn !== bOn) return aOn ? -1 : 1;
-            
+
             const rank = r => r === 'admin' ? 0 : r === 'staff' ? 1 : 2;
             return rank(a.role) - rank(b.role);
         });
@@ -725,11 +728,11 @@ const App = {
             return ``;
         };
 
-        const html = sorted.length === 0 
-          ? `<div class="ovn-node" style="opacity:0.4"><div class="ovn-info"><div class="ovn-dot"></div><span style="font-size:11px;color:var(--text-muted)">Niemand bekannt</span></div></div>`
-          : sorted.map(u => {
-            const isOnline = onlineIds.has(u.discordId);
-            return `
+        const html = sorted.length === 0
+            ? `<div class="ovn-node" style="opacity:0.4"><div class="ovn-info"><div class="ovn-dot"></div><span style="font-size:11px;color:var(--text-muted)">Niemand bekannt</span></div></div>`
+            : sorted.map(u => {
+                const isOnline = onlineIds.has(u.discordId);
+                return `
             <div class="ovn-node ${isOnline ? '' : 'offline'}" style="${isOnline ? '' : 'opacity: 0.6; filter: grayscale(0.5);'}">
                 <div class="ovn-info">
                     <div class="ovn-dot ${isOnline ? 'online' : ''}" style="background: ${isOnline ? 'var(--status-online)' : '#666'}"></div>
@@ -738,7 +741,7 @@ const App = {
                 </div>
                 ${badgeEl(u)}
             </div>`;
-          }).join('');
+            }).join('');
 
         const homeList = document.getElementById('dashboardUserList');
         if (homeList) homeList.innerHTML = html;
@@ -773,7 +776,7 @@ const App = {
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             const clockEl = document.getElementById('ovClock');
-            const dateEl  = document.getElementById('ovDate');
+            const dateEl = document.getElementById('ovDate');
             if (clockEl) clockEl.textContent = `${hh}:${mm}`;
             if (dateEl) {
                 const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
@@ -842,7 +845,7 @@ const App = {
         el.setAttribute('data-msgid', msg.id);
 
         const imgUrl = msg.avatar || msg.PFB || msg.pfb;
-        const avatarHtml = imgUrl 
+        const avatarHtml = imgUrl
             ? `<img src="${imgUrl}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\'>${initial}</div>';">`
             : `<div class="avatar-fallback-inner">${initial}</div>`;
 
@@ -1037,10 +1040,10 @@ const App = {
     // --- SETTINGS ---
     setAccent(color) {
         const map = {
-            blue:   ['#0066CC', '#003D7A'],
-            cyan:   ['#00d4ff', '#7b2fff'],
-            green:  ['#56ab2f', '#a8e063'],
-            pink:   ['#f857a6', '#ff5858'],
+            blue: ['#0066CC', '#003D7A'],
+            cyan: ['#00d4ff', '#7b2fff'],
+            green: ['#56ab2f', '#a8e063'],
+            pink: ['#f857a6', '#ff5858'],
         };
         const [a, b] = map[color] || map.blue;
         document.documentElement.style.setProperty('--brand-blue', a);
@@ -1121,7 +1124,7 @@ const App = {
             const res = await fetch('https://enrp.princearmy.de/announcements.json?t=' + Date.now(), { cache: 'no-store' });
             if (!res.ok) throw new Error('News fetch failed');
             const news = await res.json();
-            
+
             if (!news || news.length === 0) {
                 listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Momentan keine Neuigkeiten.</div>';
                 return;
@@ -1255,7 +1258,7 @@ Object.assign(App, {
     async loadRobloxState() {
         let profile = RobloxService.getProfile();
         const user = AuthService.getUser();
-        
+
         // Wenn kein lokales Profil da ist, frage die Bot-API (für bereits verknüpfte User)
         if (!profile && user?.discordId) {
             console.log('[Roblox] Suche Link in Bot-Datenbank...');
@@ -1471,10 +1474,10 @@ Object.assign(App, {
         try {
             if (window.electronAPI && window.electronAPI.sendToDiscord) {
                 // Main-Prozess erwartet version (Titel) und notes (Nachricht)
-                window.electronAPI.sendToDiscord({ 
-                    webhookUrl: WEBHOOK_URL, 
-                    version: title, 
-                    notes: message 
+                window.electronAPI.sendToDiscord({
+                    webhookUrl: WEBHOOK_URL,
+                    version: title,
+                    notes: message
                 });
                 NotificationService.show('Gesendet!', 'Discord-Benachrichtigung wurde versendet.', 'success');
                 document.getElementById('webhookTitle').value = '';
@@ -1488,14 +1491,14 @@ Object.assign(App, {
     // --- LIVE NEWS ---
     async loadLiveNews() {
         const NEWS_URL = 'https://enrp.princearmy.de/announcements.json';
-        const newsContainer = document.getElementById('newsList'); 
+        const newsContainer = document.getElementById('newsList');
         if (!newsContainer) return;
 
         try {
             console.log('[News] Lade Live-News von Website...');
             const res = await fetch(`${NEWS_URL}?t=${Date.now()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Konnten News nicht laden');
-            
+
             const data = await res.json();
             const news = data.announcements || [];
 

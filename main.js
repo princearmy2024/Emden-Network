@@ -173,6 +173,8 @@ ipcMain.handle('get-github-changelog', async () => {
     });
 });
 
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 // Discord Webhook (Manuel/Automatisch)
 ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
     console.log('[Discord] Sende Webhook für Version:', version);

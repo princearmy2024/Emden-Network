@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hideRobloxOverlay: () => ipcRenderer.send('hide-roblox-overlay'),
     testRobloxOverlay: () => ipcRenderer.send('test-roblox-overlay'),
 
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     onToggleRobloxCmd: (callback) => ipcRenderer.on('toggle-roblox-cmd', callback),
     overlayRequestFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
 });
