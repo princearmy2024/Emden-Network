@@ -47,7 +47,7 @@ jobs:
           
           cat <<EOF > discord_msg.json
           {
-            "username": "Nexus Updates 🚀",
+            "username": "Emden Network Updates 📻",
             "avatar_url": "${LOG_ICON}",
             "embeds": [{
               "title": "💎 Emden Network | Control Center — ${GITHUB_REF_NAME}",

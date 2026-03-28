@@ -1,5 +1,5 @@
 /**
- * NEXUS DASHBOARD - renderer.js
+ * EMDEN NETWORK DASHBOARD - renderer.js
  * Frontend-Logik (Renderer-Prozess)
  *
  * Architektur:
@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.2.3'; // Stand: 28.03.2026 (Walkie-Talkie & PM Filtering)
+let CURRENT_VERSION = '1.2.7'; // Stand: 28.03.2026 (Walkie-Talkie Pro: Owner, Pass, Custom Audio)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -39,10 +39,8 @@ const AuthService = {
         if (CONFIG.DEMO_MODE) {
             await sleep(900);
             const demo = {
-                'NEXUS-DEMO': { username: 'DemoUser', role: 'user', discordId: '000000000' },
-                'NEXUS-ADMIN': { username: 'Admin', role: 'admin', discordId: '111111111' },
                 'EN-DEMO': { username: 'DemoUser', role: 'user', discordId: '000000000' },
-                'EN-ADMIN': { username: 'Admin', role: 'admin', discordId: '111111111' },
+                'EN-ADMIN': { username: 'Admin', role: 'admin', discordId: '111111111' }
             };
             const d = demo[code.trim().toUpperCase()];
             if (d) {
@@ -83,12 +81,12 @@ const AuthService = {
     },
 
     saveSession() {
-        try { localStorage.setItem('nexus_session', JSON.stringify(this.session)); } catch (e) { }
+        try { localStorage.setItem('en_session', JSON.stringify(this.session)); } catch (e) { }
     },
 
     loadSession() {
         try {
-            const raw = localStorage.getItem('nexus_session');
+            const raw = localStorage.getItem('en_session');
             if (raw) { this.session = JSON.parse(raw); return true; }
         } catch (e) { }
         return false;
@@ -96,7 +94,7 @@ const AuthService = {
 
     logout() {
         this.session = null;
-        try { localStorage.removeItem('nexus_session'); } catch (e) { }
+        try { localStorage.removeItem('en_session'); } catch (e) { }
     },
 
     getUser() { return this.session?.user || null; },
@@ -141,7 +139,7 @@ const ApiService = {
 // =============================================================
 const UserRegistry = {
     get() {
-        try { return JSON.parse(localStorage.getItem('nexus_members') || '{}'); } catch (e) { return {}; }
+        try { return JSON.parse(localStorage.getItem('en_members') || '{}'); } catch (e) { return {}; }
     },
     update(users) {
         const registry = this.get();
@@ -155,7 +153,7 @@ const UserRegistry = {
                 };
             }
         });
-        localStorage.setItem('nexus_members', JSON.stringify(registry));
+        localStorage.setItem('en_members', JSON.stringify(registry));
     }
 };
 
@@ -220,16 +218,27 @@ const WebSocketService = {
                 App.appendChatMessage(msg);
             });
 
-            this.socket.on('online_users', (users) => {
-                UserRegistry.update(users); // Alle neuen Nutzer in die Registry speichern
-                App.renderFullUserList(users); // Die volle Liste inkl. Offline-Usern rendern
-            });
-
             // OAuth Callbacks
             this.socket.on(`roblox_connected_${AuthService.getUser()?.discordId}`, (profile) => {
                 RobloxService.saveProfile(profile);
                 App.renderRobloxCard(profile);
                 NotificationService.show('Roblox verbunden! 🎮', `Willkommen, ${profile.displayName}!`, 'success');
+            });
+
+            // ── VOICE SYNC (Walkie-Talkie Synchronisation) ──
+            this.socket.on('voice_state_update', (channels) => {
+                console.log('[Voice] Empfange Live-Update der Sprachkanäle...');
+                // API-Daten in das lokale MockData spiegeln für das Rendering
+                MockData.voiceChannels = channels;
+                App.renderVoiceChannels();
+            });
+
+            this.socket.on('voice_created', (newChannel) => {
+                if (!MockData.voiceChannels.find(vc => vc.id === newChannel.id)) {
+                    MockData.voiceChannels.push(newChannel);
+                    App.renderVoiceChannels();
+                    NotificationService.show('Funkkanal', `Neuer Kanal #${newChannel.name} wurde erstellt.`, 'info');
+                }
             });
         }
     },
@@ -431,8 +440,8 @@ const MockData = {
         { id: 5, name: 'random', desc: 'Smalltalk', members: 21 },
     ],
     voiceChannels: [
-        { id: 'vc-1', name: 'voice-general', type: 'public', active: true, members: ['Alex', 'Du'] },
-        { id: 'vc-2', name: 'ops-room', type: 'private', active: false, members: [] }
+        { id: 'vc-1', name: 'voice-general', type: 'public', active: true, members: ['Alex', 'Du'], owner: 'Admin' },
+        { id: 'vc-2', name: 'ops-room', type: 'private', active: false, members: [], owner: 'Admin' }
     ]
 };
 
@@ -478,6 +487,8 @@ const App = {
 
             if (AuthService.loadSession() && AuthService.isLoggedIn()) {
                 this.showDashboard(AuthService.getUser());
+                this.renderActiveVoiceCard(); // Active Voice Card beim Start laden
+                this.syncHotkeyUI(); // Key in UI laden
             } else {
                 this.showScreen('loginScreen');
                 this.initLoginHandlers();
@@ -583,6 +594,8 @@ const App = {
         this.renderChannels();
         this.renderServers();
         this.renderVoiceChannels();
+        this.renderActiveVoiceCard(); // Active Voice Card beim Login zeigen
+        this.syncHotkeyUI(); // Key in UI laden
         this.selectVoiceChannel('vc-1'); // Standard auf General setzen
         this.showScreen('dashboardScreen');
         this.navigate('overview');
@@ -1101,12 +1114,16 @@ const App = {
                     <label class="input-label">KANAL-TYP</label>
                     <div style="display:flex; gap:10px; margin-top:8px;">
                         <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='public'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active')">
-                            <div class="v-type-opt active" style="padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center; font-size:12px; transition:0.2s;">🌐 Öffentlich</div>
+                            <div class="v-type-opt active">🌐 Öffentlich</div>
                         </label>
-                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='private'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active')">
-                            <div class="v-type-opt" style="padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center; font-size:12px; transition:0.2s;">🔒 Privat</div>
+                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='private'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active'); document.getElementById('vcPasswordGroup').classList.remove('hidden')">
+                            <div class="v-type-opt">🔒 Privat</div>
                         </label>
                     </div>
+                </div>
+                <div class="input-group hidden" id="vcPasswordGroup" style="margin-top:15px; animation: slideDown 0.3s ease;">
+                    <label class="input-label">KANAL-PASSWORT</label>
+                    <input type="password" id="newVoicePassword" class="input-field" placeholder="Passwort festlegen">
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:20px;">
                     <button class="btn btn-primary" onclick="App.createVoiceChannel()" style="width:100%;">Erstellen</button>
@@ -1143,22 +1160,33 @@ const App = {
 
     createVoiceChannel() {
         const nameInput = document.getElementById('newVoiceName');
+        const passInput = document.getElementById('newVoicePassword');
         const name = nameInput?.value.trim().replace(/\s+/g, '-').toLowerCase();
         if (!name) return;
 
-        const newCh = {
+        const newVC = {
             id: 'vc-' + Date.now(),
             name: name,
-            type: App._tempVoiceType || 'public',
-            active: false,
-            members: []
+            type: this._tempVoiceType || 'public',
+            password: (this._tempVoiceType === 'private') ? passInput?.value : null,
+            members: ['Du'],
+            owner: 'Du', // Aktueller User als Ersteller
+            active: true
         };
 
-        MockData.voiceChannels.push(newCh);
+        // SYNC: Kanal weltweit bekannt machen
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('voice_create_channel', newVC);
+        }
+
+        MockData.voiceChannels.forEach(v => v.active = false);
+        MockData.voiceChannels.push(newVC);
         this.renderVoiceChannels();
         this.closeModal();
         this.playBlip(600, 0.1);
-        NotificationService.show('Sprachkanal erstellt', `#${name} ist jetzt verfügbar.`, 'success');
+        
+        const status = document.getElementById('pttStatus');
+        if (status) status.textContent = 'Frequenz: #' + name;
     },
 
     renderVoiceChannels() {
@@ -1739,7 +1767,7 @@ Object.assign(App, {
                             <div class="v-user ${isSpeaking ? 'is-speaking' : ''}">
                                 ${img}
                                 <span class="v-username">${m}</span>
-                                ${m === 'Du' ? '' : '<span class="v-tag">STAFF</span>'}
+                                ${m === (vc.owner || 'Admin') ? '<span class="v-tag owner">OWNER</span>' : '<span class="v-tag">STAFF</span>'}
                             </div>
                         `;
                     }).join('')}
@@ -1751,16 +1779,25 @@ Object.assign(App, {
     },
 
     selectVoiceChannel(id) {
+        const targetVC = MockData.voiceChannels.find(vc => vc.id === id);
+        if (!targetVC) return;
+
+        // --- PRIVACY CHECK (Passwort-Abfrage) ---
+        if (targetVC.type === 'private' && targetVC.password && !targetVC.active) {
+            // "Du" ist noch nicht drin? Dann nach Passwort fragen
+            const pass = prompt(`Kanal #${targetVC.name} ist geschützt. Bitte Passwort eingeben:`);
+            if (pass !== targetVC.password) {
+                NotificationService.show('Zutritt verweigert', 'Falsches Passwort für diese Frequenz.', 'error');
+                return;
+            }
+        }
+
         // Sound-Effekt (Frequenzwechsel)
         this.playBlip(700, 0.08);
 
-        // Auto-Delete Check: Vorherige leere Kanäle löschen (außer die Start-Kanäle)
-        const currentActive = MockData.voiceChannels.find(vc => vc.active);
-        if (currentActive && currentActive.members.length <= 1 && currentActive.id.startsWith('vc-')) {
-             // Wenn nur noch "Du" drin bist und du gehst -> löschen (außer vc-1, vc-2)
-             if (currentActive.id !== 'vc-1' && currentActive.id !== 'vc-2') {
-                MockData.voiceChannels = MockData.voiceChannels.filter(v => v.id !== currentActive.id);
-             }
+        // SYNC: Signal an den Server senden (Falls verbunden)
+        if (WebSocketService.socket?.connected) {
+             WebSocketService.socket.emit('voice_channel_join', { channelId: id });
         }
 
         MockData.voiceChannels.forEach(vc => {
@@ -1770,6 +1807,7 @@ Object.assign(App, {
         });
 
         this.renderVoiceChannels();
+        this.renderActiveVoiceCard(); // Dashboard-Card aktualisieren
 
         const status = document.getElementById('pttStatus');
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
@@ -1783,9 +1821,17 @@ Object.assign(App, {
 
     // --- PTT HOTKEY LOGIK ---
     isSpeaking: false,
-    pttKey: 'v', // Standard Key 'V'
+    pttKey: localStorage.getItem('ptt_key') || 'v', // Gespeicherter Key oder 'V'
+    pttSoundUrl: localStorage.getItem('ptt_sound_url') || './walkie-talkie-start.mp3.wav',
+    isMonitoring: false, // Mic abhören
+    _staticLoop: null,
 
     initPTTHandlers() {
+        // Audio vorbereiten
+        this._staticLoop = new Audio('https://www.soundjay.com/communication/radio-static-1.mp3');
+        this._staticLoop.loop = true;
+        this._staticLoop.volume = 0.05;
+
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
                 const active = document.activeElement;
@@ -1800,11 +1846,48 @@ Object.assign(App, {
         });
     },
 
+    setPTTKey(k) {
+        if (!k || k.length === 0) return;
+        this.pttKey = k.toLowerCase().charAt(0);
+        localStorage.setItem('ptt_key', this.pttKey);
+        
+        const inp = document.getElementById('pttKeyInput');
+        if (inp) inp.value = this.pttKey.toUpperCase();
+        
+        NotificationService.show('Hotkey geändert', `Neuer Funk-Key: ${this.pttKey.toUpperCase()}`, 'info');
+    },
+
+    setPTTSound(url) {
+        if (!url) return;
+        this.pttSoundUrl = url;
+        localStorage.setItem('ptt_sound_url', url);
+        NotificationService.show('Sound aktualisiert', 'Dein neuer Funk-Sound ist aktiv.', 'success');
+    },
+
+    syncHotkeyUI() {
+        const hInp = document.getElementById('pttKeyInput');
+        if (hInp) hInp.value = this.pttKey.toUpperCase();
+        
+        const sInp = document.getElementById('pttSoundInput');
+        if (sInp) sInp.value = this.pttSoundUrl;
+    },
+
+    toggleMonitoring() {
+        this.isMonitoring = !this.isMonitoring;
+        const btn = document.getElementById('btnMonitor');
+        if (btn) {
+            btn.classList.toggle('active', this.isMonitoring);
+            btn.innerHTML = this.isMonitoring ? '<span>🎧 Abhören: AN</span>' : '<span>🎧 Abhören: AUS</span>';
+        }
+        NotificationService.show('Mic-Monitor', this.isMonitoring ? 'Eigenstimme wird wiedergegeben.' : 'Eigenstimme stummgeschaltet.', 'info');
+    },
+
     startPTT() {
         if (this.isSpeaking) return;
         this.isSpeaking = true;
         this.playRadioStatic(true);
         this.renderVoiceChannels();
+        this.renderActiveVoiceCard();
         
         const btn = document.getElementById('pttBtn');
         if (btn) btn.classList.add('active');
@@ -1827,15 +1910,54 @@ Object.assign(App, {
 
     playRadioStatic(active) {
         if (active) {
-            // "Kkrschhh" beim Öffnen
-            this.playBlip(300, 0.05); // Initialer Klick
-            // Simulierter Funk-Chime
-            this.playBlip(800, 0.1); 
+            // "Kkrschhh" beim Öffnen (Deine URL oder Default)
+            const openSound = new Audio(this.pttSoundUrl);
+            openSound.volume = 0.15;
+            openSound.play().catch(() => {});
+            
+            // Loop starten
+            if (this._staticLoop) this._staticLoop.play().catch(() => {});
         } else {
-            // "Roger that" / "Over" Sound
+            // Loop stoppen
+            if (this._staticLoop) {
+                this._staticLoop.pause();
+                this._staticLoop.currentTime = 0;
+            }
+            
+            // "Roger that" / End-Beep
             this.playBlip(500, 0.1);
             setTimeout(() => this.playBlip(400, 0.05), 100);
         }
+    },
+
+    renderActiveVoiceCard() {
+        const activeContainer = document.getElementById('activeVoiceContainer'); 
+        if (!activeContainer) return;
+
+        const vc = MockData.voiceChannels.find(v => v.active);
+        if (!vc) {
+            activeContainer.innerHTML = '';
+            return;
+        }
+
+        const user = AuthService.getUser();
+        const avatarHtml = user.avatar ? `<img src="${user.avatar}" class="avc-p-img">` : `<div class="avc-p-initials">${user.username[0].toUpperCase()}</div>`;
+
+        activeContainer.innerHTML = `
+            <div class="active-voice-card animated-in">
+                <div class="avc-head">
+                   <div class="avc-icon">🔊</div>
+                   <div class="avc-name">#${escHtml(vc.name)}</div>
+                   <span class="status-live-badge" style="margin-left:auto;">LIVE</span>
+                </div>
+                <div class="avc-participants">
+                    <div class="avc-p-item">
+                        ${avatarHtml}
+                        <span class="avc-p-name">Du</span>
+                    </div>
+                </div>
+            </div>
+        `;
     },
 });
 

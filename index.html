@@ -178,6 +178,9 @@
                 </a>
             </nav>
 
+            <!-- ACTIVE VOICE CARD (DYNAMIC) -->
+            <div id="activeVoiceContainer" style="padding: 0 10px; margin-bottom: 12px;"></div>
+
             <!-- Profile avatar only -->
             <div class="sidebar-user">
                 <div class="user-avatar" id="sidebarAvatar">A</div>
@@ -693,6 +696,40 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="settings-section">
+                            <h3 class="settings-title">Walkie-Talkie</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Push-to-Talk Hotkey</div>
+                                    <div class="setting-desc">Taste zum Sprechen (Standard: V)</div>
+                                </div>
+                                <div class="hotkey-box" style="display:flex; align-items:center; gap:8px;">
+                                    <input type="text" id="pttKeyInput" class="input-field" style="width:60px; text-align:center; font-weight:800; text-transform:uppercase;" maxlength="1" placeholder="V" onkeyup="App.setPTTKey(this.value)">
+                                    <span style="font-size:11px; color:var(--text-muted);">Ein Buchstabe</span>
+                                </div>
+                            </div>
+                            <!-- NEW: Funk-Sound URL -->
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Funk-Sound (Start)</div>
+                                    <div class="setting-desc">Direkt-URL zum mp3 (z.B. Pixabay)</div>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:6px; flex:1; max-width:300px;">
+                                    <input type="text" id="pttSoundInput" class="input-field" placeholder="https://..." onchange="App.setPTTSound(this.value)">
+                                    <span style="font-size:10px; color:var(--brand-blue); cursor:pointer;" onclick="window.electronAPI.openExternal('https://pixabay.com/sound-effects/search/walkie-talkie/')">🔗 Sounds auf Pixabay suchen</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Mic-Monitoring (Abhören)</div>
+                                    <div class="setting-desc">Höre dich selbst inkl. Funk-Effekt</div>
+                                </div>
+                                <button class="btn btn-ghost" id="btnMonitor" style="width:auto; padding:6px 15px; font-size:12px;" onclick="App.toggleMonitoring()">
+                                    <span>🎧 Abhören: AUS</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="settings-section">
                             <h3 class="settings-title">Account</h3>
                             <div class="account-card" style="margin-bottom: 12px;">

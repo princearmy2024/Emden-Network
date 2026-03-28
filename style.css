@@ -1586,6 +1586,13 @@ svg { display: block; flex-shrink: 0; }
     color: var(--text-muted);
 }
 
+.v-tag.owner {
+    background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+    color: #000 !important;
+    font-weight: 800;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
 .status-live-badge {
     background: #f23f43;
     color: #fff;
@@ -1610,4 +1617,95 @@ svg { display: block; flex-shrink: 0; }
 }
 .ptt-btn.active svg {
     filter: drop-shadow(0 0 5px #fff);
+}
+
+/* ACTIVE VOICE CARD (SIDEBAR FOOTER) */
+.active-voice-card {
+    background: rgba(35, 165, 89, 0.08);
+    border: 1px solid rgba(35, 165, 89, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.active-voice-card.animated-in {
+    animation: avcSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes avcSlideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.active-voice-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at top left, rgba(35, 165, 89, 0.1), transparent);
+    pointer-events: none;
+}
+
+.avc-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.avc-icon {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.avc-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.avc-participants {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.avc-p-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.avc-p-img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(35, 165, 89, 0.4);
+    object-fit: cover;
+}
+
+.avc-p-initials {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-surface-3);
+    color: var(--text-muted);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.1);
+}
+
+.avc-p-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
 }
