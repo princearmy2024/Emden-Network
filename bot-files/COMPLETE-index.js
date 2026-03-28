@@ -108,6 +108,7 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 // === 🌐 API Server ===
 // Wer gerade im Dashboard ist (Heartbeat-System)
 const dashboardUsers = new Map(); // discordId → { username, avatar, lastSeen }
+const voiceChannelStates = new Map(); // channelId → Set of { discordId, username, isSpeaking }
 
 const apiServer = http.createServer(async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -573,6 +574,12 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         overlayClients.delete(socket.id);
+        // Automatisches Verlassen der Voice-Channels beim Disconnect
+        for (const [cid, members] of voiceChannelStates.entries()) {
+            const filtered = Array.from(members).filter(m => m.socketId !== socket.id);
+            voiceChannelStates.set(cid, new Set(filtered));
+        }
+        broadcastVoiceState();
     });
 
     // User schickt Heartbeat via Socket für sofortiges Update
@@ -596,6 +603,69 @@ io.on("connection", (socket) => {
         // An ALLE anderen Dashboards senden
         socket.broadcast.emit("receive_message", msgData);
     });
+
+    // ── VOICE SYNC (Realtime Synchronisation) ──
+    socket.on("voice_channel_join", ({ channelId, user }) => {
+        if (!channelId || !user) return;
+        
+        // Erstmal überall austragen
+        for (const [cid, members] of voiceChannelStates.entries()) {
+            const list = Array.from(members);
+            const filtered = list.filter(m => m.discordId !== user.id && m.discordId !== user.discordId);
+            voiceChannelStates.set(cid, new Set(filtered));
+        }
+
+        // In neuen Kanal eintragen
+        if (!voiceChannelStates.has(channelId)) voiceChannelStates.set(channelId, new Set());
+        voiceChannelStates.get(channelId).add({ 
+            discordId: user.id || user.discordId, 
+            username: user.username, 
+            avatar: user.avatar,
+            isSpeaking: false,
+            socketId: socket.id
+        });
+
+        broadcastVoiceState();
+    });
+
+    socket.on("voice_channel_leave", ({ channelId, discordId }) => {
+        if (voiceChannelStates.has(channelId)) {
+            const members = voiceChannelStates.get(channelId);
+            const filtered = Array.from(members).filter(m => m.discordId !== discordId);
+            voiceChannelStates.set(channelId, new Set(filtered));
+            broadcastVoiceState();
+        }
+    });
+
+    socket.on("voice_audio_relay", ({ channelId, audioBlob, user }) => {
+        // Sende das Audio nur an Leute im gleichen Kanal (broadcast)
+        socket.broadcast.emit(`voice_audio_receive_${channelId}`, { audioBlob, user });
+    });
+
+    socket.on("voice_speaking_state", ({ channelId, discordId, isSpeaking }) => {
+        if (voiceChannelStates.has(channelId)) {
+            const members = voiceChannelStates.get(channelId);
+            for (const m of members) {
+                if (m.discordId === discordId) {
+                    m.isSpeaking = isSpeaking;
+                    break;
+                }
+            }
+            broadcastVoiceState();
+        }
+    });
+
+    // Hilfsfunktion für Broadcast
+    function broadcastVoiceState() {
+        const formatted = [];
+        for (const [cid, members] of voiceChannelStates.entries()) {
+            formatted.push({
+                id: cid,
+                members: Array.from(members)
+            });
+        }
+        io.emit("voice_state_update", formatted);
+    }
 });
 
 apiServer.listen(API_PORT, "0.0.0.0", () => {
