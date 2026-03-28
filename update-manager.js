@@ -15,7 +15,13 @@ const UpdateManager = (() => {
     // ─── INITIALISIERUNG ─────────────────────────────────────────
     async function init() {
         // Hol die echte Version vom Hauptprozess
-        if (window.electronAPI && window.electronAPI.getAppVersion) {
+        // 1. Prio: Globaler Wert aus renderer.js (für sofortige Code-Updates)
+        if (window.CURRENT_VERSION) {
+            currentAppVersion = window.CURRENT_VERSION;
+            console.log(`[Update] Code-Version erkannt: ${currentAppVersion}`);
+        }
+        // 2. Prio: Hard-Coded Version vom Hauptprozess (Build)
+        if (currentAppVersion === '1.0.0' && window.electronAPI && window.electronAPI.getAppVersion) {
             try {
                 currentAppVersion = await window.electronAPI.getAppVersion();
                 console.log(`[Update] System bereit. Aktuelle Version: ${currentAppVersion}`);
