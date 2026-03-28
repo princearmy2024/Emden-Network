@@ -58,21 +58,28 @@ const UpdateManager = (() => {
 
                 console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
                 
-                // Suche automatisch nach dem Asset, das auf .exe endet
-                const exeAsset = data.assets && data.assets.find(a => a.name.endsWith('.exe'));
-                const downloadUrl = exeAsset ? exeAsset.browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`;
-                
-                showUpdateToast({
+                // Wir speichern die Info global für den Dialog
+                window._lastUpdateInfo = {
                     version: remoteVer,
                     notes: data.body,
-                    url: downloadUrl
-                });
+                    url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
+                };
+
+                // NEU: Nur das Icon einblenden statt dem fetten Banner!
+                const notifier = document.getElementById('updateNotifier');
+                if (notifier) notifier.classList.add('visible');
             }
         } catch (e) {
             console.error('[Update] Fehler beim GitHub Update-Check:', e.message);
         } finally {
             isChecking = false;
         }
+    }
+
+    // --- MANUELLER DIALOG (Beim Klick auf das Icon) ---
+    function showUpdateDialog() {
+        if (!window._lastUpdateInfo || updateToastActive) return;
+        showUpdateToast(window._lastUpdateInfo);
     }
 
     // ─── CHANGELOG FETCH (GITHUB) ───────────────────────────────
@@ -158,6 +165,8 @@ const UpdateManager = (() => {
             setTimeout(() => {
                 updateToastActive = false;
                 container.innerHTML = '';
+                // Wir lassen das Icon da, falls er es sich nochmal überlegt, 
+                // außer er hat "Später" geklickt (skipped_version)
             }, 800);
         }
 

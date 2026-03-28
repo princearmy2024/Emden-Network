@@ -1269,29 +1269,41 @@ svg { display: block; flex-shrink: 0; }
 .ovb-bars { display: none; } /* removed decorative bars */
 .ovb-footer { display: none; }
 
-/* ==========================================
-   UPDATE BANNER
-   ========================================== */
-.update-banner {
-    background: linear-gradient(135deg, var(--brand-blue) 0%, #173796 100%);
-    color: white;
-    margin: 16px 20px 0 20px;
-    border-radius: 12px;
-    padding: 12px 20px;
-    display: flex;
+/* ── UPDATE NOTIFIER (ICON-BASED) ─────────────────────────── */
+.update-notifier {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 4px 14px rgba(59,130,246,0.3);
-    animation: slideDownUpdate 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    z-index: 50;
-    position: relative;
+    gap: 6px;
+    background: rgba(0, 209, 167, 0.1);
+    border: 1px solid rgba(0, 209, 167, 0.2);
+    color: var(--brand-blue);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 12px;
+    animation: notifierPulse 2s infinite;
+    transition: all 0.2s;
+    user-select: none;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-10px);
 }
-.update-banner.hidden {
-    display: none;
+.update-notifier.visible {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
 }
-@keyframes slideDownUpdate {
-    from { opacity: 0; transform: translateY(-15px); }
-    to { opacity: 1; transform: translateY(0); }
+.update-notifier:hover {
+    background: var(--brand-blue);
+    color: #fff;
+    box-shadow: 0 0 15px var(--brand-glow);
+}
+@keyframes notifierPulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 209, 167, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 209, 167, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 209, 167, 0); }
 }
 
 /* ── Roblox Connect Cards ─────────────────────────────────── */

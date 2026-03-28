@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.1.9'; // Stand: 28.03.2026
+let CURRENT_VERSION = '1.2.0'; // Stand: 28.03.2026 (Sync)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1547,6 +1547,13 @@ Object.assign(App, {
         } catch (e) {
             console.error('[News] Fehler beim Laden der Live-News:', e.message);
             newsContainer.innerHTML = '<div class="news-error">Live-News konnten nicht geladen werden.</div>';
+        }
+    },
+
+    // Schnittstelle zum UpdateManager (Icon-Klick)
+    showUpdateDialog() {
+        if (typeof UpdateManager !== 'undefined') {
+            UpdateManager.showUpdateDialog();
         }
     },
 });
