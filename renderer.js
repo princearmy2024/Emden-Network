@@ -2,12 +2,12 @@
  * EMDEN NETWORK DASHBOARD - renderer.js
  * Frontend-Logik (Renderer-Prozess)
  * 
- * Version: 1.3.4 (Stabilisierte PTT & Sync)
+ * Version: 1.3.5 (Fix renderChannels & init error)
  */
 
 'use strict';
 
-window.CURRENT_VERSION = '1.3.4';
+window.CURRENT_VERSION = '1.3.5';
 
 const CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
@@ -168,7 +168,7 @@ const App = {
     _staticLoop: null,
 
     async init() {
-        console.log('[App] Starting v1.3.4...');
+        console.log('[App] Starting v1.3.5...');
         this.initBackgroundParallax();
         this.startClock();
         this.initPTTHandlers();
@@ -186,6 +186,18 @@ const App = {
                 if (btn) btn.style.display = 'block';
                 NotificationService.show('Update bereit!', 'Bitte neu starten.', 'success');
             });
+        }
+    },
+
+    initLoginHandlers() {
+        const btn = document.getElementById('loginBtn');
+        const input = document.getElementById('loginInput');
+        if (btn && input) {
+            btn.onclick = async () => {
+                const res = await AuthService.verify(input.value);
+                if (res.success) this.showDashboard(res.user);
+                else NotificationService.show('Fehler', res.error, 'error');
+            };
         }
     },
 
@@ -214,6 +226,12 @@ const App = {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-' + view)?.classList.add('active');
         document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
+    },
+
+    renderChannels() {
+        const el = document.getElementById('channelList');
+        if (!el) return;
+        el.innerHTML = MockData.channels.map(ch => `<div class="channel-item" onclick="App.currentChat='${ch.name}'; App.navigate('messages')"><span>#</span> ${ch.name}</div>`).join('');
     },
 
     showScreen(id) {
