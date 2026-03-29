@@ -238,28 +238,21 @@ const WebSocketService = {
             });
 
             // 📡 VOICE SYNC (Walkie-Talkie Synchronisation) 📡
-            this.socket.on('voice_state_update', (channels) => {
+            let lastUpdate = 0;
+            const handleVoiceSync = (channels) => {
                 if (!channels) return;
-                console.log('[Voice] Empfange Live-Update der Sprachkanäle...');
                 
-                // Wir spiegeln die Daten, BEHALTEN aber unseren eigenen 'active' Status bei
+                // Rate Limiting: Ignoriere Updates die schneller als 1s nacheinander kommen
+                const now = Date.now();
+                if (now - lastUpdate < 1000) return;
+                lastUpdate = now;
+
+                console.log('[Voice] Synchronisiere Sprachkanäle...');
+                
+                // Rock-Solid Persistence: Wir behalten UNSERE Auswahl!
                 MockData.voiceChannels = channels.map(serverVC => {
                     const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
-                    return {
-                        ...serverVC,
-                        active: localVC ? localVC.active : false
-                    };
-                });
-
-                App.renderVoiceChannels();
-            });
-
-            this.socket.on('voice_channel_members', (channels) => {
-                if (!channels) return;
-                console.log('[Voice] Mitglieder-Update empfangen.');
-                
-                MockData.voiceChannels = channels.map(serverVC => {
-                    const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
+                    // Den Status 'active' behalten wir nur von uns selbst bei
                     return {
                         ...serverVC,
                         active: localVC ? localVC.active : false
@@ -268,7 +261,10 @@ const WebSocketService = {
 
                 App.renderVoiceChannels();
                 App.renderActiveVoiceCard();
-            });
+            };
+
+            this.socket.on('voice_state_update', handleVoiceSync);
+            this.socket.on('voice_channel_members', handleVoiceSync);
 
             this.socket.on('voice_created', (newChannel) => {
                 if (!MockData.voiceChannels.find(vc => vc.id === newChannel.id)) {
