@@ -498,7 +498,7 @@ const App = {
 
     // --- INIT ---
     async init() {
-        console.log(`[App] Initialisiere Dashboard v1.6.2...`);
+        console.log(`[App] Initialisiere Dashboard v1.6.4...`);
         
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
@@ -506,7 +506,7 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.6.2`;
+            if (splashVer) splashVer.textContent = `Control Center v1.6.4`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -2437,6 +2437,7 @@ Object.assign(App, {
         }
 
         const user = AuthService.getUser();
+        const avatarHtml = user?.avatar ? `<img src="${user.avatar}" class="avc-p-img">` : `<div class="avc-p-initials">${user?.username ? user.username[0].toUpperCase() : 'U'}</div>`;
         
         // Alle Teilnehmer außer mir selbst
         const otherMembers = (vc.members || []).filter(m => m !== 'Du' && m !== user?.username);
@@ -2444,14 +2445,21 @@ Object.assign(App, {
         activeContainer.innerHTML = `
             <div class="active-voice-card animated-in">
                 <div class="avc-head">
-                   <div class="avc-icon">🔊</div>
+                   <div class="avc-icon">📻</div>
                    <div class="avc-name">#${escHtml(vc.name)}</div>
                    <span class="status-live-badge" style="margin-left:auto;">LIVE</span>
                 </div>
                 <div class="avc-participants">
+                    <div class="avc-p-item me">
                         ${avatarHtml}
                         <span class="avc-p-name">Du</span>
                     </div>
+                    ${otherMembers.map(m => `
+                        <div class="avc-p-item">
+                            <div class="avc-p-initials">${m[0]?.toUpperCase() || '?'}</div>
+                            <span class="avc-p-name">${escHtml(m)}</span>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
         `;
