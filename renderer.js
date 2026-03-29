@@ -1215,12 +1215,33 @@ const App = {
     },
 
     selectVoiceChannel(id) {
+        const targetVC = MockData.voiceChannels.find(vc => vc.id === id);
+        if (!targetVC) return;
+
+        // --- PRIVACY CHECK (Passwort-Abfrage) ---
+        if (targetVC.type === 'private' && targetVC.password && !targetVC.active) {
+            const pass = prompt(`Kanal #${targetVC.name} ist geschützt. Bitte Passwort eingeben:`);
+            if (pass !== targetVC.password) {
+                NotificationService.show('Zutritt verweigert', 'Falsches Passwort für diese Frequenz.', 'error');
+                return;
+            }
+        }
+
         // Sound-Effekt (Frequenzwechsel)
         this.playBlip(700, 0.08);
 
+        // SYNC: Signal an den Server senden (Falls verbunden)
+        if (WebSocketService.socket?.connected) {
+            const user = AuthService.getUser();
+            WebSocketService.socket.emit('voice_channel_join', {
+                channelId: id,
+                username:  user?.username  || 'User',
+                discordId: user?.discordId || '',
+            });
+        }
+
         MockData.voiceChannels.forEach(vc => {
             vc.active = (vc.id === id);
-            // Mock: "Du" wechselt den Kanal
             vc.members = vc.members.filter(m => m !== 'Du');
             if (vc.active) vc.members.push('Du');
         });
@@ -1867,7 +1888,6 @@ Object.assign(App, {
 
         // --- PRIVACY CHECK (Passwort-Abfrage) ---
         if (targetVC.type === 'private' && targetVC.password && !targetVC.active) {
-            // "Du" ist noch nicht drin? Dann nach Passwort fragen
             const pass = prompt(`Kanal #${targetVC.name} ist geschützt. Bitte Passwort eingeben:`);
             if (pass !== targetVC.password) {
                 NotificationService.show('Zutritt verweigert', 'Falsches Passwort für diese Frequenz.', 'error');
