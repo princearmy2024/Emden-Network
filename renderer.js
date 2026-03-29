@@ -237,12 +237,37 @@ const WebSocketService = {
                 NotificationService.show('Roblox verbunden! 🎮', `Willkommen, ${profile.displayName}!`, 'success');
             });
 
-            // ── VOICE SYNC (Walkie-Talkie Synchronisation) ──
+            // 📡 VOICE SYNC (Walkie-Talkie Synchronisation) 📡
             this.socket.on('voice_state_update', (channels) => {
+                if (!channels) return;
                 console.log('[Voice] Empfange Live-Update der Sprachkanäle...');
-                // API-Daten in das lokale MockData spiegeln für das Rendering
-                MockData.voiceChannels = channels;
+                
+                // Wir spiegeln die Daten, BEHALTEN aber unseren eigenen 'active' Status bei
+                MockData.voiceChannels = channels.map(serverVC => {
+                    const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
+                    return {
+                        ...serverVC,
+                        active: localVC ? localVC.active : false
+                    };
+                });
+
                 App.renderVoiceChannels();
+            });
+
+            this.socket.on('voice_channel_members', (channels) => {
+                if (!channels) return;
+                console.log('[Voice] Mitglieder-Update empfangen.');
+                
+                MockData.voiceChannels = channels.map(serverVC => {
+                    const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
+                    return {
+                        ...serverVC,
+                        active: localVC ? localVC.active : false
+                    };
+                });
+
+                App.renderVoiceChannels();
+                App.renderActiveVoiceCard();
             });
 
             this.socket.on('voice_created', (newChannel) => {
@@ -2382,12 +2407,8 @@ Object.assign(App, {
             this.playBlip(600, 0.05);
         });
 
-        // Kanal-Mitglieder-Update (wer ist wo)
-        socket.on('voice_channel_members', (channels) => {
-            if (channels) MockData.voiceChannels = channels;
-            this.renderVoiceChannels();
-            this.renderActiveVoiceCard();
-        });
+        // Kanal-Mitglieder-Update (v1.6.1: Entfernt da nun via WebSocketService zentral)
+        // (Wird oben bereits in WebSocketService.connect() gehandelt)
     },
 
     playRadioStatic(active) {
