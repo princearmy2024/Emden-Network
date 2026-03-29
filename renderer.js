@@ -249,12 +249,16 @@ const WebSocketService = {
 
                 console.log('[Voice] Synchronisiere Sprachkanäle...');
                 
-                // Rock-Solid Persistence: Wir behalten UNSERE Auswahl!
+                const me = AuthService.getUser();
                 MockData.voiceChannels = channels.map(serverVC => {
                     const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
-                    // Den Status 'active' behalten wir nur von uns selbst bei
+                    
+                    // Deduplizierung: Wenn mein Name in der Server-Liste steht, entferne das lokale 'Du'
+                    let serverMembers = serverVC.members || [];
+                    
                     return {
                         ...serverVC,
+                        members: serverMembers,
                         active: localVC ? localVC.active : false
                     };
                 });
@@ -494,7 +498,7 @@ const App = {
 
     // --- INIT ---
     async init() {
-        console.log(`[App] Initialisiere Dashboard v1.5.4...`);
+        console.log(`[App] Initialisiere Dashboard v1.6.2...`);
         
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
@@ -502,7 +506,7 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.5.4`;
+            if (splashVer) splashVer.textContent = `Control Center v1.6.2`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -1225,9 +1229,7 @@ const App = {
                 <div class="vc-info">
                     <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
                     <div class="vc-name">#${escHtml(vc.name)}</div>
-                </div>
-                <div class="vc-members">
-                    ${vc.members.map(m => `<div class="vc-member-avatar">${m[0].toUpperCase()}</div>`).join('')}
+                    ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
                 </div>
             </div>
         `).join('');
@@ -1268,13 +1270,15 @@ const App = {
         });
 
         this.renderVoiceChannels();
+        this.renderActiveVoiceCard(); // Dashboard-Card aktualisieren
 
         const status = document.getElementById('pttStatus');
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
         if (status && activeCh) {
-            status.textContent = 'Verbunden mit #' + activeCh.name;
+            status.textContent = 'Frequenz: #' + activeCh.name;
             status.style.color = 'var(--status-online)';
             status.style.fontWeight = '700';
+            status.style.textShadow = '0 0 10px var(--status-online)';
         }
     },
 
@@ -1356,7 +1360,7 @@ const App = {
         NotificationService.show(title, msg, type);
     },
 
-    // --- LIVE NEWS SYSTEM ---
+    // --- LIVE NEWS ---
     async loadLiveNews() {
         const listEl = document.getElementById('announcementList');
         if (!listEl) return;
@@ -1872,29 +1876,24 @@ Object.assign(App, {
             if (!activeCh) {
                 wtMemberList.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
             } else {
-                wtMemberList.innerHTML = activeCh.members.filter(m => m !== 'Alex').map(m => {
-                    const isSpeaking = App.isSpeaking && m === 'Du';
-                    const user = AuthService.getUser();
-                    const isMe = m === 'Du';
+                const user = AuthService.getUser();
+                // Filter: Nur einzigartige Namen anzeigen (bevorzugt den echten Namen statt 'Du')
+                const uniqueMembers = [...new Set(activeCh.members.map(m => m === 'Du' ? user?.username : m))].filter(Boolean);
+
+                wtMemberList.innerHTML = uniqueMembers.map(m => {
+                    const isMe = m === user?.username;
+                    const isSpeaking = App.isSpeaking && isMe;
                     const speakClass = isSpeaking ? 'is-me transmitting' : '';
-                    const avatarContent = (isMe && user.avatar) 
+                    const avatarContent = (isMe && user?.avatar) 
                         ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` 
-                        : m[0].toUpperCase();
+                        : (m ? m[0].toUpperCase() : '?');
 
                     return `
                         <div class="wt-member-item ${speakClass}">
                             <div class="wt-member-avatar">${avatarContent}</div>
                             <div class="wt-member-info">
-                                <div class="wt-member-name">${m}</div>
+                                <div class="wt-member-name">${m === user?.username ? 'Du' : m}</div>
                                 <div class="wt-member-role">${m === (activeCh.owner || 'Admin') ? 'OWNER' : (isMe ? 'Du' : 'Mitglied')}</div>
-                            </div>
-                            <div class="wt-member-mic">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                    <line x1="12" y1="19" x2="12" y2="23"/>
-                                    <line x1="8" y1="23" x2="16" y2="23"/>
-                                </svg>
                             </div>
                         </div>
                     `;
@@ -2438,7 +2437,9 @@ Object.assign(App, {
         }
 
         const user = AuthService.getUser();
-        const avatarHtml = user.avatar ? `<img src="${user.avatar}" class="avc-p-img">` : `<div class="avc-p-initials">${user.username[0].toUpperCase()}</div>`;
+        
+        // Alle Teilnehmer außer mir selbst
+        const otherMembers = (vc.members || []).filter(m => m !== 'Du' && m !== user?.username);
 
         activeContainer.innerHTML = `
             <div class="active-voice-card animated-in">
@@ -2448,7 +2449,6 @@ Object.assign(App, {
                    <span class="status-live-badge" style="margin-left:auto;">LIVE</span>
                 </div>
                 <div class="avc-participants">
-                    <div class="avc-p-item">
                         ${avatarHtml}
                         <span class="avc-p-name">Du</span>
                     </div>
