@@ -1841,7 +1841,7 @@ svg { display: block; flex-shrink: 0; }
 /* ── Voice channel items ──────────────────────── */
 .voice-channels { display: flex; flex-direction: column; gap: 4px; }
 .voice-channel-item {
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: row; align-items: center; gap: 8px;
     padding: 10px 12px; border-radius: 10px;
     background: transparent; border: 1px solid transparent;
     cursor: pointer; transition: all 0.2s ease;
@@ -1855,7 +1855,30 @@ svg { display: block; flex-shrink: 0; }
     border-color: rgba(0,209,167,0.25);
     box-shadow: 0 0 16px rgba(0,209,167,0.04);
 }
-.vc-info { display: flex; align-items: center; gap: 8px; }
+.vc-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+
+/* Leave-Button (✕) der beim aktiven Kanal erscheint */
+.vc-leave-btn {
+    flex-shrink: 0;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 60, 60, 0.12);
+    border: 1px solid rgba(255, 60, 60, 0.2);
+    color: rgba(255, 100, 100, 0.8);
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    padding: 0;
+}
+.vc-leave-btn:hover {
+    background: rgba(255, 60, 60, 0.3);
+    border-color: rgba(255, 60, 60, 0.5);
+    color: #fff;
+    transform: scale(1.15);
+    box-shadow: 0 0 10px rgba(255, 60, 60, 0.3);
+}
 .vc-icon { font-size: 14px; }
 .vc-name { font-size: 12.5px; font-weight: 600; color: var(--text); }
 .vc-participants-discord { display: flex; flex-direction: column; gap: 4px; padding-left: 22px; }

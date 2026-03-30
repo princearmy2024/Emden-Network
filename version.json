@@ -1,6 +1,6 @@
 {
-    "version": "1.5.4",
-    "releaseDate": "2026-03-28",
-    "notes": "v1.5.4: Stabilisierung der Audio-Engine & Fix für Roblox PTT-Indicator.",
+    "version": "1.6.5",
+    "releaseDate": "2026-03-30",
+    "notes": "v1.6.5: Voice-Chat Stabilisierung, globales Voice-Tracking, Walkie-Talkie Fixes & Roblox Debug-Code entfernt.",
     "forceUpdate": true
 }

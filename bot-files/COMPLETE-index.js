@@ -537,6 +537,28 @@ const io = new SocketIOServer(apiServer, {
 
 const chatHistory = []; // max 50 Nachrichten
 
+// ================================================================
+// 🎙️ GLOBALE Voice-User Tracking Map (MUSS global sein!)
+// Vorher war diese Map lokal pro Socket → kritischer Bug behoben
+// ================================================================
+const activeVoiceUsers = new Map(); // socketId → { channelId, username, discordId }
+
+// Hilfsfunktion: Aktuellen Voice-Status als Array bauen und an alle senden
+function broadcastVoiceState() {
+    const voiceChannels = [
+        { id: 'vc-1', name: 'voice-general', type: 'public', active: false, members: [] },
+        { id: 'vc-2', name: 'ops-room',      type: 'private', active: false, members: [] }
+    ];
+    for (const user of activeVoiceUsers.values()) {
+        const vc = voiceChannels.find(v => v.id === user.channelId);
+        if (vc && user.username && !vc.members.includes(user.username)) {
+            vc.members.push(user.username);
+        }
+    }
+    io.emit('voice_channel_members', voiceChannels);
+    console.log('[Voice] 📡 Broadcast state:', voiceChannels.map(v => `${v.id}:[${v.members.join(',')}]`).join(' | '));
+}
+
 function broadcastOnlineUsers() {
     // Alte User (> 30s) entfernen
     const cutoff = Date.now() - 35000;
@@ -557,7 +579,7 @@ io.on("connection", (socket) => {
 
     socket.on("overlay_client_connect", ({ discordId, robloxId, isAdmin }) => {
         if (discordId) overlayClients.set(socket.id, { discordId, isAdmin });
-        
+
         // Re-verknüpfung im Speicher, falls Bot neugestartet ist
         if (discordId && robloxId) {
             robloxLinks.set(discordId, robloxId);
@@ -567,7 +589,7 @@ io.on("connection", (socket) => {
         socket.emit("overlay_supporter_count", { count: Math.max(0, lastSupporterCount) });
         // Sende aktuellen Spiel-Status, falls schon aktiv 
         if (discordId && robloxPresenceState.get(discordId)) {
-            socket.emit(`overlay_game_start_${discordId}`, { startTime: Date.now() }); 
+            socket.emit(`overlay_game_start_${discordId}`, { startTime: Date.now() });
         }
     });
 
@@ -598,27 +620,54 @@ io.on("connection", (socket) => {
     });
 
     // ================================================================
-    // 🎙️ WALKIE-TALKIE VOICE SYSTEM
+    // 🎙️ WALKIE-TALKIE VOICE SYSTEM (v2 — Global Tracking)
     // ================================================================
 
     // User tritt einem Sprachkanal bei → socket.io "room" beitreten
     socket.on("voice_channel_join", ({ channelId, username, discordId }) => {
+        if (!channelId || !username) return;
+
         // Alle alten Voice-Rooms verlassen
         for (const room of socket.rooms) {
             if (room.startsWith("voice:") && room !== socket.id) {
                 socket.leave(room);
             }
         }
+
         const room = `voice:${channelId}`;
         socket.join(room);
+
         socket.currentVoiceChannel = channelId;
-        socket.voiceUsername = username || "User";
-        socket.voiceDiscordId = discordId || "";
+        socket.voiceUsername        = username || "User";
+        socket.voiceDiscordId       = discordId || "";
 
-        console.log(`[Voice] ${username} → #${channelId}`);
+        // Globale Map aktualisieren
+        activeVoiceUsers.set(socket.id, { channelId, username, discordId: discordId || '' });
+        console.log(`[Voice] ✅ ${username} ist #${channelId} beigetreten (${activeVoiceUsers.size} aktive User)`);
 
-        // Allen im Raum sagen wer da ist
-        io.to(room).emit("voice_user_joined", { channelId, username, discordId });
+        // Alle benachrichtigen wer wo ist
+        broadcastVoiceState();
+    });
+
+    // User verlässt Kanal manuell (ohne App zu schließen)
+    socket.on("voice_channel_leave", ({ channelId, username, discordId }) => {
+        if (!channelId) return;
+
+        const room = `voice:${channelId}`;
+        socket.leave(room);
+
+        // PTT-Stop senden falls noch aktiv
+        socket.to(room).emit("voice_ptt_stop", {
+            channelId, username: username || socket.voiceUsername || 'User',
+            discordId: discordId || socket.voiceDiscordId || '',
+        });
+
+        activeVoiceUsers.delete(socket.id);
+        socket.currentVoiceChannel = null;
+        socket.voiceUsername        = null;
+
+        console.log(`[Voice] 🚪 ${username} hat #${channelId} verlassen`);
+        broadcastVoiceState();
     });
 
     // Kanal erstellen → an alle broadcasten
@@ -640,27 +689,32 @@ io.on("connection", (socket) => {
         console.log(`[Voice] ⏹ ${data.username} stoppt in #${data.channelId}`);
     });
 
-    // Audio-Chunk → nur an Leute im selben Voice-Channel weiterschicken
+    // Audio-Chunk → nur an Leute im selben Voice-Channel (NICHT zurück an Sender)
     socket.on("voice_audio_chunk", (data) => {
         const room = `voice:${data.channelId}`;
-        // Broadcast: NICHT zurück an den Sender
         socket.to(room).emit("voice_audio_chunk", data);
     });
 
-    // Beim Disconnect: PTT-Stop senden falls noch aktiv
+    // Beim Disconnect: Aufräumen
     socket.on("disconnect", () => {
         overlayClients.delete(socket.id);
-        if (socket.currentVoiceChannel && socket.voiceUsername) {
-            const room = `voice:${socket.currentVoiceChannel}`;
+
+        if (activeVoiceUsers.has(socket.id)) {
+            const user = activeVoiceUsers.get(socket.id);
+            const room = `voice:${user.channelId}`;
+
+            // PTT-Stop an alle im Raum senden (falls User noch sprach)
             io.to(room).emit("voice_ptt_stop", {
-                channelId: socket.currentVoiceChannel,
-                username: socket.voiceUsername,
-                discordId: socket.voiceDiscordId || "",
+                channelId: user.channelId,
+                username:  user.username,
+                discordId: user.discordId || '',
             });
-            io.to(room).emit("voice_user_left", {
-                channelId: socket.currentVoiceChannel,
-                username: socket.voiceUsername,
-            });
+
+            activeVoiceUsers.delete(socket.id);
+            console.log(`[Voice] 🔌 ${user.username} disconnected — aus #${user.channelId} entfernt`);
+
+            // Allen den neuen State senden
+            broadcastVoiceState();
         }
     });
 });
@@ -763,16 +817,6 @@ function startOverlayDataLoop() {
                                 if (String(val) === rId) { dId = key; break; }
                             }
                             if (dId) {
-                                // DEBUG: Sende eine Benachrichtigung ans Dashboard mit der erkannten PlaceID
-                                if (pres.userPresenceType === 2 && pres.placeId) {
-                                    io.emit(`overlay_notification_${dId}`, {
-                                        title: '🔄 Roblox API Debug',
-                                        text: `Spiel erkannt!\nPlaceID: ${pres.placeId}\nRootID: ${pres.rootPlaceId || 'N/A'}\nBitte sende diese ID an den Developer!`,
-                                        type: 'announce',
-                                        duration: 15000
-                                    });
-                                }
-
                                 const isPlayingEmden = pres.userPresenceType === 2 &&
                                     (String(pres.placeId) === "12716055617" || String(pres.rootPlaceId) === "12716055617");
                                 const prevState = robloxPresenceState.get(dId) || false;

@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.5.4'; // Stand: 28.03.2026 (Stability: Audio Engine, Roblox PTT-Indicator)
+let CURRENT_VERSION = '1.6.5'; // Stand: 30.03.2026 (Voice Stabilisierung, Walkie-Talkie Fixes)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -238,27 +238,18 @@ const WebSocketService = {
             });
 
             // 📡 VOICE SYNC (Walkie-Talkie Synchronisation) 📡
-            let lastUpdate = 0;
             const handleVoiceSync = (channels) => {
                 if (!channels) return;
-                
-                // Rate Limiting: Ignoriere Updates die schneller als 1s nacheinander kommen
-                const now = Date.now();
-                if (now - lastUpdate < 1000) return;
-                lastUpdate = now;
-
-                console.log('[Voice] Synchronisiere Sprachkanäle...');
+                console.log('[Voice] Synchronisiere Sprachkanäle...', channels);
                 
                 const me = AuthService.getUser();
                 MockData.voiceChannels = channels.map(serverVC => {
                     const localVC = MockData.voiceChannels.find(v => v.id === serverVC.id);
                     
-                    // Deduplizierung: Wenn mein Name in der Server-Liste steht, entferne das lokale 'Du'
-                    let serverMembers = serverVC.members || [];
-                    
                     return {
                         ...serverVC,
-                        members: serverMembers,
+                        members: serverVC.members || [],
+                        // Lokaler active-Zustand bleibt erhalten (Server kennt diesen nicht)
                         active: localVC ? localVC.active : false
                     };
                 });
@@ -269,6 +260,10 @@ const WebSocketService = {
 
             this.socket.on('voice_state_update', handleVoiceSync);
             this.socket.on('voice_channel_members', handleVoiceSync);
+            this.socket.on('voice_channel_leave', (data) => {
+                // Logik zum Entfernen aus UI bei Verlassen
+                App.renderVoiceChannels();
+            });
 
             this.socket.on('voice_created', (newChannel) => {
                 if (!MockData.voiceChannels.find(vc => vc.id === newChannel.id)) {
@@ -498,7 +493,7 @@ const App = {
 
     // --- INIT ---
     async init() {
-        console.log(`[App] Initialisiere Dashboard v1.6.4...`);
+        console.log(`[App] Initialisiere Dashboard v1.6.5...`);
         
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
@@ -506,7 +501,7 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.6.4`;
+            if (splashVer) splashVer.textContent = `Control Center v1.6.5`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -638,11 +633,6 @@ const App = {
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
-
-        // Auto-Join Standard-Kanal nach Socket-Verbindung
-        setTimeout(() => {
-            this.selectVoiceChannel('vc-1'); // Standard auf General setzen
-        }, 1500);
 
         // Demo: Notifications nach kurzer Zeit
         setTimeout(() => {
@@ -1224,6 +1214,7 @@ const App = {
         if (!listContainer) return;
 
         const title = '<div class="section-title">Sprachkanäle</div>';
+        const activeVC = MockData.voiceChannels.find(vc => vc.active);
         const html = MockData.voiceChannels.map(vc => `
             <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
                 <div class="vc-info">
@@ -1231,6 +1222,7 @@ const App = {
                     <div class="vc-name">#${escHtml(vc.name)}</div>
                     ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
                 </div>
+                ${vc.active ? `<button class="vc-leave-btn" onclick="event.stopPropagation(); App.leaveVoiceChannel('${vc.id}')" title="Kanal verlassen">✕</button>` : ''}
             </div>
         `).join('');
 
@@ -1280,6 +1272,45 @@ const App = {
             status.style.fontWeight = '700';
             status.style.textShadow = '0 0 10px var(--status-online)';
         }
+    },
+
+    // Verlässt den aktuellen Sprachkanal
+    leaveVoiceChannel(id) {
+        const vc = MockData.voiceChannels.find(v => v.id === id);
+        if (!vc || !vc.active) return;
+
+        // PTT stoppen falls noch aktiv
+        if (this.isSpeaking) this.stopPTT();
+
+        // Socket-Event an den Server senden
+        if (WebSocketService.socket?.connected) {
+            const user = AuthService.getUser();
+            WebSocketService.socket.emit('voice_channel_leave', {
+                channelId: id,
+                username:  user?.username  || 'User',
+                discordId: user?.discordId || '',
+            });
+        }
+
+        // Lokal: Kanal deaktivieren, 'Du' aus der Mitgliederliste entfernen
+        vc.active = false;
+        const me = AuthService.getUser();
+        vc.members = vc.members.filter(m => m !== 'Du' && m !== me?.username);
+
+        this.renderVoiceChannels();
+        this.renderActiveVoiceCard();
+        this.playBlip(400, 0.08);
+
+        // Status zurücksetzen
+        const status = document.getElementById('pttStatus');
+        if (status) {
+            status.textContent = 'NICHT VERBUNDEN';
+            status.style.color = 'var(--text-muted)';
+            status.style.textShadow = 'none';
+            status.style.fontWeight = 'normal';
+        }
+
+        NotificationService.show('Kanal verlassen', `Du hast #${vc.name} verlassen.`, 'info');
     },
 
     // --- SETTINGS ---
@@ -1853,99 +1884,9 @@ Object.assign(App, {
         });
     },
     // --- VOICE (Walkie-Talkie) ───
-    renderVoiceChannels() {
-        const listContainer = document.querySelector('.voice-channels');
-        if (!listContainer) return;
-
-        const html = MockData.voiceChannels.map(vc => `
-            <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
-                <div class="vc-info">
-                    <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
-                    <div class="vc-name">#${escHtml(vc.name)}</div>
-                    ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
-                </div>
-            </div>
-        `).join('');
-
-        listContainer.innerHTML = html;
-
-        // Render Right Sidebar (Participants)
-        const wtMemberList = document.getElementById('wtMemberList');
-        if (wtMemberList) {
-            const activeCh = MockData.voiceChannels.find(vc => vc.active);
-            if (!activeCh) {
-                wtMemberList.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
-            } else {
-                const user = AuthService.getUser();
-                // Filter: Nur einzigartige Namen anzeigen (bevorzugt den echten Namen statt 'Du')
-                const uniqueMembers = [...new Set(activeCh.members.map(m => m === 'Du' ? user?.username : m))].filter(Boolean);
-
-                wtMemberList.innerHTML = uniqueMembers.map(m => {
-                    const isMe = m === user?.username;
-                    const isSpeaking = App.isSpeaking && isMe;
-                    const speakClass = isSpeaking ? 'is-me transmitting' : '';
-                    const avatarContent = (isMe && user?.avatar) 
-                        ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` 
-                        : (m ? m[0].toUpperCase() : '?');
-
-                    return `
-                        <div class="wt-member-item ${speakClass}">
-                            <div class="wt-member-avatar">${avatarContent}</div>
-                            <div class="wt-member-info">
-                                <div class="wt-member-name">${m === user?.username ? 'Du' : m}</div>
-                                <div class="wt-member-role">${m === (activeCh.owner || 'Admin') ? 'OWNER' : (isMe ? 'Du' : 'Mitglied')}</div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-    },
-
-    selectVoiceChannel(id) {
-        const targetVC = MockData.voiceChannels.find(vc => vc.id === id);
-        if (!targetVC) return;
-
-        // --- PRIVACY CHECK (Passwort-Abfrage) ---
-        if (targetVC.type === 'private' && targetVC.password && !targetVC.active) {
-            const pass = prompt(`Kanal #${targetVC.name} ist geschützt. Bitte Passwort eingeben:`);
-            if (pass !== targetVC.password) {
-                NotificationService.show('Zutritt verweigert', 'Falsches Passwort für diese Frequenz.', 'error');
-                return;
-            }
-        }
-
-        // Sound-Effekt (Frequenzwechsel)
-        this.playBlip(700, 0.08);
-
-        // SYNC: Signal an den Server senden (Falls verbunden)
-        if (WebSocketService.socket?.connected) {
-            const user = AuthService.getUser();
-            WebSocketService.socket.emit('voice_channel_join', {
-                channelId: id,
-                username:  user?.username  || 'User',
-                discordId: user?.discordId || '',
-            });
-        }
-
-        MockData.voiceChannels.forEach(vc => {
-            vc.active = (vc.id === id);
-            vc.members = vc.members.filter(m => m !== 'Du');
-            if (vc.active) vc.members.push('Du');
-        });
-
-        this.renderVoiceChannels();
-        this.renderActiveVoiceCard(); // Dashboard-Card aktualisieren
-
-        const status = document.getElementById('pttStatus');
-        const activeCh = MockData.voiceChannels.find(vc => vc.active);
-        if (status && activeCh) {
-            status.textContent = 'Frequenz: #' + activeCh.name;
-            status.style.color = 'var(--status-online)';
-            status.style.fontWeight = '700';
-            status.style.textShadow = '0 0 10px var(--status-online)';
-        }
-    },
+    // renderVoiceChannels() und selectVoiceChannel() sind oben im App-Objekt definiert.
+    // Diese Kopien wurden entfernt um Doppelfunktionen zu vermeiden.
+    // Der Leave-Button ✕ wird jetzt in der Haupt-renderVoiceChannels() gerendert.
 
     // --- PTT HOTKEY LOGIK ---
     isSpeaking: false,          // V-Taste gedrückt (Kanal offen)
