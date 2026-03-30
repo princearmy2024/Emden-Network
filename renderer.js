@@ -143,6 +143,17 @@ const UserRegistry = {
     },
     update(users) {
         const registry = this.get();
+        const now = Date.now();
+        const MAX_AGE = 7 * 24 * 60 * 60 * 1000;  // 7 days
+        
+        // Remove stale entries more than 7 days old
+        Object.entries(registry).forEach(([id, user]) => {
+            if (now - user.lastSeen > MAX_AGE) {
+                delete registry[id];
+            }
+        });
+        
+        // Add/update current users
         users.forEach(u => {
             const id = u.discordId || u.id || u.username; // Fallback auf Username
             if (id) {
@@ -192,7 +203,7 @@ const WebSocketService = {
             this.socket.on('connect', () => {
                 announceOnline();
                 // Nach Socket-Verbindung sofort Status neu holen (für frische User-Liste)
-                setTimeout(() => this._fetchStatus(), 800);
+                setTimeout(() => this._fetchStatus(), 2000);
                 // ── VOICE EVENTS registrieren (nach jeder Verbindung) ──
                 App.initVoiceSocketEvents(this.socket);
             });
@@ -284,6 +295,11 @@ const WebSocketService = {
 
     async _fetchStatus() {
         const data = await ApiService.get('/api/status');
+        if (!data) {
+            console.warn('[WebSocketService] Status fetch returned null');
+            App.setConnectionStatus('reconnect');
+            return;
+        }
         if (data?.online) {
             App.setConnectionStatus('online');
 
@@ -746,7 +762,12 @@ const App = {
         });
 
         // 2. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
-        const allMembers = Object.values(registry);
+        const now = Date.now();
+        const CUTOFF = 30 * 60 * 1000;  // 30 minutes
+        const allMembers = Object.values(registry).filter(u => 
+            onlineIds.has(u.discordId) || 
+            (now - u.lastSeen) < CUTOFF
+        );
 
         // 3. Online-IDs für den grünen Punkt sammeln
         const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
@@ -772,7 +793,10 @@ const App = {
         const avatarEl = u => {
             const initial = (u.username || '?')[0].toUpperCase();
             if (u.avatar) {
-                return `<img src="${u.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback\'>${initial}</div>';">`;
+                return `<div class="avatar-container" style="position:relative;">
+                    <img src="${u.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="avatar-fallback" style="display:none; width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0; position:absolute; top:0; left:0;">${initial}</div>
+                </div>`;
             }
             return `<div class="avatar-fallback" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0;">${initial}</div>`;
         };
