@@ -7,7 +7,7 @@
 
 // CONFIG
 const OVL_CONFIG = {
-    API_URL: 'http://91.98.124.212:5009',
+    API_URL: 'http://localhost:5009',
     EMDEN_PLACE_ID: 12716055617,
     ON_DUTY_ROLE_ID: 'PLACEHOLDER_ON_DUTY_ROLE_ID',
 };

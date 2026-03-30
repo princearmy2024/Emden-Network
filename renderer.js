@@ -19,8 +19,9 @@ let CURRENT_VERSION = '1.6.5'; // Stand: 30.03.2026 (Voice Stabilisierung, Walki
 // CONFIG — Bot-API
 // =============================================================
 const CONFIG = {
-    API_URL: 'http://91.98.124.212:5009',
+    API_URL: 'http://localhost:5009',
     API_KEY: 'emden-super-secret-key-2026',
+    DEMO_MODE: true,  // Aktiviert Demo-Codes für Testzwecke
 };
 
 // =============================================================
@@ -761,16 +762,16 @@ const App = {
             }
         });
 
-        // 2. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
+        // 2. Online-IDs für den grünen Punkt sammeln
+        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
+
+        // 3. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
         const now = Date.now();
         const CUTOFF = 30 * 60 * 1000;  // 30 minutes
         const allMembers = Object.values(registry).filter(u => 
             onlineIds.has(u.discordId) || 
             (now - u.lastSeen) < CUTOFF
         );
-
-        // 3. Online-IDs für den grünen Punkt sammeln
-        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
 
         // Zähler nur für ECHTE online Leute
         const onlineCount = onlineUsers.length;
