@@ -179,9 +179,35 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 // Discord Webhook (Manuel/Automatisch)
 ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
     console.log('[Discord] Sende Webhook für Version:', version);
-    
+
+    const now = new Date();
+    const timestamp = now.toISOString();
+
     const data = JSON.stringify({
-        content: `🚀 **Benachrichtigung aus dem Dashboard**\n\n**Titel:** ${version}\n\n**Nachricht:**\n${notes}\n\n[Download von GitHub](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe)`
+        username: 'Emden Network',
+        avatar_url: `https://github.com/${GITHUB_OWNER}.png`,
+        embeds: [{
+            title: `📢  ${version}`,
+            description: notes,
+            color: 0x00D1A7,
+            fields: [
+                {
+                    name: '🔗 Repository',
+                    value: `[Emden-Network auf GitHub](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO})`,
+                    inline: true
+                },
+                {
+                    name: '📥 Download',
+                    value: `[Setup herunterladen](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe)`,
+                    inline: true
+                }
+            ],
+            footer: {
+                text: 'Emden Network Control Center',
+                icon_url: `https://github.com/${GITHUB_OWNER}.png`
+            },
+            timestamp
+        }]
     });
 
     try {

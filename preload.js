@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // GitHub Updates
     checkGithubUpdate: () => ipcRenderer.invoke('check-github-update'),
     getGithubChangelog: () => ipcRenderer.invoke('get-github-changelog'),
-    sendToDiscord: (webhookUrl, version, notes) => ipcRenderer.send('send-to-discord', { webhookUrl, version, notes }),
+    sendToDiscord: ({ webhookUrl, version, notes }) => ipcRenderer.send('send-to-discord', { webhookUrl, version, notes }),
 
     // Öffnet URLs im System-Browser (für Roblox OAuth)
     openExternal: (url) => ipcRenderer.send('open-external', url),
