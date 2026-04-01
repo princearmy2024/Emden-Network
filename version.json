@@ -1,6 +1,6 @@
 {
-    "version": "1.7.6",
+    "version": "1.7.7",
     "releaseDate": "2026-04-01",
-    "notes": "v1.7.6: Walkie-Talkie Crash komplett behoben — playBlip shared AudioContext.",
+    "notes": "v1.7.7: Walkie-Talkie Audio Fix — Chunks werden gesammelt und komplett abgespielt.",
     "forceUpdate": true
 }

@@ -1953,6 +1953,7 @@ Object.assign(App, {
     _vadContext: null,
     _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
     _blipCtx: null,      // Shared AudioContext für playBlip
+    _incomingChunks: {}, // username → Uint8Array[] (Chunks sammeln bis PTT-Stop)
     _vadAnalyser: null,
     _vadBuffer: null,
     _vadInterval: null,
@@ -2288,16 +2289,13 @@ Object.assign(App, {
         }
     },
 
-    // ── EMPFÄNGER: Eingehende Audio-Chunks abspielen ────────────
-    // Nutzt <audio> + Blob-URL statt decodeAudioData — stabiler in Electron,
-    // kein AudioContext-Limit, kein nativer Renderer-Crash.
-    _playIncomingAudio(base64data, mimeType) {
+    // ── EMPFÄNGER: Alle Chunks einer PTT-Session abspielen ──────
+    // Nimmt ein Array von Uint8Arrays (alle Chunks zusammen) und
+    // spielt sie als eine zusammenhängende Audiodatei ab.
+    // WebM-Chunks sind nur komplett decodierbar (erster Chunk = Header).
+    _playIncomingAudio(chunks, mimeType) {
         try {
-            const binaryStr = atob(base64data);
-            const bytes = new Uint8Array(binaryStr.length);
-            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-            const blob = new Blob([bytes], { type: mimeType || 'audio/webm;codecs=opus' });
+            const blob = new Blob(chunks, { type: mimeType || 'audio/webm;codecs=opus' });
             const url  = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.volume = Math.min(1.0, this.pttVolume * 2.0);
@@ -2342,26 +2340,31 @@ Object.assign(App, {
 
     // ── Socket.IO Voice Events registrieren ─────────────────────
     initVoiceSocketEvents(socket) {
-        // Eingehende Audio-Chunks
+        // Eingehende Audio-Chunks → sammeln (WebM-Chunks sind nur zusammen decodierbar)
         socket.on('voice_audio_chunk', (data) => {
             const me = AuthService.getUser();
-            if (data.username === me?.username) return; // Kein Echo
-            this._playIncomingAudio(data.data, data.mimeType);
+            if (data.username === me?.username) return;
+            try {
+                const binary = atob(data.data);
+                const bytes  = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                if (!this._incomingChunks[data.username]) this._incomingChunks[data.username] = { chunks: [], mimeType: data.mimeType };
+                this._incomingChunks[data.username].chunks.push(bytes);
+            } catch(e) {}
         });
 
-        // Anderer User drückt PTT
+        // Anderer User drückt PTT → Buffer zurücksetzen
         socket.on('voice_ptt_start', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
 
             console.log('[Voice] 🔊', data.username, 'sendet...');
+            this._incomingChunks[data.username] = { chunks: [], mimeType: 'audio/webm;codecs=opus' };
             this._setSpeakerActive(data.username, true);
-
-            // Toast nur beim ersten Mal (nicht bei jedem Chunk)
             this.playBlip(800, 0.05);
         });
 
-        // Anderer User lässt PTT los
+        // Anderer User lässt PTT los → gesammelte Chunks abspielen
         socket.on('voice_ptt_stop', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
@@ -2369,11 +2372,16 @@ Object.assign(App, {
             console.log('[Voice] ⏹', data.username, 'hat aufgehört.');
             this._setSpeakerActive(data.username, false);
 
-            // Refresh Status-Text
+            // Alle Chunks zusammenfügen und abspielen
+            const entry = this._incomingChunks[data.username];
+            if (entry && entry.chunks.length > 0) {
+                this._playIncomingAudio(entry.chunks, entry.mimeType);
+                delete this._incomingChunks[data.username];
+            }
+
             const status = document.getElementById('pttStatus');
             const waveform = document.getElementById('wt-waveform');
             const activeCh = MockData.voiceChannels.find(vc => vc.active);
-            
             if (!this.isSpeaking && Object.keys(this._activeSpeakers).length === 0) {
                 if (status) {
                     status.textContent = activeCh?.name ? `VERBUNDEN · #${activeCh.name.toUpperCase()}` : 'NICHT VERBUNDEN';
@@ -2382,7 +2390,6 @@ Object.assign(App, {
                 }
                 if (waveform) waveform.classList.remove('active');
             }
-
             this.playBlip(600, 0.05);
         });
 
