@@ -272,6 +272,7 @@ const WebSocketService = {
 
                 App.renderVoiceChannels();
                 App.renderActiveVoiceCard();
+                App.renderWTMembers();
             };
 
             this.socket.on('voice_state_update', handleVoiceSync);
@@ -1299,7 +1300,8 @@ const App = {
         });
 
         this.renderVoiceChannels();
-        this.renderActiveVoiceCard(); // Dashboard-Card aktualisieren
+        this.renderActiveVoiceCard();
+        this.renderWTMembers();
 
         const status = document.getElementById('pttStatus');
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
@@ -1336,6 +1338,7 @@ const App = {
 
         this.renderVoiceChannels();
         this.renderActiveVoiceCard();
+        this.renderWTMembers();
         this.playBlip(400, 0.08);
 
         // Status zurücksetzen
@@ -2321,6 +2324,7 @@ Object.assign(App, {
         this._renderSpeakingOverlay();
         this.renderVoiceChannels();
         this.renderActiveVoiceCard();
+        this.renderWTMembers();
     },
 
     _renderSpeakingOverlay() {
@@ -2408,6 +2412,34 @@ Object.assign(App, {
             this.playBlip(500, 0.1);
             setTimeout(() => this.playBlip(400, 0.05), 100);
         }
+    },
+
+    renderWTMembers() {
+        const el = document.getElementById('wtMemberList');
+        if (!el) return;
+
+        const activeVC = MockData.voiceChannels.find(vc => vc.active);
+        if (!activeVC || !activeVC.members || activeVC.members.length === 0) {
+            el.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
+            return;
+        }
+
+        const me = AuthService.getUser();
+        el.innerHTML = activeVC.members.map(m => {
+            const isMe = m === 'Du' || m === me?.username;
+            const isSpeaking = !!this._activeSpeakers?.[m];
+            const isTransmitting = isMe && this.isSpeaking;
+            const initial = (m || 'U')[0].toUpperCase();
+            const classes = ['wt-member-item', isMe ? 'is-me' : '', isSpeaking ? 'is-speaking' : '', isTransmitting ? 'transmitting' : ''].filter(Boolean).join(' ');
+            return `<div class="${classes}">
+                <div class="wt-member-avatar">${initial}</div>
+                <div class="wt-member-info">
+                    <span class="wt-member-name">${escHtml(m)}${isMe ? ' <small style="opacity:0.45;font-size:9px">(Du)</small>' : ''}</span>
+                    <span class="wt-member-role">${isSpeaking ? '🔴 SENDET' : isTransmitting ? '🔴 SENDET' : '🟢 BEREIT'}</span>
+                </div>
+                <div class="wt-member-mic">${isSpeaking || isTransmitting ? '🔴' : '🎙'}</div>
+            </div>`;
+        }).join('');
     },
 
     renderActiveVoiceCard() {

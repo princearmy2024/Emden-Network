@@ -762,6 +762,83 @@ async function updateBotStatus(ci) {
     } catch (e) { console.error("[STATUS]", e.message); }
 }
 
+// ================================================================
+// 🚀 GITHUB RELEASE MONITOR — Sendet schönes Embed bei neuem Tag
+// ================================================================
+const GITHUB_OWNER = 'princearmy2024';
+const GITHUB_REPO  = 'Emden-Network';
+const UPDATE_WEBHOOK_URL = process.env.UPDATE_WEBHOOK_URL ||
+    'https://discord.com/api/webhooks/1487189165278756924/aYRVcnsC8YTq49rjMzs4VocunHsGAvSei3-webqm81tdNlyTVkPzb1w3WZOYatW-Ni_V';
+
+let lastKnownTag = null;
+
+async function checkGithubRelease() {
+    try {
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, {
+            headers: { 'User-Agent': 'EmdenNetwork-Bot' }
+        });
+        if (!res.ok) return;
+        const release = await res.json();
+        if (!release?.tag_name) return;
+
+        // Beim ersten Check nur speichern, nicht senden
+        if (!lastKnownTag) {
+            lastKnownTag = release.tag_name;
+            console.log(`[Update] Aktueller Tag: ${lastKnownTag}`);
+            return;
+        }
+
+        if (release.tag_name === lastKnownTag) return;
+
+        // Neuer Tag → Embed senden
+        lastKnownTag = release.tag_name;
+        const version = release.tag_name.replace('v', '');
+        const notes = (release.body || 'Keine Änderungen angegeben.')
+            .split('\n').slice(0, 8).join('\n').trim();
+        const downloadUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe`;
+        const releaseUrl  = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/${release.tag_name}`;
+        const avatarUrl   = `https://github.com/${GITHUB_OWNER}.png`;
+        const now         = new Date();
+        const dateStr     = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        const payload = JSON.stringify({
+            username:   'Emden Network Updates',
+            avatar_url: avatarUrl,
+            embeds: [{
+                author: {
+                    name:     'Neues Update veröffentlicht',
+                    icon_url: avatarUrl
+                },
+                title:       `⬆️  Emden Network Control Center — ${release.tag_name}`,
+                description: '> Eine neue Version ist verfügbar. Bitte aktualisiere dein Dashboard.',
+                color:       0x00D1A7,
+                fields: [
+                    { name: '📦  Version',   value: `\`${version}\``,  inline: true  },
+                    { name: '✅  Status',    value: '`Stabil`',         inline: true  },
+                    { name: '📅  Datum',     value: `\`${dateStr}\``,   inline: true  },
+                    { name: '📝  Änderungen', value: notes.length > 0 ? `\`\`\`\n${notes}\n\`\`\`` : '_Keine Beschreibung_', inline: false },
+                    { name: '📥  Download',  value: `[Setup herunterladen](${downloadUrl})`, inline: true  },
+                    { name: '🔗  Release',   value: `[GitHub Release](${releaseUrl})`,        inline: true  }
+                ],
+                footer: {
+                    text:     'Emden Network • Control Center',
+                    icon_url: avatarUrl
+                },
+                timestamp: now.toISOString()
+            }]
+        });
+
+        await fetch(UPDATE_WEBHOOK_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    payload
+        });
+        console.log(`[Update] ✅ Discord-Benachrichtigung gesendet für ${release.tag_name}`);
+    } catch (e) {
+        console.error('[Update] Fehler beim GitHub-Check:', e.message);
+    }
+}
+
 client.once("ready", async () => {
     console.log(`🤖 ${client.user.tag} ist online!`);
     startReminderScheduler(client);
@@ -769,6 +846,10 @@ client.once("ready", async () => {
     await updateBotStatus(client);
     setInterval(() => updateBotStatus(client), STATUS_UPDATE_INTERVAL);
     startOverlayDataLoop();
+
+    // GitHub Release Monitor starten
+    await checkGithubRelease(); // Beim Start: aktuellen Tag speichern
+    setInterval(checkGithubRelease, 5 * 60 * 1000); // Alle 5 Minuten prüfen
 });
 
 client.on("channelCreate", channel => {
