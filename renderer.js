@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.6.6'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '1.9.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1953,6 +1953,7 @@ Object.assign(App, {
     _vadContext: null,
     _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
     _blipCtx: null,      // Shared AudioContext für playBlip
+    _radioCtx: null,     // Shared AudioContext für Radio-Effekt (eingehend)
     _incomingStreams: {}, // username → { ms, sb, audio, queue }
     _vadAnalyser: null,
     _vadBuffer: null,
@@ -2073,8 +2074,52 @@ Object.assign(App, {
         if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
     },
 
+    // Busy-Ton: drei absteigende Pieptöne wenn Kanal belegt ──────
+    _playBusyTone() {
+        try {
+            if (!this._blipCtx || this._blipCtx.state === 'closed') {
+                this._blipCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this._blipCtx.state === 'suspended') this._blipCtx.resume().catch(() => {});
+            const ctx = this._blipCtx;
+            const now = ctx.currentTime;
+            [[440, 0, 0.07], [370, 0.09, 0.07], [311, 0.18, 0.12]].forEach(([freq, t, dur]) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, now + t);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + t + dur);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + t);
+                osc.stop(now + t + dur);
+            });
+        } catch(e) {}
+    },
+
     async startPTT() {
         if (this.isSpeaking) return;
+
+        // ── Kanal belegt? Jemand sendet bereits ──────────────────
+        if (Object.keys(this._activeSpeakers).length > 0) {
+            this._playBusyTone();
+            const status = document.getElementById('pttStatus');
+            if (status) {
+                const prev = { text: status.textContent, color: status.style.color, shadow: status.style.textShadow };
+                status.textContent = '⛔ KANAL BELEGT';
+                status.style.color = '#ff8c00';
+                status.style.textShadow = '0 0 10px rgba(255,140,0,0.5)';
+                setTimeout(() => {
+                    if (!this.isSpeaking) {
+                        status.textContent = prev.text;
+                        status.style.color = prev.color;
+                        status.style.textShadow = prev.shadow;
+                    }
+                }, 1500);
+            }
+            return;
+        }
 
         // ── 1. Mikrofon öffnen ────────────────────────────────────
         try {
@@ -2106,6 +2151,9 @@ Object.assign(App, {
             status.style.textShadow = '0 0 14px rgba(255,60,60,0.6)';
         }
         document.getElementById('wt-signal')?.classList.add('active');
+
+        // Kanal-Öffnungs-Sound
+        this.playRadioStatic(true);
 
         // Direkt senden — kein VAD
         this._startVoiceSend();
@@ -2270,8 +2318,52 @@ Object.assign(App, {
                 ? 'audio/webm;codecs=opus' : 'audio/webm';
             const ms    = new MediaSource();
             const audio = new Audio();
-            audio.src    = URL.createObjectURL(ms);
-            audio.volume = Math.min(1.0, this.pttVolume * 2.0);
+            audio.src = URL.createObjectURL(ms);
+
+            // ── Walkie-Talkie Radio-Effekt via Web Audio ─────────
+            let radioConnected = false;
+            const applyRadioEffect = () => {
+                try {
+                    if (!this._radioCtx || this._radioCtx.state === 'closed') {
+                        this._radioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    if (this._radioCtx.state === 'suspended') this._radioCtx.resume().catch(() => {});
+
+                    const src = this._radioCtx.createMediaElementSource(audio);
+
+                    // Bandpass (typisches Funkgerät: 300–3000 Hz)
+                    const bpf = this._radioCtx.createBiquadFilter();
+                    bpf.type = 'bandpass';
+                    bpf.frequency.value = 1400;
+                    bpf.Q.value = 0.6;
+
+                    // Leichte Verzerrung für den "Funk-Crunch"
+                    const ws = this._radioCtx.createWaveShaper();
+                    const n = 256, amount = 25;
+                    const curve = new Float32Array(n);
+                    for (let i = 0; i < n; i++) {
+                        const x = (i * 2) / n - 1;
+                        curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
+                    }
+                    ws.curve = curve;
+                    ws.oversample = '2x';
+
+                    // Ausgangslautstärke
+                    const gain = this._radioCtx.createGain();
+                    gain.gain.value = Math.min(1.0, this.pttVolume * 2.2);
+
+                    src.connect(bpf);
+                    bpf.connect(ws);
+                    ws.connect(gain);
+                    gain.connect(this._radioCtx.destination);
+                    audio.volume = 1; // Web Audio regelt die Lautstärke
+                    radioConnected = true;
+                } catch(e) {
+                    // Fallback ohne Effekt
+                    if (!radioConnected) audio.volume = Math.min(1.0, this.pttVolume * 2.0);
+                }
+            };
+            applyRadioEffect();
 
             const stream = { ms, audio, sb: null, queue: [], url: audio.src };
             this._incomingStreams[username] = stream;
@@ -2430,7 +2522,7 @@ Object.assign(App, {
 
         const activeVC = MockData.voiceChannels.find(vc => vc.active);
         if (!activeVC || !activeVC.members || activeVC.members.length === 0) {
-            el.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--text-muted);font-size:12px;">Keinem Kanal beigetreten</div>';
+            el.innerHTML = '<div class="wt-empty-msg">Keinem Kanal beigetreten</div>';
             return;
         }
 
@@ -2440,14 +2532,30 @@ Object.assign(App, {
             const isSpeaking = !!this._activeSpeakers?.[m];
             const isTransmitting = isMe && this.isSpeaking;
             const initial = (m || 'U')[0].toUpperCase();
+
+            const micIconReady = `<svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15" opacity="0.25"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+            const micIconTx = `<svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15" class="wt-mic-tx"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+            const micIconRx = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="15" height="15" class="wt-mic-rx"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+
+            let badge = '';
+            let icon = micIconReady;
+            if (isTransmitting) { badge = '<span class="wt-live-badge tx">TX</span>'; icon = micIconTx; }
+            else if (isSpeaking)  { badge = '<span class="wt-live-badge rx">RX</span>'; icon = micIconRx; }
+
+            const statusText = isTransmitting ? 'SENDET GERADE' : isSpeaking ? 'EMPFÄNGT AUDIO' : 'BEREIT';
             const classes = ['wt-member-item', isMe ? 'is-me' : '', isSpeaking ? 'is-speaking' : '', isTransmitting ? 'transmitting' : ''].filter(Boolean).join(' ');
+
             return `<div class="${classes}">
-                <div class="wt-member-avatar">${initial}</div>
-                <div class="wt-member-info">
-                    <span class="wt-member-name">${escHtml(m)}${isMe ? ' <small style="opacity:0.45;font-size:9px">(Du)</small>' : ''}</span>
-                    <span class="wt-member-role">${isSpeaking ? '🔴 SENDET' : isTransmitting ? '🔴 SENDET' : '🟢 BEREIT'}</span>
+                <div class="wt-member-avatar-wrap">
+                    <div class="wt-member-avatar">${initial}</div>
+                    ${isSpeaking || isTransmitting ? '<div class="wt-speaking-ring"></div>' : ''}
                 </div>
-                <div class="wt-member-mic">${isSpeaking || isTransmitting ? '🔴' : '🎙'}</div>
+                <div class="wt-member-info">
+                    <span class="wt-member-name">${escHtml(m)}${isMe ? ' <small class="wt-you-tag">DU</small>' : ''}</span>
+                    <span class="wt-member-status">${statusText}</span>
+                </div>
+                ${badge}
+                <div class="wt-member-mic-icon">${icon}</div>
             </div>`;
         }).join('');
     },
