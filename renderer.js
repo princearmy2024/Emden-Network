@@ -2093,43 +2093,22 @@ Object.assign(App, {
         }
 
         this.isSpeaking = true;
-        this.playRadioStatic(true);
 
-        // ── 2. VAD: AnalyserNode messen ───────────────────────────
-        if (this._vadContext) { try { this._vadContext.close(); } catch (_) {} this._vadContext = null; }
-        this._vadContext  = new (window.AudioContext || window.webkitAudioContext)();
-        const src          = this._vadContext.createMediaStreamSource(this._micStream);
-        this._vadAnalyser  = this._vadContext.createAnalyser();
-        this._vadAnalyser.fftSize = 512;
-        this._vadBuffer    = new Uint8Array(this._vadAnalyser.frequencyBinCount);
-        src.connect(this._vadAnalyser);
-
-        // UI: Kanal geöffnet (aber noch kein Senden)
+        // UI sofort auf SENDEN schalten
         const btn = document.getElementById('pttBtn');
-        if (btn) btn.classList.add('active');
+        if (btn) { btn.classList.add('active'); btn.classList.add('transmitting'); }
         const rings = document.getElementById('wt-ptt-rings');
-        if (rings) rings.classList.add('listening');
-
+        if (rings) { rings.classList.add('listening'); rings.classList.add('transmitting'); }
         const status = document.getElementById('pttStatus');
         if (status) {
-            status.textContent = '🟡 WARTE AUF SPRACHE...';
-            status.style.color = '#ffcc00';
-            status.style.textShadow = '0 0 10px rgba(255,204,0,0.5)';
+            status.textContent = '🔴 SENDE...';
+            status.style.color = '#ff3c3c';
+            status.style.textShadow = '0 0 14px rgba(255,60,60,0.6)';
         }
         document.getElementById('wt-signal')?.classList.add('active');
 
-        // ── 3. VAD-Loop: alle 80ms Audio-Level prüfen ─────────────
-        this._vadInterval = setInterval(() => {
-            if (!this.isSpeaking) return;
-            this._vadAnalyser.getByteFrequencyData(this._vadBuffer);
-            const avg = this._vadBuffer.reduce((a, b) => a + b, 0) / this._vadBuffer.length;
-
-            if (avg > this._VAD_THRESHOLD) {
-                if (!this.isActuallySending) this._startVoiceSend();
-            } else {
-                if (this.isActuallySending) this._pauseVoiceSend();
-            }
-        }, 80);
+        // Direkt senden — kein VAD
+        this._startVoiceSend();
 
         // Overlay-Signal
         const activeCh = MockData.voiceChannels.find(vc => vc.active);
@@ -2239,13 +2218,7 @@ Object.assign(App, {
         this.isSpeaking        = false;
         this.isActuallySending = false;
 
-        // VAD aufräumen
-        clearInterval(this._vadInterval);
-        this._vadInterval = null;
-        if (this._vadContext) {
-            this._vadContext.close().catch(() => {});
-            this._vadContext = this._vadAnalyser = this._vadBuffer = null;
-        }
+        // (kein VAD mehr)
 
         // MediaRecorder stoppen
         if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
@@ -2399,19 +2372,12 @@ Object.assign(App, {
 
     playRadioStatic(active) {
         if (active) {
-            // "Kkrschhh" beim Öffnen
+            // Einmal kurz abspielen beim Drücken — kein Loop
             const openSound = new Audio(this.pttSoundUrl);
             openSound.volume = 0.15;
             openSound.play().catch(() => {});
-            // Loop starten
-            if (this._staticLoop) this._staticLoop.play().catch(() => {});
         } else {
-            // Loop stoppen
-            if (this._staticLoop) {
-                this._staticLoop.pause();
-                this._staticLoop.currentTime = 0;
-            }
-            // End-Beep
+            // End-Beep beim Loslassen
             this.playBlip(500, 0.1);
             setTimeout(() => this.playBlip(400, 0.05), 100);
         }
