@@ -1953,7 +1953,7 @@ Object.assign(App, {
     _vadContext: null,
     _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
     _blipCtx: null,      // Shared AudioContext für playBlip
-    _incomingHeaders: {}, // username → Uint8Array (erster WebM-Chunk = Init-Segment/Header)
+    _incomingStreams: {}, // username → { ms, sb, audio, queue }
     _vadAnalyser: null,
     _vadBuffer: null,
     _vadInterval: null,
@@ -2262,23 +2262,73 @@ Object.assign(App, {
         }
     },
 
-    // ── EMPFÄNGER: Alle Chunks einer PTT-Session abspielen ──────
-    // Nimmt ein Array von Uint8Arrays (alle Chunks zusammen) und
-    // spielt sie als eine zusammenhängende Audiodatei ab.
-    // WebM-Chunks sind nur komplett decodierbar (erster Chunk = Header).
+    // ── LIVE-STREAMING via MediaSource API ──────────────────────
+    _openVoiceStream(username, mimeType) {
+        this._closeVoiceStream(username); // vorherigen aufräumen
+        try {
+            const mime = MediaSource.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus' : 'audio/webm';
+            const ms    = new MediaSource();
+            const audio = new Audio();
+            audio.src    = URL.createObjectURL(ms);
+            audio.volume = Math.min(1.0, this.pttVolume * 2.0);
+
+            const stream = { ms, audio, sb: null, queue: [], url: audio.src };
+            this._incomingStreams[username] = stream;
+
+            ms.addEventListener('sourceopen', () => {
+                try {
+                    stream.sb = ms.addSourceBuffer(mime);
+                    stream.sb.mode = 'sequence';
+                    stream.sb.addEventListener('updateend', () => {
+                        if (stream.queue.length > 0 && !stream.sb.updating) {
+                            try { stream.sb.appendBuffer(stream.queue.shift()); } catch(e) {}
+                        }
+                    });
+                    // Queued chunks die ankamen bevor sourceopen fertig war
+                    if (stream.queue.length > 0 && !stream.sb.updating) {
+                        try { stream.sb.appendBuffer(stream.queue.shift()); } catch(e) {}
+                    }
+                } catch(e) {}
+            });
+
+            audio.play().catch(() => {});
+        } catch(e) {}
+    },
+
+    _appendVoiceChunk(username, bytes) {
+        const stream = this._incomingStreams[username];
+        if (!stream) return;
+        if (stream.sb && !stream.sb.updating) {
+            try { stream.sb.appendBuffer(bytes); } catch(e) { stream.queue.push(bytes); }
+        } else {
+            stream.queue.push(bytes);
+        }
+    },
+
+    _closeVoiceStream(username) {
+        const stream = this._incomingStreams[username];
+        if (!stream) return;
+        delete this._incomingStreams[username];
+        setTimeout(() => {
+            try { if (stream.ms.readyState === 'open') stream.ms.endOfStream(); } catch(e) {}
+            stream.audio.pause();
+            URL.revokeObjectURL(stream.url);
+        }, 500);
+    },
+
+    // Fallback für direkte Blob-Wiedergabe (nicht mehr primär genutzt)
     _playIncomingAudio(chunks, mimeType) {
         try {
-            const blob = new Blob(chunks, { type: mimeType || 'audio/webm;codecs=opus' });
-            const url  = URL.createObjectURL(blob);
+            const blob  = new Blob(chunks, { type: mimeType || 'audio/webm;codecs=opus' });
+            const url   = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.volume = Math.min(1.0, this.pttVolume * 2.0);
             const cleanup = () => URL.revokeObjectURL(url);
             audio.onended = cleanup;
             audio.onerror = cleanup;
             audio.play().catch(cleanup);
-        } catch(e) {
-            // Leiser Fehler
-        }
+        } catch(e) {}
     },
 
     // ── Wer-spricht-Anzeige updaten ──────────────────────────────
@@ -2313,9 +2363,7 @@ Object.assign(App, {
 
     // ── Socket.IO Voice Events registrieren ─────────────────────
     initVoiceSocketEvents(socket) {
-        // Eingehende Audio-Chunks → sofort abspielen (Echtzeit)
-        // Erster Chunk = WebM Init-Segment (Header), wird gespeichert
-        // und jedem weiteren Chunk vorangestellt damit er decodierbar ist
+        // Eingehende Audio-Chunks → MediaSource Live-Streaming
         socket.on('voice_audio_chunk', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
@@ -2323,42 +2371,29 @@ Object.assign(App, {
                 const binary = atob(data.data);
                 const bytes  = new Uint8Array(binary.length);
                 for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-                const mimeType = data.mimeType || 'audio/webm;codecs=opus';
-
-                if (!this._incomingHeaders[data.username]) {
-                    // Erster Chunk = Header — speichern UND direkt abspielen
-                    this._incomingHeaders[data.username] = { bytes, mimeType };
-                    this._playIncomingAudio([bytes], mimeType);
-                } else {
-                    // Folgechunks: Header + Chunk zusammen → decodierbar
-                    const header = this._incomingHeaders[data.username].bytes;
-                    this._playIncomingAudio([header, bytes], mimeType);
-                }
+                this._appendVoiceChunk(data.username, bytes);
             } catch(e) {}
         });
 
-        // Anderer User drückt PTT → Header zurücksetzen
+        // Anderer User drückt PTT → neuen Live-Stream öffnen
         socket.on('voice_ptt_start', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
-
             console.log('[Voice] 🔊', data.username, 'sendet...');
-            delete this._incomingHeaders[data.username];
+            this._openVoiceStream(data.username, data.mimeType || 'audio/webm;codecs=opus');
             this._setSpeakerActive(data.username, true);
             this.playBlip(800, 0.05);
         });
 
-        // Anderer User lässt PTT los
+        // Anderer User lässt PTT los → Stream schließen
         socket.on('voice_ptt_stop', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
-
             console.log('[Voice] ⏹', data.username, 'hat aufgehört.');
-            delete this._incomingHeaders[data.username];
+            this._closeVoiceStream(data.username);
             this._setSpeakerActive(data.username, false);
 
-            const status = document.getElementById('pttStatus');
+            const status  = document.getElementById('pttStatus');
             const waveform = document.getElementById('wt-waveform');
             const activeCh = MockData.voiceChannels.find(vc => vc.active);
             if (!this.isSpeaking && Object.keys(this._activeSpeakers).length === 0) {

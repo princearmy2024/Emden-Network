@@ -1,6 +1,6 @@
 {
-    "version": "1.7.9",
+    "version": "1.8.0",
     "releaseDate": "2026-04-01",
-    "notes": "v1.7.9: Echtzeit-Audio — Chunks sofort abspielen statt warten bis PTT-Stop.",
+    "notes": "v1.8.0: Echtzeit-Streaming via MediaSource API — Audio beginnt sofort beim Drücken.",
     "forceUpdate": true
 }
