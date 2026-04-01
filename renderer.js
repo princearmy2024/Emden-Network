@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.6.5'; // Stand: 30.03.2026 (Voice Stabilisierung, Walkie-Talkie Fixes)
+let CURRENT_VERSION = '1.6.6'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -112,6 +112,7 @@ const ApiService = {
                 headers: { 'x-api-key': CONFIG.API_KEY },
                 signal: AbortSignal.timeout(5000),
             });
+            if (!res.ok) { console.warn('[ApiService] HTTP error:', res.status, endpoint); return null; }
             return res.json();
         } catch (e) {
             console.warn('[ApiService] GET fehlgeschlagen:', endpoint, e.message);
@@ -127,6 +128,7 @@ const ApiService = {
                 body: JSON.stringify(body),
                 signal: AbortSignal.timeout(5000),
             });
+            if (!res.ok) { console.warn('[ApiService] HTTP error:', res.status, endpoint); return null; }
             return res.json();
         } catch (e) {
             console.warn('[ApiService] POST fehlgeschlagen:', endpoint, e.message);
@@ -172,6 +174,7 @@ const UserRegistry = {
 const WebSocketService = {
     _pollInterval: null,
     _heartbeatInterval: null,
+    _announceInterval: null,
     socket: null,
     listeners: {},
 
@@ -220,7 +223,8 @@ const WebSocketService = {
             });
 
             // Alle 20s nochmal melden
-            setInterval(announceOnline, 20000);
+            if (this._announceInterval) clearInterval(this._announceInterval);
+            this._announceInterval = setInterval(announceOnline, 20000);
 
             this.socket.on('chat_history', (msgs) => {
                 const chatBox = document.getElementById('chatMessages');
@@ -357,7 +361,12 @@ const WebSocketService = {
     disconnect() {
         if (this._pollInterval) clearInterval(this._pollInterval);
         if (this._heartbeatInterval) clearInterval(this._heartbeatInterval);
-        this._pollInterval = this._heartbeatInterval = null;
+        if (this._announceInterval) clearInterval(this._announceInterval);
+        this._pollInterval = this._heartbeatInterval = this._announceInterval = null;
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
     },
 };
 
@@ -507,10 +516,11 @@ const App = {
     currentView: 'overview',
     currentChat: 'general',
     messages: [], // Zentraler Speicher für Filterung
+    _clockInterval: null,
 
     // --- INIT ---
     async init() {
-        console.log(`[App] Initialisiere Dashboard v1.6.5...`);
+        console.log(`[App] Initialisiere Dashboard v1.6.6...`);
         
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
@@ -518,7 +528,7 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.6.5`;
+            if (splashVer) splashVer.textContent = `Control Center v1.6.6`;
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -562,8 +572,8 @@ const App = {
             [100, 'Bereit.'],
         ];
         for (const [pct, msg] of steps) {
-            bar.style.width = pct + '%';
-            status.textContent = msg;
+            if (bar) bar.style.width = pct + '%';
+            if (status) status.textContent = msg;
             await sleep(380);
         }
         await sleep(400);
@@ -660,6 +670,7 @@ const App = {
     applyUser(user) {
         if (!user) return;
         const initial = (user.username || 'U')[0].toUpperCase();
+        const initialEscaped = escHtml(initial);
 
         // Hilfsfunktion: Avatar-Element mit Profilbild oder Initial befüllen
         const setAvatar = (id) => {
@@ -667,12 +678,12 @@ const App = {
             if (!el) return;
             const imgUrl = user.avatar || user.PFB || user.pfb;
             if (imgUrl) {
-                el.innerHTML = `<img src="${imgUrl}" alt="Avatar"
+                el.innerHTML = `<img src="${escHtml(imgUrl)}" alt="Avatar"
                     style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"
-                    onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\' style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;\'>${initial}</div>';">`;
+                    onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\' style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;\'>${initialEscaped}</div>';">`;
                 el.textContent = '';
             } else {
-                el.innerHTML = `<div class="avatar-fallback-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
+                el.innerHTML = `<div class="avatar-fallback-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initialEscaped}</div>`;
                 el.textContent = '';
             }
         };
@@ -884,7 +895,8 @@ const App = {
             }
         };
         tick();
-        setInterval(tick, 30000);
+        if (this._clockInterval) clearInterval(this._clockInterval);
+        this._clockInterval = setInterval(tick, 30000);
     },
 
     // --- MESSAGES ---
@@ -1416,8 +1428,8 @@ const App = {
         NotificationService.show(title, msg, type);
     },
 
-    // --- LIVE NEWS ---
-    async loadLiveNews() {
+    // --- ANNOUNCEMENT BANNER (announcementList) ---
+    async loadAnnouncementBanner() {
         const listEl = document.getElementById('announcementList');
         if (!listEl) return;
 
@@ -1766,7 +1778,9 @@ Object.assign(App, {
 
         const fmtDate = iso => {
             if (!iso) return '—';
-            return new Date(iso).toLocaleDateString('de-DE', { year: 'numeric', month: 'short', day: 'numeric' });
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleDateString('de-DE', { year: 'numeric', month: 'short', day: 'numeric' });
         };
         setEl('rblxCreated', fmtDate(profile.created));
         setEl('rblxConnectedAt', fmtDate(profile.connectedAt));
@@ -1870,9 +1884,14 @@ Object.assign(App, {
                     <div class="nc-date">${item.date || ''}</div>
                     <div class="nc-title">${escHtml(item.title)}</div>
                     <div class="nc-text">${escHtml(item.content)}</div>
-                    ${item.url ? `<button class="btn-small" onclick="window.electronAPI.openExternal('${item.url}')">Mehr lesen</button>` : ''}
+                    ${item.url ? `<button class="btn-small btn-open-news" data-url="${escHtml(item.url)}">Mehr lesen</button>` : ''}
                 </div>
             `).join('');
+            newsContainer.querySelectorAll('.btn-open-news').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    window.electronAPI?.openExternal(btn.dataset.url);
+                });
+            });
 
             console.log(`[News] ${news.length} News-Beiträge geladen.`);
         } catch (e) {
@@ -2071,6 +2090,7 @@ Object.assign(App, {
         this.playRadioStatic(true);
 
         // ── 2. VAD: AnalyserNode messen ───────────────────────────
+        if (this._vadContext) { try { this._vadContext.close(); } catch (_) {} this._vadContext = null; }
         this._vadContext  = new (window.AudioContext || window.webkitAudioContext)();
         const src          = this._vadContext.createMediaStreamSource(this._micStream);
         this._vadAnalyser  = this._vadContext.createAnalyser();

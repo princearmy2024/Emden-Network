@@ -1,6 +1,6 @@
 {
-    "version": "1.6.5",
+    "version": "1.6.6",
     "releaseDate": "2026-03-30",
-    "notes": "v1.6.5: Voice-Chat Stabilisierung, globales Voice-Tracking, Walkie-Talkie Fixes & Roblox Debug-Code entfernt.",
+    "notes": "v1.6.6: Versions-Synchronisierung, Konsistenz-Check bestanden.",
     "forceUpdate": true
 }

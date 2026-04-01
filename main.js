@@ -121,7 +121,7 @@ ipcMain.on('send-overlay-notification', (event, data) => {
 
 // Öffnet externe URLs im System-Browser (auch localhost + https)
 ipcMain.on('open-external', (event, url) => {
-    if (url && (url.startsWith('https://') || url.startsWith('http://localhost') || url.startsWith('http://'))) {
+    if (url && (url.startsWith('https://') || url.startsWith('http://localhost'))) {
         shell.openExternal(url);
     }
 });
@@ -186,6 +186,10 @@ ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
 
     try {
         const url = new URL(webhookUrl);
+        if (url.hostname !== 'discord.com' && !url.hostname.endsWith('.discord.com')) {
+            console.error('[Discord] Ungültige Webhook-Domain:', url.hostname);
+            return;
+        }
         const options = {
             hostname: url.hostname,
             path: url.pathname,
@@ -229,13 +233,15 @@ ipcMain.on('start-app-update', (event, { url }) => {
                 return;
             }
 
-            const totalSize = parseInt(response.headers['content-length'], 10);
+            const totalSize = parseInt(response.headers['content-length'], 10) || 0;
             let downloadedSize = 0;
             const file = fs.createWriteStream(tempPath);
 
             response.on('data', (chunk) => {
                 downloadedSize += chunk.length;
-                const progress = Math.round((downloadedSize / totalSize) * 100);
+                const progress = totalSize > 0
+                    ? Math.round((downloadedSize / totalSize) * 100)
+                    : -1; // -1 = unbekannte Dateigröße
                 event.sender.send('update_progress', progress);
             });
 
@@ -276,7 +282,11 @@ ipcMain.on('start-app-update', (event, { url }) => {
 let robloxCallbackServer = null;
 ipcMain.on('start-roblox-callback-server', (event, { botCallbackUrl }) => {
     // Alten Server aufräumen falls noch einer läuft
-    if (robloxCallbackServer) { try { robloxCallbackServer.close(); } catch (_) {} robloxCallbackServer = null; }
+    if (robloxCallbackServer) {
+        try { robloxCallbackServer.close(); }
+        catch (e) { console.warn('[Roblox] Fehler beim Schließen des alten Servers:', e.message); }
+        robloxCallbackServer = null;
+    }
 
     robloxCallbackServer = http.createServer((req, res) => {
         const urlObj = new URL(req.url, 'http://localhost:7329');
@@ -288,15 +298,21 @@ ipcMain.on('start-roblox-callback-server', (event, { botCallbackUrl }) => {
         res.writeHead(302, { Location: forwardUrl });
         res.end();
 
-        // Server nach kurzer Verzögerung schließen
-        setTimeout(() => { 
-            try { 
-                if (robloxCallbackServer && robloxCallbackServer.listening) {
-                    robloxCallbackServer.close(); 
+        // Server nach kurzer Verzögerung schließen (nur einmal planen)
+        if (!robloxCallbackServer._closeScheduled) {
+            robloxCallbackServer._closeScheduled = true;
+            setTimeout(() => {
+                try {
+                    if (robloxCallbackServer && robloxCallbackServer.listening) {
+                        robloxCallbackServer.close();
+                    }
+                    robloxCallbackServer = null;
+                } catch (e) {
+                    console.warn('[Roblox] Fehler beim Schließen des Callback-Servers:', e.message);
+                    robloxCallbackServer = null;
                 }
-                robloxCallbackServer = null; 
-            } catch (_) {} 
-        }, 3000);
+            }, 3000);
+        }
     });
 
     robloxCallbackServer.listen(7329, '127.0.0.1', () => {
@@ -425,6 +441,20 @@ app.whenReady().then(() => {
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('overlay-ptt-start');
                 }
+
+                // Sicherheits-Timeout: PTT automatisch nach 30s stoppen
+                setTimeout(() => {
+                    if (globalPTTActive) {
+                        console.warn('[PTT] Sicherheits-Timeout: Erzwinge PTT-Stop nach 30s');
+                        globalPTTActive = false;
+                        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                            robloxOverlayWin.webContents.send('overlay-ptt-stop');
+                        }
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.webContents.send('overlay-ptt-stop');
+                        }
+                    }
+                }, 30000);
             });
             console.log('[PTT] Global Shortcut registriert auf:', currentPttKey);
         } catch(e) {
@@ -437,7 +467,11 @@ app.whenReady().then(() => {
 
     // Dynamisch updaten, wenn Client es ändert
     ipcMain.on('set-ptt-key', (e, newKey) => {
-        registerPTT(newKey);
+        if (typeof newKey !== 'string' || newKey.trim().length === 0) {
+            console.warn('[PTT] Ungültiger PTT-Key empfangen:', newKey);
+            return;
+        }
+        registerPTT(newKey.trim());
     });
 
     // PTT LOSLASSEN — Leider kann globalShortcut kein keyup, deshalb nutzen wir

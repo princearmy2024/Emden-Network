@@ -12,6 +12,15 @@ const UpdateManager = (() => {
     let isChecking = false;
     let updateToastActive = false;
 
+    // ─── HELPER: VERSION VERGLEICH ──────────────────────────────
+    function isNewerVersion(remote, local) {
+        const p = v => v.split('.').map(Number);
+        const [r1, r2, r3] = p(remote), [l1, l2, l3] = p(local);
+        if (r1 !== l1) return r1 > l1;
+        if (r2 !== l2) return r2 > l2;
+        return r3 > l3;
+    }
+
     // ─── INITIALISIERUNG ─────────────────────────────────────────
     async function init() {
         // Hol die echte Version vom Hauptprozess
@@ -22,6 +31,13 @@ const UpdateManager = (() => {
             } catch (e) {
                 console.warn('[Update] Konnte App-Version nicht abrufen, nutze Fallback.');
             }
+        }
+        
+        // Lade gespeicherte Version (falls Update erfolgt war)
+        const storedVer = localStorage.getItem('current_version');
+        if (storedVer && isNewerVersion(storedVer, currentAppVersion)) {
+            currentAppVersion = storedVer;
+            console.log(`[Update] Gespeicherte Version geladen: ${currentAppVersion}`);
         }
         
         // Beim Start prüfen (kurze Verzögerung für smoothes Laden)
@@ -43,9 +59,9 @@ const UpdateManager = (() => {
             if (data && data.tag_name) {
                 const remoteVer = data.tag_name.replace('v', '');
                 
-                // Falls Version gleich -> notifier verstecken
-                if (remoteVer === currentAppVersion) {
-                    console.log('[Update] App ist auf dem neuesten Stand.');
+                // Falls Version gleich oder älter -> notifier verstecken
+                if (remoteVer === currentAppVersion || !isNewerVersion(remoteVer, currentAppVersion)) {
+                    console.log(`[Update] App ist auf dem neuesten Stand (${currentAppVersion}).`);
                     const notifier = document.getElementById('updateNotifier');
                     if (notifier) notifier.classList.remove('visible');
                     return;
@@ -58,7 +74,7 @@ const UpdateManager = (() => {
                     return;
                 }
 
-                console.log(`[Update] Neue Version gefunden: ${remoteVer}`);
+                console.log(`[Update] Neue Version gefunden: ${remoteVer} (aktuell: ${currentAppVersion})`);
                 
                 // Wir speichern die Info global für den Dialog
                 window._lastUpdateInfo = {
@@ -92,7 +108,7 @@ const UpdateManager = (() => {
 
         try {
             const releases = await window.electronAPI.getGithubChangelog();
-            if (!releases || releases.length === 0) {
+            if (!Array.isArray(releases) || releases.length === 0) {
                 container.innerHTML = '<div class="cl-empty">Keine Updates gefunden.</div>';
                 return;
             }
@@ -103,7 +119,7 @@ const UpdateManager = (() => {
                         <span class="cl-ver">${rel.tag_name}</span>
                         <span class="cl-date">${new Date(rel.published_at).toLocaleDateString('de-DE')}</span>
                     </div>
-                    <div class="cl-body">${rel.body ? rel.body.replace(/\n/g, '<br>') : 'Keine Beschreibung.'}</div>
+                    <div class="cl-body">${rel.body ? (typeof escHtml === 'function' ? escHtml(rel.body) : rel.body.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))).replace(/\n/g, '<br>') : 'Keine Beschreibung.'}</div>
                 </div>
             `).join('');
         } catch (e) {
@@ -172,17 +188,24 @@ const UpdateManager = (() => {
             }, 800);
         }
 
-        // Listener für Fortschritt vom Hauptprozess
+        // Listener für Fortschritt vom Hauptprozess (alte zuerst entfernen)
         if (window.electronAPI && window.electronAPI.onUpdateProgress) {
+            if (window.electronAPI.removeUpdateListeners) {
+                window.electronAPI.removeUpdateListeners();
+            }
             window.electronAPI.onUpdateProgress((pct) => {
                 const bar = document.getElementById('updateProgressBar');
                 const txt = document.getElementById('updateProgressText');
-                if (bar) bar.style.width = pct + '%';
-                if (txt) txt.textContent = `Fortschritt: ${pct}%`;
-                
-                if (pct >= 100 && txt) {
-                    txt.textContent = 'Starte Installation...';
-                    txt.style.color = '#4ade80';
+                if (pct < 0) {
+                    // Unbekannte Dateigröße (kein content-length Header)
+                    if (txt) txt.textContent = 'Lade herunter...';
+                } else {
+                    if (bar) bar.style.width = pct + '%';
+                    if (txt) txt.textContent = `Fortschritt: ${pct}%`;
+                    if (pct >= 100 && txt) {
+                        txt.textContent = 'Starte Installation...';
+                        txt.style.color = '#4ade80';
+                    }
                 }
             });
             
@@ -211,6 +234,11 @@ const UpdateManager = (() => {
 
         if (window.electronAPI && window.electronAPI.startAppUpdate) {
             window.electronAPI.startAppUpdate(url);
+            // Speichere die erwartete Version für den nächsten Start
+            if (window._lastUpdateInfo) {
+                localStorage.setItem('current_version', window._lastUpdateInfo.version);
+                console.log(`[Update] Erwartete Version gespeichert: ${window._lastUpdateInfo.version}`);
+            }
         } else {
             console.warn('[Update] startAppUpdate nicht verfügbar, öffne Browser...');
             window.open(url, '_blank');

@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdateProgress: (cb) => ipcRenderer.on('update_progress', (event, pct) => cb(pct)),
     onUpdateDownloaded: (cb) => ipcRenderer.on('update_downloaded', () => cb()),
     onUpdateError:      (cb) => ipcRenderer.on('update_error', (event, err) => cb(err)),
+    removeUpdateListeners: () => {
+        ipcRenderer.removeAllListeners('update_progress');
+        ipcRenderer.removeAllListeners('update_error');
+    },
     restartApp: () => ipcRenderer.send('restart_app'),
     startAppUpdate: (url) => ipcRenderer.send('start-app-update', { url }),
 
