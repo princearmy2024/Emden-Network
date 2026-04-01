@@ -803,15 +803,16 @@ const App = {
             return rank(a.role) - rank(b.role);
         });
 
-        const avatarEl = u => {
+        const avatarEl = (u, isOnline) => {
             const initial = (u.username || '?')[0].toUpperCase();
+            const statusClass = isOnline ? '' : 'offline';
             if (u.avatar) {
-                return `<div class="avatar-container" style="position:relative;">
-                    <img src="${u.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <div class="avatar-fallback" style="display:none; width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0; position:absolute; top:0; left:0;">${initial}</div>
+                return `<div class="ovn-avatar ${statusClass}" style="background:none;overflow:visible;">
+                    <img src="${u.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;position:relative;z-index:1;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <span style="display:none;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#00D1A7);align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">${escHtml(initial)}</span>
                 </div>`;
             }
-            return `<div class="avatar-fallback" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-muted);flex-shrink:0;">${initial}</div>`;
+            return `<div class="ovn-avatar ${statusClass}">${escHtml(initial)}</div>`;
         };
 
         const badgeEl = u => {
@@ -825,13 +826,12 @@ const App = {
             : sorted.map(u => {
                 const isOnline = onlineIds.has(u.discordId);
                 return `
-            <div class="ovn-node ${isOnline ? '' : 'offline'} ${App.currentChat === '@' + u.username ? 'active' : ''}" 
-                 style="${isOnline ? '' : 'opacity: 0.6; filter: grayscale(0.5);'} cursor: pointer;"
+            <div class="ovn-node ${isOnline ? '' : 'offline'} ${App.currentChat === '@' + u.username ? 'active' : ''}"
+                 style="${isOnline ? '' : 'opacity: 0.55;'} cursor: pointer;"
                  onclick="App.selectChat('@${u.username}')">
                 <div class="ovn-info">
-                    <div class="ovn-dot ${isOnline ? 'online' : ''}" style="background: ${isOnline ? 'var(--status-online)' : '#666'}"></div>
-                    ${avatarEl(u)}
-                    <span class="ovn-name">${escHtml(u.username)} ${isOnline ? '' : '<small style="font-size:9px; opacity:0.5;">(Off)</small>'}</span>
+                    ${avatarEl(u, isOnline)}
+                    <span class="ovn-name">${escHtml(u.username)}</span>
                 </div>
                 ${badgeEl(u)}
                 
