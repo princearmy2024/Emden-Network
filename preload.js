@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getGithubChangelog: () => ipcRenderer.invoke('get-github-changelog'),
     sendToDiscord: ({ webhookUrl, version, notes }) => ipcRenderer.send('send-to-discord', { webhookUrl, version, notes }),
 
+    // Tenor GIF Search (via Main-Prozess, umgeht CSP)
+    searchTenorGifs: (query) => ipcRenderer.invoke('search-tenor-gifs', query),
+
     // Öffnet URLs im System-Browser (für Roblox OAuth)
     openExternal: (url) => ipcRenderer.send('open-external', url),
 

@@ -1708,13 +1708,10 @@ const App = {
         grid.innerHTML = '<div class="gif-loading">Laden...</div>';
 
         try {
-            const isTrending = query === 'trending';
-            const endpoint = isTrending
-                ? 'https://tenor.googleapis.com/v2/featured?key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif'
-                : `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif`;
-
-            const res = await fetch(endpoint);
-            const data = await res.json();
+            // Via IPC durch Main-Prozess (umgeht CSP)
+            const data = window.electronAPI
+                ? await window.electronAPI.searchTenorGifs(query)
+                : { results: [] };
 
             if (!data.results || data.results.length === 0) {
                 grid.innerHTML = '<div class="gif-loading">Keine GIFs gefunden</div>';
@@ -1723,7 +1720,7 @@ const App = {
 
             grid.innerHTML = data.results.map(gif => {
                 const url = gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || '';
-                return `<img src="${url}" class="gif-item" onclick="App.sendGif('${url}')" alt="GIF" loading="lazy">`;
+                return `<img src="${url}" class="gif-item" onclick="App.sendGif('${url.replace(/'/g, '')}')" alt="GIF" loading="lazy">`;
             }).join('');
         } catch (e) {
             grid.innerHTML = '<div class="gif-loading">Fehler beim Laden</div>';
@@ -1748,14 +1745,26 @@ const App = {
         input.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const dataUrl = ev.target.result;
-                localStorage.setItem('custom_bg', dataUrl);
+            // Bild auf max 1920px skalieren um localStorage nicht zu sprengen
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxW = 1920;
+                const scale = Math.min(1, maxW / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                try {
+                    localStorage.setItem('custom_bg', dataUrl);
+                } catch(err) {
+                    NotificationService.show('Fehler', 'Bild zu groß für den Speicher.', 'error');
+                    return;
+                }
                 this._applyBackground(dataUrl);
                 NotificationService.show('Hintergrund', 'Wallpaper wurde gesetzt!', 'success');
             };
-            reader.readAsDataURL(file);
+            img.src = URL.createObjectURL(file);
         };
         input.click();
     },

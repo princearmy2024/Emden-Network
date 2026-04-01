@@ -193,6 +193,24 @@ function getLocalChangelog() {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// Tenor GIF Search (via Main-Prozess, umgeht CSP)
+ipcMain.handle('search-tenor-gifs', async (event, query) => {
+    return new Promise((resolve) => {
+        const isTrending = !query || query === 'trending';
+        const apiPath = isTrending
+            ? '/v2/featured?key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif'
+            : `/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif`;
+
+        https.get({ hostname: 'tenor.googleapis.com', path: apiPath, headers: { 'User-Agent': 'EmdenNetwork' } }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch(e) { resolve({ results: [] }); }
+            });
+        }).on('error', () => resolve({ results: [] }));
+    });
+});
+
 // Discord Webhook (Manuel/Automatisch)
 ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
     console.log('[Discord] Sende Webhook für Version:', version);
