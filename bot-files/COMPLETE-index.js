@@ -768,7 +768,7 @@ async function updateBotStatus(ci) {
 const GITHUB_OWNER = 'princearmy2024';
 const GITHUB_REPO  = 'Emden-Network';
 const UPDATE_WEBHOOK_URL = process.env.UPDATE_WEBHOOK_URL ||
-    'https://discord.com/api/webhooks/1487189165278756924/aYRVcnsC8YTq49rjMzs4VocunHsGAvSei3-webqm81tdNlyTVkPzb1w3WZOYatW-Ni_V';
+    'https://discord.com/api/webhooks/1488902385786028084/MNd5QLJOThjoA8JZP2LDr2l3-dDzzQVCz4pCqCsMTEVVjIwnMfmqmlyvHXeSosXwOZPc';
 
 let lastKnownTag = null;
 

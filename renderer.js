@@ -1838,7 +1838,7 @@ Object.assign(App, {
     async sendAdminWebhook() {
         const title = document.getElementById('webhookTitle').value.trim();
         const message = document.getElementById('webhookMessage').value.trim();
-        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1487189165278756924/aYRVcnsC8YTq49rjMzs4VocunHsGAvSei3-webqm81tdNlyTVkPzb1w3WZOYatW-Ni_V';
+        const WEBHOOK_URL = 'https://discord.com/api/webhooks/1488902385786028084/MNd5QLJOThjoA8JZP2LDr2l3-dDzzQVCz4pCqCsMTEVVjIwnMfmqmlyvHXeSosXwOZPc';
 
         if (!title || !message) {
             NotificationService.show('Fehler', 'Titel und Nachricht werden benötigt.', 'error');
