@@ -2,9 +2,9 @@
   "name": "emden-network-bot",
   "version": "1.0.0",
   "type": "module",
-  "main": "COMPLETE-index.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node COMPLETE-index.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
