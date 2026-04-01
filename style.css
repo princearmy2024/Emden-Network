@@ -138,81 +138,174 @@ svg { display: block; flex-shrink: 0; }
 .tb-close:hover { background: var(--status-danger); color: #fff; }
 
 /* ============================================================
-   SPLASH SCREEN
+   SPLASH SCREEN — Premium Design
    ============================================================ */
 .splash-bg {
     position: absolute; inset: 0;
-    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,102,204,0.12) 0%, transparent 70%), var(--bg-base);
+    background:
+        radial-gradient(ellipse 70% 50% at 50% 30%, rgba(0,102,204,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,209,167,0.05) 0%, transparent 50%),
+        var(--bg-base);
     overflow: hidden;
 }
 .splash-grid {
-    position: absolute; inset: 0;
+    position: absolute; inset: -40px;
     background-image:
-        linear-gradient(rgba(0,102,204,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,102,204,0.06) 1px, transparent 1px);
-    background-size: 40px 40px;
-    animation: gridDrift 20s linear infinite;
+        linear-gradient(rgba(0,102,204,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,102,204,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridDrift 25s linear infinite;
+    mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 70%);
 }
-@keyframes gridDrift { from { transform: translateY(0); } to { transform: translateY(40px); } }
+@keyframes gridDrift { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(60px) rotate(0.5deg); } }
 
 .splash-orb {
     position: absolute; border-radius: 50%;
-    filter: blur(80px); opacity: 0.15;
-    animation: orbFloat 8s ease-in-out infinite;
+    filter: blur(100px); opacity: 0.12;
+    animation: orbFloat 10s ease-in-out infinite;
 }
-.orb1 { width: 500px; height: 500px; background: var(--brand-blue); top: -200px; left: -100px; }
-.orb2 { width: 400px; height: 400px; background: #1A4FCC; bottom: -150px; right: -100px; animation-delay: -4s; }
-.orb3 { width: 300px; height: 300px; background: #0044AA; top: 30%; left: 60%; animation-delay: -2s; }
+.orb1 { width: 600px; height: 600px; background: linear-gradient(135deg, #0066CC, #00D1A7); top: -250px; left: -150px; }
+.orb2 { width: 450px; height: 450px; background: linear-gradient(135deg, #1A4FCC, #0066CC); bottom: -200px; right: -100px; animation-delay: -5s; }
+.orb3 { width: 350px; height: 350px; background: linear-gradient(135deg, #00D1A7, #0088ff); top: 40%; left: 55%; animation-delay: -2.5s; opacity: 0.07; }
 @keyframes orbFloat {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(20px, -30px) scale(1.05); }
+    33% { transform: translate(15px, -25px) scale(1.04); }
+    66% { transform: translate(-10px, 10px) scale(0.97); }
+}
+
+/* Floating particles */
+.splash-particles {
+    position: absolute; inset: 0; pointer-events: none;
+}
+.splash-particle {
+    position: absolute; width: 2px; height: 2px;
+    background: rgba(0,102,204,0.4); border-radius: 50%;
+    animation: particleFloat linear infinite;
+}
+@keyframes particleFloat {
+    0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(-20px) scale(1); opacity: 0; }
 }
 
 .splash-content {
     position: relative; z-index: 2;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; gap: 40px;
+    height: 100%; gap: 48px;
     padding-top: var(--titlebar-h);
+    animation: splashFadeIn 0.8s ease-out;
 }
-.splash-logo { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.splash-logo-img {
-    width: 80px; height: 80px;
-    border-radius: 0;
-    mix-blend-mode: screen;
-    filter: drop-shadow(0 0 20px rgba(0,102,204,0.6));
-    animation: logoPulse 3s ease-in-out infinite;
+@keyframes splashFadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes logoPulse {
-    0%, 100% { box-shadow: 0 0 30px rgba(0,102,204,0.3); }
-    50%       { box-shadow: 0 0 60px rgba(0,102,204,0.6); }
+.splash-logo { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+
+/* Logo Ring */
+.splash-logo-ring {
+    position: relative;
+    width: 110px; height: 110px;
+    display: flex; align-items: center; justify-content: center;
 }
+.splash-ring-glow {
+    position: absolute; inset: -4px;
+    border-radius: 24px;
+    border: 2px solid rgba(0,102,204,0.3);
+    animation: ringPulse 3s ease-in-out infinite;
+}
+.splash-ring-glow::before {
+    content: '';
+    position: absolute; inset: -8px;
+    border-radius: 28px;
+    border: 1px solid rgba(0,102,204,0.12);
+    animation: ringPulse 3s ease-in-out infinite 0.5s;
+}
+@keyframes ringPulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 1; transform: scale(1.04); }
+}
+
+.splash-logo-ring .en-logo.xlarge {
+    width: 90px; height: 90px; font-size: 36px;
+    border-radius: 20px;
+    box-shadow:
+        0 8px 32px rgba(0,102,204,0.25),
+        0 0 60px rgba(0,102,204,0.1),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+    animation: logoGlow 4s ease-in-out infinite;
+}
+@keyframes logoGlow {
+    0%, 100% { box-shadow: 0 8px 32px rgba(0,102,204,0.25), 0 0 60px rgba(0,102,204,0.1); }
+    50%      { box-shadow: 0 8px 40px rgba(0,102,204,0.35), 0 0 80px rgba(0,102,204,0.15); }
+}
+
 .splash-wordmark {
-    font-size: 32px; font-weight: 800; letter-spacing: -0.5px;
+    font-size: 36px; font-weight: 800; letter-spacing: -0.5px;
     line-height: 1;
 }
 .splash-wordmark .w-emden { color: #FFFFFF; }
 .splash-wordmark .w-network { color: var(--brand-blue); }
+
+.splash-tagline {
+    font-size: 12px; font-weight: 600; letter-spacing: 6px;
+    text-transform: uppercase; color: rgba(255,255,255,0.35);
+}
 .splash-sub {
-    font-size: 11px; font-weight: 500; letter-spacing: 3px;
+    font-size: 10px; font-weight: 500; letter-spacing: 2px;
     text-transform: uppercase; color: var(--text-muted);
     font-family: var(--font-mono);
+    padding: 4px 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.03);
 }
-.splash-loader { width: 320px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Loader */
+.splash-loader { width: 280px; display: flex; flex-direction: column; gap: 12px; }
 .loader-track {
-    height: 2px; background: var(--border);
-    border-radius: 2px; overflow: hidden;
+    height: 3px; background: rgba(255,255,255,0.06);
+    border-radius: 3px; overflow: hidden;
+    position: relative;
+}
+.loader-track::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.03);
+    border-radius: 3px;
 }
 .loader-bar {
     height: 100%; width: 0%;
-    background: linear-gradient(90deg, var(--brand-blue), #4DA6FF);
-    border-radius: 2px;
-    transition: width 0.4s ease;
-    box-shadow: 0 0 10px var(--brand-blue);
+    background: linear-gradient(90deg, var(--brand-blue), #00D1A7, #4DA6FF);
+    background-size: 200% 100%;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(0,102,204,0.5), 0 0 24px rgba(0,102,204,0.2);
+    animation: loaderShimmer 2s linear infinite;
+}
+@keyframes loaderShimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 .loader-status {
-    font-size: 11px; font-family: var(--font-mono);
-    color: var(--text-muted); letter-spacing: 0.5px;
-    text-align: center;
+    font-size: 10px; font-family: var(--font-mono);
+    color: var(--text-muted); letter-spacing: 1px;
+    text-align: center; text-transform: uppercase;
+}
+
+/* Footer */
+.splash-footer {
+    display: flex; align-items: center; gap: 12px;
+    position: absolute; bottom: 40px;
+}
+.splash-footer-line {
+    width: 40px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+}
+.splash-footer-text {
+    font-size: 8px; letter-spacing: 3px; color: rgba(255,255,255,0.2);
+    font-family: var(--font-mono); text-transform: uppercase;
 }
 
 /* ============================================================
@@ -1798,6 +1891,7 @@ svg { display: block; flex-shrink: 0; }
 .avc-dock {
     padding: 0 10px;
     margin-bottom: 12px;
+    display: none; /* Voice-Card nur im Voice-Panel, nicht in Sidebar */
 }
 
 /* VOLUME SLIDER STYLES */

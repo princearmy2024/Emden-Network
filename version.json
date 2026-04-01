@@ -1,6 +1,6 @@
 {
-    "version": "1.9.0",
+    "version": "1.9.1",
     "releaseDate": "2026-04-01",
-    "notes": "v1.9.0: Modernes Teilnehmerpanel, Kanal-Blockierung bei belegtem Funk, Radio-Effekt auf eingehende Stimmen.",
+    "notes": "v1.9.1: Premium Splash-Screen, Voice-Card Bug Fix, UI Polish.",
     "forceUpdate": true
 }

@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.9.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '1.9.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -529,7 +529,22 @@ const App = {
         try {
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
-            if (splashVer) splashVer.textContent = `Control Center v1.6.6`;
+            if (splashVer) splashVer.textContent = `v${CURRENT_VERSION}`;
+
+            // Splash Particles erzeugen
+            const particleContainer = document.getElementById('splashParticles');
+            if (particleContainer) {
+                for (let i = 0; i < 25; i++) {
+                    const p = document.createElement('div');
+                    p.className = 'splash-particle';
+                    p.style.left = Math.random() * 100 + '%';
+                    p.style.animationDuration = (6 + Math.random() * 10) + 's';
+                    p.style.animationDelay = (Math.random() * 8) + 's';
+                    p.style.width = p.style.height = (1 + Math.random() * 2.5) + 'px';
+                    p.style.opacity = 0.15 + Math.random() * 0.3;
+                    particleContainer.appendChild(p);
+                }
+            }
 
             // Custom Titlebar
             document.getElementById('btnMin')?.addEventListener('click', () => window.electronAPI?.minimizeWindow());
@@ -566,11 +581,13 @@ const App = {
         const bar = document.getElementById('loaderBar');
         const status = document.getElementById('loaderStatus');
         const steps = [
-            [15, 'Lade Konfiguration...'],
-            [35, 'Initialisiere Services...'],
-            [60, 'Verbinde mit Netzwerk...'],
-            [80, 'Lade Benutzeroberfläche...'],
-            [100, 'Bereit.'],
+            [12, 'Systemprüfung...'],
+            [28, 'Lade Module...'],
+            [45, 'Initialisiere Dienste...'],
+            [62, 'Verbinde mit Netzwerk...'],
+            [80, 'Synchronisiere Daten...'],
+            [95, 'Finalisiere...'],
+            [100, 'Bereit'],
         ];
         for (const [pct, msg] of steps) {
             if (bar) bar.style.width = pct + '%';
