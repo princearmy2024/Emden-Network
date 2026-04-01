@@ -1952,43 +1952,14 @@ Object.assign(App, {
     _VAD_THRESHOLD: 8,  // 0-255 — Lautstärke-Schwelle ab der gesendet wird
 
     async initPTTHandlers() {
-        // Web Audio API White Noise Generator (kein externer Link nötig)
-        const buildStaticLoop = () => {
-            let ctx = null, source = null, gainNode = null, running = false;
-            return {
-                get volume() { return gainNode ? gainNode.gain.value : 0; },
-                set volume(v) { if (gainNode) gainNode.gain.value = Math.max(0, v); },
-                play() {
-                    if (running) return Promise.resolve();
-                    try {
-                        ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        const bufferSize = ctx.sampleRate * 2;
-                        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-                        const data = buffer.getChannelData(0);
-                        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
-                        source = ctx.createBufferSource();
-                        source.buffer = buffer;
-                        source.loop = true;
-                        gainNode = ctx.createGain();
-                        gainNode.gain.value = this.volume || 0.05;
-                        source.connect(gainNode);
-                        gainNode.connect(ctx.destination);
-                        source.start();
-                        running = true;
-                    } catch(e) { console.warn('[PTT] Static noise error:', e.message); }
-                    return Promise.resolve();
-                },
-                pause() {
-                    if (!running) return;
-                    try { source?.stop(); ctx?.close(); } catch(_) {}
-                    source = null; ctx = null; gainNode = null; running = false;
-                },
-                get currentTime() { return 0; },
-                set currentTime(_) {},
-            };
-        };
-        this._staticLoop = buildStaticLoop();
+        // Walkie-Talkie Loop Sound (lokale Datei)
+        this._staticLoop = new Audio('./walkie-talkie-start.mp3.wav');
+        this._staticLoop.loop = true;
         this._staticLoop.volume = this.pttVolume * 0.1;
+        this._staticLoop.onerror = () => {
+            console.warn('[PTT] Loop-Sound konnte nicht geladen werden - Silent Mode.');
+            this._staticLoop = null;
+        };
 
         try {
             await navigator.mediaDevices.getUserMedia({ audio: true });
