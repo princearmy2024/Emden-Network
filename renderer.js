@@ -2286,39 +2286,22 @@ Object.assign(App, {
     },
 
     // ── EMPFÄNGER: Eingehende Audio-Chunks abspielen ────────────
-    // Einen einzigen shared AudioContext wiederverwenden — verhindert den
-    // Browser-Crash der durch zu viele gleichzeitige Contexts entstand.
-    _getPlayCtx() {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!this._playCtx || this._playCtx.state === 'closed') {
-            this._playCtx = new AudioCtx();
-        }
-        if (this._playCtx.state === 'suspended') {
-            this._playCtx.resume().catch(() => {});
-        }
-        return this._playCtx;
-    },
-
-    _playIncomingAudio(base64data) {
+    // Nutzt <audio> + Blob-URL statt decodeAudioData — stabiler in Electron,
+    // kein AudioContext-Limit, kein nativer Renderer-Crash.
+    _playIncomingAudio(base64data, mimeType) {
         try {
-            const binary = atob(base64data);
-            const bytes  = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const binaryStr = atob(base64data);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
 
-            const ctx = this._getPlayCtx();
-            // slice(0) gibt eine Kopie — decodeAudioData neutralisiert den Buffer sonst
-            ctx.decodeAudioData(bytes.buffer.slice(0), (decodedData) => {
-                const gainNode = ctx.createGain();
-                gainNode.gain.value = this.pttVolume * 2.0;
-                gainNode.connect(ctx.destination);
-
-                const source = ctx.createBufferSource();
-                source.buffer = decodedData;
-                source.connect(gainNode);
-                source.start(0);
-            }, () => {
-                // Schlechter Chunk — ignorieren
-            });
+            const blob = new Blob([bytes], { type: mimeType || 'audio/webm;codecs=opus' });
+            const url  = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.volume = Math.min(1.0, this.pttVolume * 2.0);
+            const cleanup = () => URL.revokeObjectURL(url);
+            audio.onended = cleanup;
+            audio.onerror = cleanup;
+            audio.play().catch(cleanup);
         } catch(e) {
             // Leiser Fehler
         }
@@ -2360,7 +2343,7 @@ Object.assign(App, {
         socket.on('voice_audio_chunk', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return; // Kein Echo
-            this._playIncomingAudio(data.data);
+            this._playIncomingAudio(data.data, data.mimeType);
         });
 
         // Anderer User drückt PTT
