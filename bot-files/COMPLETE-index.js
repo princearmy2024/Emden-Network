@@ -93,6 +93,24 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
+// === Slash Command Handler ===
+client.on("interactionCreate", async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+    const cmd = client.commands.get(interaction.commandName);
+    if (!cmd) return;
+    try {
+        await cmd.execute(interaction);
+    } catch (e) {
+        console.error(`[CMD] Fehler bei /${interaction.commandName}:`, e);
+        const reply = { content: "❌ Fehler beim Ausführen des Befehls.", ephemeral: true };
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(reply).catch(() => {});
+        } else {
+            await interaction.reply(reply).catch(() => {});
+        }
+    }
+});
+
 // === Slash Commands registrieren (Guild = sofort!) ===
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 (async () => {
