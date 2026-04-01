@@ -547,12 +547,20 @@ svg { display: block; flex-shrink: 0; }
 }
 .user-status-dot.online { background: var(--status-online); }
 
+/* Custom Background Layer */
+#customBgLayer {
+    position: fixed; inset: 0; z-index: 0;
+    background-size: cover; background-position: center;
+    pointer-events: none;
+}
+
 /* Main Content */
 .main-content {
     margin-left: var(--sidebar-w);
     height: calc(100vh - var(--titlebar-h));
     display: flex; flex-direction: column;
     overflow: hidden;
+    position: relative; z-index: 1;
 }
 
 /* Topbar */
@@ -2073,6 +2081,12 @@ svg { display: block; flex-shrink: 0; }
     transition: all 0.2s ease;
     line-height: 1;
     padding: 0;
+}
+.vc-member-count {
+    font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+    background: rgba(0,136,255,0.12); color: var(--status-online);
+    padding: 1px 5px; border-radius: 8px; margin-left: auto;
+    border: 1px solid rgba(0,136,255,0.15);
 }
 .vc-leave-btn:hover {
     background: rgba(255, 60, 60, 0.3);

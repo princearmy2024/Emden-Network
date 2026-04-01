@@ -189,19 +189,7 @@ ipcMain.on('send-to-discord', (event, { webhookUrl, version, notes }) => {
         embeds: [{
             title: `📢  ${version}`,
             description: notes,
-            color: 0x00D1A7,
-            fields: [
-                {
-                    name: '🔗 Repository',
-                    value: `[Emden-Network auf GitHub](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO})`,
-                    inline: true
-                },
-                {
-                    name: '📥 Download',
-                    value: `[Setup herunterladen](https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe)`,
-                    inline: true
-                }
-            ],
+            color: 0x0088FF,
             footer: {
                 text: 'Emden Network Control Center',
                 icon_url: `https://github.com/${GITHUB_OWNER}.png`

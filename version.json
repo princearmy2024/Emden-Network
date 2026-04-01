@@ -1,6 +1,6 @@
 {
-    "version": "2.1.0",
+    "version": "2.2.0",
     "releaseDate": "2026-04-02",
-    "notes": "v2.1.0: Neues Logo, echte Walkie-Talkie Sounds, sanfterer Radio-Effekt.",
+    "notes": "v2.2.0: PTT-Fix, Webhook-Fix, Chat-Reparatur, Spam-Schutz, Custom Background.",
     "forceUpdate": true
 }

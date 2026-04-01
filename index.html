@@ -732,6 +732,23 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Hintergrundbild</div>
+                                    <div class="setting-desc">Eigenes Wallpaper als App-Hintergrund</div>
+                                </div>
+                                <div style="display:flex;gap:6px;align-items:center;">
+                                    <button class="btn btn-secondary small" onclick="App.setCustomBackground()">Bild wählen</button>
+                                    <button class="btn btn-secondary small" onclick="App.resetBackground()" title="Zurücksetzen">✕</button>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Hintergrund-Blur</div>
+                                    <div class="setting-desc">Glass-Blur Effekt auf dem Wallpaper</div>
+                                </div>
+                                <input type="range" class="volume-slider" id="bgBlurSlider" min="0" max="30" value="0" oninput="App.setBgBlur(this.value)" style="width:100px;">
+                            </div>
                         </div>
                         <div class="settings-section">
                             <h3 class="settings-title">Benachrichtigungen</h3>

@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.1.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.2.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -676,6 +676,7 @@ const App = {
         this.showScreen('dashboardScreen');
         this.navigate('overview');
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
+        this._loadSavedBackground(); // Custom Wallpaper laden
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
@@ -1272,16 +1273,19 @@ const App = {
 
         const title = '<div class="section-title">Sprachkanäle</div>';
         const activeVC = MockData.voiceChannels.find(vc => vc.active);
-        const html = MockData.voiceChannels.map(vc => `
+        const html = MockData.voiceChannels.map(vc => {
+            const count = vc.members ? vc.members.length : 0;
+            return `
             <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
                 <div class="vc-info">
                     <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
                     <div class="vc-name">#${escHtml(vc.name)}</div>
                     ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
+                    ${count > 0 ? `<span class="vc-member-count">${count}</span>` : ''}
                 </div>
                 ${vc.active ? `<button class="vc-leave-btn" onclick="event.stopPropagation(); App.leaveVoiceChannel('${vc.id}')" title="Kanal verlassen">✕</button>` : ''}
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         listContainer.innerHTML = title + html;
     },
@@ -1506,47 +1510,78 @@ const App = {
     // =============================================================
     // CHAT SYSTEM
     // =============================================================
+    _chatSpamTimestamps: [],
+    _chatSpamBlocked: false,
+
     sendMessage() {
         const input = document.getElementById('chatInput');
         if (!input || !input.value.trim()) return;
-        
+
+        // Spam-Schutz: max 4 Nachrichten in 5 Sekunden
+        if (this._chatSpamBlocked) {
+            NotificationService.show('Spam-Schutz', 'Bitte warte ein paar Sekunden.', 'warn');
+            return;
+        }
+        const now = Date.now();
+        this._chatSpamTimestamps.push(now);
+        this._chatSpamTimestamps = this._chatSpamTimestamps.filter(t => now - t < 5000);
+        if (this._chatSpamTimestamps.length > 4) {
+            this._chatSpamBlocked = true;
+            NotificationService.show('Spam-Schutz', 'Du wurdest für 10 Sekunden gesperrt.', 'error');
+            setTimeout(() => { this._chatSpamBlocked = false; this._chatSpamTimestamps = []; }, 10000);
+            return;
+        }
+
         const msg = input.value.trim();
         input.value = '';
 
+        // Nachricht an Server senden (wenn verbunden)
         if (WebSocketService.socket?.connected) {
             WebSocketService.socket.emit('chat_message', {
                 channel: this.currentChat || 'general',
                 message: msg
             });
-            // Hinzufügen der eigenen Nachricht ins Chatfenster
-            this.appendChatMessage({
-                username: AuthService.getUser()?.username,
-                message: msg
-            });
-        } else {
-            NotificationService.show('Verbindungsfehler', 'Keine Verbindung zum Chat-Server aktiv.', 'error');
         }
+
+        // Eigene Nachricht immer lokal anzeigen (auch offline)
+        this.appendChatMessage({
+            username: AuthService.getUser()?.username,
+            message: msg
+        });
     },
-    
+
     appendChatMessage(data) {
         const chatBox = document.querySelector('.chat-messages');
         if (!chatBox) return;
-        
+
         const isOwn = data.username === AuthService.getUser()?.username;
         const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const user = AuthService.getUser();
+        const avatarUrl = isOwn ? (user?.avatar || '') : '';
+        const initial = (data.username || 'U')[0].toUpperCase();
+
+        const ownAvatar = avatarUrl
+            ? `<div class="msg-avatar you"><img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${initial}'"></div>`
+            : `<div class="msg-avatar you" style="background:var(--brand-blue)">${initial}</div>`;
 
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}">
-                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${data.username ? data.username[0].toUpperCase() : 'U'}</div>` : ''}
+                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${initial}</div>` : ''}
                 <div class="msg-body">
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'System')}</span><span class="msg-time">${time}</span></div>
                     <div class="msg-text">${escHtml(data.message || '')}</div>
                 </div>
-                ${isOwn ? `<div class="msg-avatar you" style="background:var(--accent-blue)">U</div>` : ''}
+                ${isOwn ? ownAvatar : ''}
             </div>
         `;
-        
+
         chatBox.insertAdjacentHTML('beforeend', html);
+
+        // Max 20 Nachrichten behalten
+        while (chatBox.children.length > 20) {
+            chatBox.removeChild(chatBox.firstChild);
+        }
+
         chatBox.scrollTop = chatBox.scrollHeight;
     },
 
@@ -1557,6 +1592,63 @@ const App = {
             hash = str.charCodeAt(i) + ((hash << 5) - hash);
         }
         return `hsl(${Math.abs(hash) % 360}, 70%, 50%)`;
+    },
+
+    // ── Custom Background ──────────────────────────────────────
+    setCustomBackground() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const dataUrl = ev.target.result;
+                localStorage.setItem('custom_bg', dataUrl);
+                this._applyBackground(dataUrl);
+                NotificationService.show('Hintergrund', 'Wallpaper wurde gesetzt!', 'success');
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    },
+
+    resetBackground() {
+        localStorage.removeItem('custom_bg');
+        localStorage.removeItem('bg_blur');
+        const el = document.getElementById('customBgLayer');
+        if (el) { el.style.backgroundImage = 'none'; el.style.filter = 'none'; }
+        const slider = document.getElementById('bgBlurSlider');
+        if (slider) slider.value = 0;
+        NotificationService.show('Hintergrund', 'Wallpaper wurde zurückgesetzt.', 'info');
+    },
+
+    setBgBlur(val) {
+        localStorage.setItem('bg_blur', val);
+        const el = document.getElementById('customBgLayer');
+        if (el) el.style.filter = val > 0 ? `blur(${val}px)` : 'none';
+    },
+
+    _applyBackground(dataUrl) {
+        let el = document.getElementById('customBgLayer');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'customBgLayer';
+            el.style.cssText = 'position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;pointer-events:none;';
+            document.body.prepend(el);
+        }
+        el.style.backgroundImage = `url(${dataUrl})`;
+        const blur = localStorage.getItem('bg_blur') || 0;
+        if (blur > 0) el.style.filter = `blur(${blur}px)`;
+    },
+
+    _loadSavedBackground() {
+        const bg = localStorage.getItem('custom_bg');
+        if (bg) this._applyBackground(bg);
+        const blur = localStorage.getItem('bg_blur') || 0;
+        const slider = document.getElementById('bgBlurSlider');
+        if (slider) slider.value = blur;
     }
 };
 
@@ -2014,17 +2106,18 @@ Object.assign(App, {
 
         // V-Taste DRÜCKEN → Kanal öffnen
         document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === this.pttKey && !this.isSpeaking) {
-                const active = document.activeElement;
-                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
-                this.startPTT();
-            }
+            if (e.repeat) return; // Key-Repeat verhindern
+            if (e.key.toLowerCase() !== this.pttKey) return;
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+            if (!this.isSpeaking) this.startPTT();
         });
         // V-Taste LOSLASSEN → Kanal schließen
         document.addEventListener('keyup', (e) => {
-            if (e.key.toLowerCase() === this.pttKey) {
-                this.stopPTT();
-            }
+            if (e.key.toLowerCase() !== this.pttKey) return;
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+            this.stopPTT();
         });
 
         // IPC: Globaler PTT (z.B. wenn Focus im Overlay-Fenster ist)
