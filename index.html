@@ -499,7 +499,21 @@
                                     <div class="msg-avatar you" id="chatOwnAvatar">U</div>
                                 </div>
                             </div>
+                            <!-- GIF Picker Panel -->
+                            <div class="gif-picker-panel hidden" id="gifPickerPanel">
+                                <div class="gif-picker-header">
+                                    <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="GIFs suchen..." oninput="App.searchGifs(this.value)">
+                                </div>
+                                <div class="gif-grid" id="gifGrid">
+                                    <div class="gif-loading">Suchbegriff eingeben...</div>
+                                </div>
+                            </div>
                             <div class="chat-input-area">
+                                <button class="chat-gif-btn" onclick="App.toggleGifPicker()" title="GIF senden">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="20" rx="4"/><text x="12" y="15.5" text-anchor="middle" fill="currentColor" stroke="none" font-size="9" font-weight="800">GIF</text>
+                                    </svg>
+                                </button>
                                 <input type="text" id="chatInput" class="input-field"
                                     placeholder="Nachricht eingeben..." />
                                 <button class="btn btn-primary small" onclick="App.sendMessage()">

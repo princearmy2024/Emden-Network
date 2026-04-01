@@ -452,7 +452,9 @@ app.whenReady().then(() => {
                 if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
                     robloxOverlayWin.webContents.send('overlay-ptt-start');
                 }
-                if (mainWindow && !mainWindow.isDestroyed()) {
+                // Nur an mainWindow senden wenn es NICHT fokussiert ist
+                // (sonst handelt der DOM keydown-Handler in renderer.js)
+                if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
                     mainWindow.webContents.send('overlay-ptt-start');
                 }
 

@@ -1,6 +1,6 @@
 {
-    "version": "2.3.0",
+    "version": "2.4.0",
     "releaseDate": "2026-04-02",
-    "notes": "v2.3.0: Emoji-Reactions, GIF-Support, User-Persistenz, Custom Background.",
+    "notes": "v2.4.0: GIF-Picker (Tenor), Full-App Background, Settings Redesign, PTT-Fix.",
     "forceUpdate": true
 }

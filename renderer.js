@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1679,6 +1679,67 @@ const App = {
         return `hsl(${Math.abs(hash) % 360}, 70%, 50%)`;
     },
 
+    // ── GIF Picker (Tenor API) ────────────────────────────────
+    _gifSearchTimer: null,
+
+    toggleGifPicker() {
+        const panel = document.getElementById('gifPickerPanel');
+        if (!panel) return;
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) {
+            document.getElementById('gifSearchInput')?.focus();
+            // Trending GIFs laden
+            this._fetchGifs('trending');
+        }
+    },
+
+    searchGifs(query) {
+        clearTimeout(this._gifSearchTimer);
+        if (!query || query.length < 2) {
+            document.getElementById('gifGrid').innerHTML = '<div class="gif-loading">Suchbegriff eingeben...</div>';
+            return;
+        }
+        this._gifSearchTimer = setTimeout(() => this._fetchGifs(query), 400);
+    },
+
+    async _fetchGifs(query) {
+        const grid = document.getElementById('gifGrid');
+        if (!grid) return;
+        grid.innerHTML = '<div class="gif-loading">Laden...</div>';
+
+        try {
+            const isTrending = query === 'trending';
+            const endpoint = isTrending
+                ? 'https://tenor.googleapis.com/v2/featured?key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif'
+                : `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif`;
+
+            const res = await fetch(endpoint);
+            const data = await res.json();
+
+            if (!data.results || data.results.length === 0) {
+                grid.innerHTML = '<div class="gif-loading">Keine GIFs gefunden</div>';
+                return;
+            }
+
+            grid.innerHTML = data.results.map(gif => {
+                const url = gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || '';
+                return `<img src="${url}" class="gif-item" onclick="App.sendGif('${url}')" alt="GIF" loading="lazy">`;
+            }).join('');
+        } catch (e) {
+            grid.innerHTML = '<div class="gif-loading">Fehler beim Laden</div>';
+        }
+    },
+
+    sendGif(url) {
+        if (!url) return;
+        // GIF als Nachricht senden
+        const input = document.getElementById('chatInput');
+        if (input) input.value = url;
+        this.sendMessage();
+        // Picker schließen
+        document.getElementById('gifPickerPanel')?.classList.add('hidden');
+    },
+
     // ── Custom Background ──────────────────────────────────────
     setCustomBackground() {
         const input = document.createElement('input');
@@ -1704,6 +1765,7 @@ const App = {
         localStorage.removeItem('bg_blur');
         const el = document.getElementById('customBgLayer');
         if (el) { el.style.backgroundImage = 'none'; el.style.filter = 'none'; }
+        document.body.classList.remove('has-custom-bg');
         const slider = document.getElementById('bgBlurSlider');
         if (slider) slider.value = 0;
         NotificationService.show('Hintergrund', 'Wallpaper wurde zurückgesetzt.', 'info');
@@ -1720,12 +1782,12 @@ const App = {
         if (!el) {
             el = document.createElement('div');
             el.id = 'customBgLayer';
-            el.style.cssText = 'position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;pointer-events:none;';
             document.body.prepend(el);
         }
         el.style.backgroundImage = `url(${dataUrl})`;
         const blur = localStorage.getItem('bg_blur') || 0;
         if (blur > 0) el.style.filter = `blur(${blur}px)`;
+        document.body.classList.add('has-custom-bg');
     },
 
     _loadSavedBackground() {
