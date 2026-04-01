@@ -1949,6 +1949,7 @@ Object.assign(App, {
     _activeSpeakers: {},
     // VAD (Voice Activity Detection)
     _vadContext: null,
+    _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
     _vadAnalyser: null,
     _vadBuffer: null,
     _vadInterval: null,
@@ -2285,32 +2286,41 @@ Object.assign(App, {
     },
 
     // ── EMPFÄNGER: Eingehende Audio-Chunks abspielen ────────────
-    _playIncomingAudio(base64data, mimeType) {
+    // Einen einzigen shared AudioContext wiederverwenden — verhindert den
+    // Browser-Crash der durch zu viele gleichzeitige Contexts entstand.
+    _getPlayCtx() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!this._playCtx || this._playCtx.state === 'closed') {
+            this._playCtx = new AudioCtx();
+        }
+        if (this._playCtx.state === 'suspended') {
+            this._playCtx.resume().catch(() => {});
+        }
+        return this._playCtx;
+    },
+
+    _playIncomingAudio(base64data) {
         try {
-            // base64 → ArrayBuffer
             const binary = atob(base64data);
             const bytes  = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            const ctx = new AudioCtx();
-            ctx.decodeAudioData(bytes.buffer, (decodedData) => {
-                const source = ctx.createBufferSource();
-
-                // Lautstärke
+            const ctx = this._getPlayCtx();
+            // slice(0) gibt eine Kopie — decodeAudioData neutralisiert den Buffer sonst
+            ctx.decodeAudioData(bytes.buffer.slice(0), (decodedData) => {
                 const gainNode = ctx.createGain();
                 gainNode.gain.value = this.pttVolume * 2.0;
+                gainNode.connect(ctx.destination);
 
+                const source = ctx.createBufferSource();
                 source.buffer = decodedData;
                 source.connect(gainNode);
-                gainNode.connect(ctx.destination);
                 source.start(0);
-                source.onended = () => ctx.close();
-            }, (err) => {
-                ctx.close();
+            }, () => {
+                // Schlechter Chunk — ignorieren
             });
         } catch(e) {
-            // Leiser Fehler — kann bei kleinen/leeren Chunks passieren
+            // Leiser Fehler
         }
     },
 
@@ -2350,7 +2360,7 @@ Object.assign(App, {
         socket.on('voice_audio_chunk', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return; // Kein Echo
-            this._playIncomingAudio(data.data, data.mimeType);
+            this._playIncomingAudio(data.data);
         });
 
         // Anderer User drückt PTT

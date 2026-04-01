@@ -1,6 +1,6 @@
 {
-    "version": "1.7.3",
+    "version": "1.7.4",
     "releaseDate": "2026-04-01",
-    "notes": "v1.7.3: DEMO_MODE deaktiviert, Sidebar Update-Button, Dashboard Redesign, /verify Fix.",
+    "notes": "v1.7.4: Walkie-Talkie Audio-Crash behoben — shared AudioContext verhindert Browser-Limit.",
     "forceUpdate": true
 }
