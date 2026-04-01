@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '1.9.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.0.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -826,7 +826,7 @@ const App = {
             if (u.avatar) {
                 return `<div class="ovn-avatar ${statusClass}" style="background:none;overflow:visible;">
                     <img src="${u.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;position:relative;z-index:1;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                    <span style="display:none;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#00D1A7);align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">${escHtml(initial)}</span>
+                    <span style="display:none;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#0088FF);align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">${escHtml(initial)}</span>
                 </div>`;
             }
             return `<div class="ovn-avatar ${statusClass}">${escHtml(initial)}</div>`;
@@ -1474,7 +1474,7 @@ const App = {
                     <div class="ann-title">${item.title}</div>
                     <div class="ann-body">${item.body}</div>
                     <div class="ann-author">
-                        <div class="ann-author-avatar" style="background:${item.authorColor || '#00D1A7'};color:#000;">${item.authorInitial || 'E'}</div>
+                        <div class="ann-author-avatar" style="background:${item.authorColor || '#0088FF'};color:#000;">${item.authorInitial || 'E'}</div>
                         <span>${item.author || 'Admin Team'}</span>
                     </div>
                 </div>
@@ -1520,7 +1520,7 @@ const App = {
 
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}">
-                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#00D1A7'}">${data.username ? data.username[0].toUpperCase() : 'U'}</div>` : ''}
+                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${data.username ? data.username[0].toUpperCase() : 'U'}</div>` : ''}
                 <div class="msg-body">
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'System')}</span><span class="msg-time">${time}</span></div>
                     <div class="msg-text">${escHtml(data.message || '')}</div>
@@ -2461,8 +2461,8 @@ Object.assign(App, {
         if (speakers.length > 0 && !this.isSpeaking) {
             if (pttStatus) {
                 pttStatus.textContent = '🔊 ' + speakers.join(', ').toUpperCase() + ' SPRICHT...';
-                pttStatus.style.color = '#00ff88';
-                pttStatus.style.textShadow = '0 0 10px rgba(0,255,136,0.6)';
+                pttStatus.style.color = '#4DA6FF';
+                pttStatus.style.textShadow = '0 0 10px rgba(0,136,255,0.6)';
             }
             if (waveform) waveform.classList.add('active');
         } else if (!this.isSpeaking) {

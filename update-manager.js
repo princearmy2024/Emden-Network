@@ -208,7 +208,7 @@ const UpdateManager = (() => {
                     if (txt) txt.textContent = `Fortschritt: ${pct}%`;
                     if (pct >= 100 && txt) {
                         txt.textContent = 'Starte Installation...';
-                        txt.style.color = '#4ade80';
+                        txt.style.color = '#4DA6FF';
                     }
                 }
             });

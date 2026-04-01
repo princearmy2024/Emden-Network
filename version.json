@@ -1,6 +1,6 @@
 {
-    "version": "1.9.1",
-    "releaseDate": "2026-04-01",
-    "notes": "v1.9.1: Premium Splash-Screen, Voice-Card Bug Fix, UI Polish.",
+    "version": "2.0.0",
+    "releaseDate": "2026-04-02",
+    "notes": "v2.0.0: Komplettes Redesign — Echtes Logo, blaue Farbpalette, neuer Splash-Screen.",
     "forceUpdate": true
 }
