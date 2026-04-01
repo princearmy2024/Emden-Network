@@ -152,12 +152,12 @@ ipcMain.handle('check-github-update', async () => {
     });
 });
 
-// Holt die letzten 3 Releases für den Changelog
+// Holt die letzten 10 Releases für den Changelog
 ipcMain.handle('get-github-changelog', async () => {
     return new Promise((resolve) => {
         const options = {
             hostname: 'api.github.com',
-            path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=3`,
+            path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=10`,
             headers: { 'User-Agent': 'EmdenNetwork-Dashboard' }
         };
 
@@ -167,12 +167,29 @@ ipcMain.handle('get-github-changelog', async () => {
             res.on('end', () => {
                 try {
                     const json = JSON.parse(data);
-                    resolve(Array.isArray(json) ? json : []);
-                } catch (e) { resolve([]); }
+                    if (Array.isArray(json) && json.length > 0) {
+                        resolve(json);
+                    } else {
+                        // Rate-Limit oder Fehler → lokalen Fallback nutzen
+                        resolve(getLocalChangelog());
+                    }
+                } catch (e) { resolve(getLocalChangelog()); }
             });
-        }).on('error', () => resolve([]));
+        }).on('error', () => resolve(getLocalChangelog()));
     });
 });
+
+// Lokaler Fallback-Changelog aus version.json
+function getLocalChangelog() {
+    try {
+        const vj = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'version.json'), 'utf8'));
+        return [{
+            tag_name: 'v' + vj.version,
+            published_at: vj.releaseDate || new Date().toISOString(),
+            body: vj.notes || 'Aktuelles Release'
+        }];
+    } catch (e) { return []; }
+}
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
