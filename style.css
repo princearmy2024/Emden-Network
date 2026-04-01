@@ -1436,6 +1436,34 @@ svg { display: block; flex-shrink: 0; }
 .ovb-footer { display: none; }
 
 /* ── UPDATE NOTIFIER (ICON-BASED) ─────────────────────────── */
+/* ── Sidebar Update Button ───────────────────────────────── */
+.nav-update-btn {
+    position: relative;
+    background: rgba(0, 209, 167, 0.1) !important;
+    border: 1px solid rgba(0, 209, 167, 0.25) !important;
+    color: var(--brand-blue) !important;
+    animation: notifierPulse 2s infinite;
+    margin-top: 4px;
+}
+.nav-update-btn::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 209, 167, 0.06);
+    pointer-events: none;
+}
+.nav-update-btn:hover {
+    background: rgba(0, 209, 167, 0.2) !important;
+    border-color: var(--brand-blue) !important;
+    transform: scale(1.08);
+    box-shadow: 0 0 20px rgba(0, 209, 167, 0.35) !important;
+}
+.nav-update-btn svg {
+    color: var(--brand-blue);
+    filter: drop-shadow(0 0 4px rgba(0, 209, 167, 0.6));
+}
+
 .update-notifier {
     display: inline-flex;
     align-items: center;

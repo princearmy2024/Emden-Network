@@ -64,6 +64,8 @@ const UpdateManager = (() => {
                     console.log(`[Update] App ist auf dem neuesten Stand (${currentAppVersion}).`);
                     const notifier = document.getElementById('updateNotifier');
                     if (notifier) notifier.classList.remove('visible');
+                    const sidebarBtn = document.getElementById('sidebarUpdateBtn');
+                    if (sidebarBtn) sidebarBtn.style.display = 'none';
                     return;
                 }
 
@@ -83,9 +85,11 @@ const UpdateManager = (() => {
                     url: data.assets && data.assets.find(a => a.name.endsWith('.exe')) ? data.assets.find(a => a.name.endsWith('.exe')).browser_download_url : `https://github.com/princearmy2024/Emden-Network/releases/download/${data.tag_name}/EmdenNetworkSetup.exe`
                 };
 
-                // NEU: Nur das Icon einblenden statt dem fetten Banner!
+                // Update-Buttons einblenden (Topbar + Sidebar)
                 const notifier = document.getElementById('updateNotifier');
                 if (notifier) notifier.classList.add('visible');
+                const sidebarBtn = document.getElementById('sidebarUpdateBtn');
+                if (sidebarBtn) sidebarBtn.style.display = 'flex';
             }
         } catch (e) {
             console.error('[Update] Fehler beim GitHub Update-Check:', e.message);

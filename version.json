@@ -1,6 +1,6 @@
 {
-    "version": "1.6.6",
-    "releaseDate": "2026-03-30",
-    "notes": "v1.6.6: Versions-Synchronisierung, Konsistenz-Check bestanden.",
+    "version": "1.7.3",
+    "releaseDate": "2026-04-01",
+    "notes": "v1.7.3: DEMO_MODE deaktiviert, Sidebar Update-Button, Dashboard Redesign, /verify Fix.",
     "forceUpdate": true
 }
