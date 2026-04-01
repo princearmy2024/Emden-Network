@@ -1953,7 +1953,7 @@ Object.assign(App, {
     _vadContext: null,
     _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
     _blipCtx: null,      // Shared AudioContext für playBlip
-    _incomingChunks: {}, // username → Uint8Array[] (Chunks sammeln bis PTT-Stop)
+    _incomingHeaders: {}, // username → Uint8Array (erster WebM-Chunk = Init-Segment/Header)
     _vadAnalyser: null,
     _vadBuffer: null,
     _vadInterval: null,
@@ -2313,7 +2313,9 @@ Object.assign(App, {
 
     // ── Socket.IO Voice Events registrieren ─────────────────────
     initVoiceSocketEvents(socket) {
-        // Eingehende Audio-Chunks → sammeln (WebM-Chunks sind nur zusammen decodierbar)
+        // Eingehende Audio-Chunks → sofort abspielen (Echtzeit)
+        // Erster Chunk = WebM Init-Segment (Header), wird gespeichert
+        // und jedem weiteren Chunk vorangestellt damit er decodierbar ist
         socket.on('voice_audio_chunk', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
@@ -2321,36 +2323,40 @@ Object.assign(App, {
                 const binary = atob(data.data);
                 const bytes  = new Uint8Array(binary.length);
                 for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                if (!this._incomingChunks[data.username]) this._incomingChunks[data.username] = { chunks: [], mimeType: data.mimeType };
-                this._incomingChunks[data.username].chunks.push(bytes);
+
+                const mimeType = data.mimeType || 'audio/webm;codecs=opus';
+
+                if (!this._incomingHeaders[data.username]) {
+                    // Erster Chunk = Header — speichern UND direkt abspielen
+                    this._incomingHeaders[data.username] = { bytes, mimeType };
+                    this._playIncomingAudio([bytes], mimeType);
+                } else {
+                    // Folgechunks: Header + Chunk zusammen → decodierbar
+                    const header = this._incomingHeaders[data.username].bytes;
+                    this._playIncomingAudio([header, bytes], mimeType);
+                }
             } catch(e) {}
         });
 
-        // Anderer User drückt PTT → Buffer zurücksetzen
+        // Anderer User drückt PTT → Header zurücksetzen
         socket.on('voice_ptt_start', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
 
             console.log('[Voice] 🔊', data.username, 'sendet...');
-            this._incomingChunks[data.username] = { chunks: [], mimeType: 'audio/webm;codecs=opus' };
+            delete this._incomingHeaders[data.username];
             this._setSpeakerActive(data.username, true);
             this.playBlip(800, 0.05);
         });
 
-        // Anderer User lässt PTT los → gesammelte Chunks abspielen
+        // Anderer User lässt PTT los
         socket.on('voice_ptt_stop', (data) => {
             const me = AuthService.getUser();
             if (data.username === me?.username) return;
 
             console.log('[Voice] ⏹', data.username, 'hat aufgehört.');
+            delete this._incomingHeaders[data.username];
             this._setSpeakerActive(data.username, false);
-
-            // Alle Chunks zusammenfügen und abspielen
-            const entry = this._incomingChunks[data.username];
-            if (entry && entry.chunks.length > 0) {
-                this._playIncomingAudio(entry.chunks, entry.mimeType);
-                delete this._incomingChunks[data.username];
-            }
 
             const status = document.getElementById('pttStatus');
             const waveform = document.getElementById('wt-waveform');

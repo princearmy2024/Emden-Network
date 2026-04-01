@@ -1,6 +1,6 @@
 {
-    "version": "1.7.8",
+    "version": "1.7.9",
     "releaseDate": "2026-04-01",
-    "notes": "v1.7.8: VAD entfernt — durchgehende Aufnahme, kein zerhacktes Audio, Static-Loop-Fix.",
+    "notes": "v1.7.9: Echtzeit-Audio — Chunks sofort abspielen statt warten bis PTT-Stop.",
     "forceUpdate": true
 }
