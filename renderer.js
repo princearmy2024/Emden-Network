@@ -19,7 +19,7 @@ let CURRENT_VERSION = '1.6.6'; // Stand: 30.03.2026 (Versions-Synchronisierung, 
 // CONFIG — Bot-API
 // =============================================================
 const CONFIG = {
-    API_URL: 'http://localhost:5009',
+    API_URL: 'http://91.98.124.212:5009',
     API_KEY: 'emden-super-secret-key-2026',
     DEMO_MODE: true,  // Aktiviert Demo-Codes für Testzwecke
 };
