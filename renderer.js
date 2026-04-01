@@ -1034,24 +1034,26 @@ const App = {
     // --- SOUND ENGINE (Walkie-Talkie Effects) ---
     playBlip(freq = 800, duration = 0.1) {
         try {
-            const context = new (window.AudioContext || window.webkitAudioContext)();
+            // Shared AudioContext wiederverwenden — nie mehr als 1 gleichzeitig
+            if (!this._blipCtx || this._blipCtx.state === 'closed') {
+                this._blipCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this._blipCtx.state === 'suspended') this._blipCtx.resume().catch(() => {});
+            const context = this._blipCtx;
+
             const osc = context.createOscillator();
             const gain = context.createGain();
-            
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, context.currentTime);
             osc.frequency.exponentialRampToValueAtTime(freq / 2, context.currentTime + duration);
-            
             gain.gain.setValueAtTime(0.05, context.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + duration);
-            
+            gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
             osc.connect(gain);
             gain.connect(context.destination);
-            
             osc.start();
             osc.stop(context.currentTime + duration);
         } catch (e) {
-            console.warn('[Sound] AudioContext blockiert oder nicht verfügbar.');
+            // AudioContext nicht verfügbar — kein Crash
         }
     },
 
@@ -1950,6 +1952,7 @@ Object.assign(App, {
     // VAD (Voice Activity Detection)
     _vadContext: null,
     _playCtx: null,      // Shared AudioContext für eingehende Audio-Chunks
+    _blipCtx: null,      // Shared AudioContext für playBlip
     _vadAnalyser: null,
     _vadBuffer: null,
     _vadInterval: null,
