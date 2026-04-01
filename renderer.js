@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.0.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.1.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -2115,27 +2115,12 @@ Object.assign(App, {
         if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
     },
 
-    // Busy-Ton: drei absteigende Pieptöne wenn Kanal belegt ──────
+    // Busy-Ton: error.wav wenn Kanal belegt ──────────────────────
     _playBusyTone() {
         try {
-            if (!this._blipCtx || this._blipCtx.state === 'closed') {
-                this._blipCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (this._blipCtx.state === 'suspended') this._blipCtx.resume().catch(() => {});
-            const ctx = this._blipCtx;
-            const now = ctx.currentTime;
-            [[440, 0, 0.07], [370, 0.09, 0.07], [311, 0.18, 0.12]].forEach(([freq, t, dur]) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(0.1, now + t);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + t + dur);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(now + t);
-                osc.stop(now + t + dur);
-            });
+            const snd = new Audio('./error.wav');
+            snd.volume = 0.4;
+            snd.play().catch(() => {});
         } catch(e) {}
     },
 
@@ -2375,37 +2360,37 @@ Object.assign(App, {
 
                     const src = ctx.createMediaElementSource(audio);
 
-                    // 1) Highpass — alles unter 300 Hz weg (Funk hat keine Bässe)
+                    // 1) Sanfter Highpass — Bässe leicht reduzieren
                     const hp = ctx.createBiquadFilter();
                     hp.type = 'highpass';
-                    hp.frequency.value = 300;
-                    hp.Q.value = 0.7;
+                    hp.frequency.value = 200;
+                    hp.Q.value = 0.5;
 
-                    // 2) Lowpass — alles über 3400 Hz weg (schmaler Funk-Kanal)
+                    // 2) Lowpass — Höhen sanft kappen
                     const lp = ctx.createBiquadFilter();
                     lp.type = 'lowpass';
-                    lp.frequency.value = 3400;
-                    lp.Q.value = 0.7;
+                    lp.frequency.value = 4000;
+                    lp.Q.value = 0.5;
 
-                    // 3) Mid-Boost bei 1.5 kHz (typischer Funk-Nasal-Sound)
+                    // 3) Leichter Mid-Boost (Funk-Charakter, nicht nasal)
                     const peak = ctx.createBiquadFilter();
                     peak.type = 'peaking';
-                    peak.frequency.value = 1500;
-                    peak.Q.value = 1.5;
-                    peak.gain.value = 6;
+                    peak.frequency.value = 1800;
+                    peak.Q.value = 0.8;
+                    peak.gain.value = 3;
 
-                    // 4) Verzerrung (stärkerer Funk-Crunch)
+                    // 4) Sehr leichte Verzerrung (nur Wärme, kein Crunch)
                     const ws = ctx.createWaveShaper();
-                    const n = 512, amount = 40;
+                    const n = 512, amount = 8;
                     const curve = new Float32Array(n);
                     for (let i = 0; i < n; i++) {
                         const x = (i * 2) / n - 1;
                         curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
                     }
                     ws.curve = curve;
-                    ws.oversample = '4x';
+                    ws.oversample = '2x';
 
-                    // 5) Leises Rauschen (Funk-Static im Hintergrund)
+                    // 5) Sehr leises Rauschen (kaum hörbar, nur Atmosphäre)
                     const noiseLen = ctx.sampleRate * 2;
                     const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
                     const noiseData = noiseBuf.getChannelData(0);
@@ -2415,17 +2400,17 @@ Object.assign(App, {
                     noiseNode.loop = true;
                     const noiseBpf = ctx.createBiquadFilter();
                     noiseBpf.type = 'bandpass';
-                    noiseBpf.frequency.value = 2000;
-                    noiseBpf.Q.value = 0.5;
+                    noiseBpf.frequency.value = 2500;
+                    noiseBpf.Q.value = 0.3;
                     const noiseGain = ctx.createGain();
-                    noiseGain.gain.value = 0.012; // sehr leise — nur Atmosphäre
+                    noiseGain.gain.value = 0.005; // extrem leise
 
                     noiseNode.connect(noiseBpf);
                     noiseBpf.connect(noiseGain);
 
                     // 6) Master Gain
                     const masterGain = ctx.createGain();
-                    masterGain.gain.value = vol * 1.1;
+                    masterGain.gain.value = vol;
 
                     // Chain: src → hp → lp → peak → waveshaper → masterGain → out
                     src.connect(hp);
@@ -2433,14 +2418,13 @@ Object.assign(App, {
                     lp.connect(peak);
                     peak.connect(ws);
                     ws.connect(masterGain);
-                    noiseGain.connect(masterGain); // Rauschen zum Master mixen
+                    noiseGain.connect(masterGain);
                     masterGain.connect(ctx.destination);
 
                     noiseNode.start();
                     audio.volume = 1;
                     radioConnected = true;
 
-                    // Noise stoppen wenn Stream endet
                     audio.addEventListener('pause', () => { try { noiseNode.stop(); } catch(e) {} }, { once: true });
                 } catch(e) {
                     if (!radioConnected) audio.volume = vol;
@@ -2558,7 +2542,7 @@ Object.assign(App, {
             console.log('[Voice] 🔊', data.username, 'sendet...');
             this._openVoiceStream(data.username, data.mimeType || 'audio/webm;codecs=opus');
             this._setSpeakerActive(data.username, true);
-            this.playBlip(800, 0.05);
+            try { const s = new Audio('./chirsp.wav'); s.volume = 0.25; s.play().catch(() => {}); } catch(e) {}
         });
 
         // Anderer User lässt PTT los → Stream schließen
@@ -2580,7 +2564,7 @@ Object.assign(App, {
                 }
                 if (waveform) waveform.classList.remove('active');
             }
-            this.playBlip(600, 0.05);
+            try { const s = new Audio('./out.wav'); s.volume = 0.25; s.play().catch(() => {}); } catch(e) {}
         });
 
         // Kanal-Mitglieder-Update (v1.6.1: Entfernt da nun via WebSocketService zentral)
@@ -2588,16 +2572,17 @@ Object.assign(App, {
     },
 
     playRadioStatic(active) {
-        if (active) {
-            // Einmal kurz abspielen beim Drücken — kein Loop
-            const openSound = new Audio(this.pttSoundUrl);
-            openSound.volume = 0.15;
-            openSound.play().catch(() => {});
-        } else {
-            // End-Beep beim Loslassen
-            this.playBlip(500, 0.1);
-            setTimeout(() => this.playBlip(400, 0.05), 100);
-        }
+        try {
+            if (active) {
+                const snd = new Audio('./chirsp.wav');
+                snd.volume = 0.35;
+                snd.play().catch(() => {});
+            } else {
+                const snd = new Audio('./out.wav');
+                snd.volume = 0.35;
+                snd.play().catch(() => {});
+            }
+        } catch(e) {}
     },
 
     renderWTMembers() {

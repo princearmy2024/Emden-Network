@@ -1,6 +1,6 @@
 {
-    "version": "2.0.1",
+    "version": "2.1.0",
     "releaseDate": "2026-04-02",
-    "notes": "v2.0.1: Besserer Funk-Effekt, Verlassen-Button, Radio-Effekt Toggle.",
+    "notes": "v2.1.0: Neues Logo, echte Walkie-Talkie Sounds, sanfterer Radio-Effekt.",
     "forceUpdate": true
 }
