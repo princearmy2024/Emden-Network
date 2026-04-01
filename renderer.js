@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.2.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -677,6 +677,13 @@ const App = {
         this.navigate('overview');
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
         this._loadSavedBackground(); // Custom Wallpaper laden
+
+        // Gespeicherte User-Liste sofort laden (Offline-Anzeige)
+        const savedUsers = Object.values(UserRegistry.get());
+        if (savedUsers.length > 0) {
+            this.renderFullUserList([]);  // Alle als offline rendern
+        }
+
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
@@ -1550,26 +1557,48 @@ const App = {
         });
     },
 
+    _msgIdCounter: 0,
+
+    // Prüft ob Text eine Bild/GIF URL ist
+    _renderMessageContent(text) {
+        const escaped = escHtml(text);
+        // URLs die auf .gif/.png/.jpg/.jpeg/.webp enden → als Bild rendern
+        const imgMatch = text.match(/^(https?:\/\/\S+\.(?:gif|png|jpe?g|webp))$/i);
+        if (imgMatch) {
+            return `<img src="${escHtml(imgMatch[1])}" class="chat-embed-img" alt="Bild" onerror="this.style.display='none'">`;
+        }
+        // Tenor/Giphy URLs → als Bild
+        const tenorMatch = text.match(/^(https?:\/\/(?:media\.tenor\.com|media\d*\.giphy\.com)\/\S+)$/i);
+        if (tenorMatch) {
+            return `<img src="${escHtml(tenorMatch[1])}" class="chat-embed-img" alt="GIF" onerror="this.style.display='none'">`;
+        }
+        return escaped;
+    },
+
     appendChatMessage(data) {
         const chatBox = document.querySelector('.chat-messages');
         if (!chatBox) return;
 
+        const msgId = 'msg-' + (++this._msgIdCounter);
         const isOwn = data.username === AuthService.getUser()?.username;
         const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
         const user = AuthService.getUser();
         const avatarUrl = isOwn ? (user?.avatar || '') : '';
         const initial = (data.username || 'U')[0].toUpperCase();
+        const content = this._renderMessageContent(data.message || '');
 
         const ownAvatar = avatarUrl
             ? `<div class="msg-avatar you"><img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${initial}'"></div>`
             : `<div class="msg-avatar you" style="background:var(--brand-blue)">${initial}</div>`;
 
         const html = `
-            <div class="msg-item ${isOwn ? 'own' : ''}">
+            <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
                 ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${initial}</div>` : ''}
                 <div class="msg-body">
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'System')}</span><span class="msg-time">${time}</span></div>
-                    <div class="msg-text">${escHtml(data.message || '')}</div>
+                    <div class="msg-text">${content}</div>
+                    <div class="msg-reactions" id="${msgId}-reactions"></div>
+                    <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
                 </div>
                 ${isOwn ? ownAvatar : ''}
             </div>
@@ -1577,12 +1606,68 @@ const App = {
 
         chatBox.insertAdjacentHTML('beforeend', html);
 
-        // Max 20 Nachrichten behalten
+        // Max 20 Nachrichten
         while (chatBox.children.length > 20) {
             chatBox.removeChild(chatBox.firstChild);
         }
 
         chatBox.scrollTop = chatBox.scrollHeight;
+    },
+
+    // Emoji Reaction Picker
+    showReactionPicker(msgId) {
+        // Altes Picker schließen
+        document.querySelectorAll('.reaction-picker').forEach(el => el.remove());
+
+        const msgEl = document.getElementById(msgId);
+        if (!msgEl) return;
+        const body = msgEl.querySelector('.msg-body');
+
+        const emojis = ['👍','❤️','😂','🔥','😮','😢','💯','🎉','👀','🤔'];
+        const picker = document.createElement('div');
+        picker.className = 'reaction-picker';
+        picker.innerHTML = emojis.map(e => `<button class="rp-emoji" onclick="App.addReaction('${msgId}','${e}')">${e}</button>`).join('');
+        body.appendChild(picker);
+
+        // Schließen bei Klick außerhalb
+        setTimeout(() => {
+            document.addEventListener('click', function close(ev) {
+                if (!picker.contains(ev.target)) {
+                    picker.remove();
+                    document.removeEventListener('click', close);
+                }
+            });
+        }, 50);
+    },
+
+    addReaction(msgId, emoji) {
+        const container = document.getElementById(msgId + '-reactions');
+        if (!container) return;
+
+        // Prüfe ob Emoji schon existiert → Zähler erhöhen
+        const existing = container.querySelector(`[data-emoji="${emoji}"]`);
+        if (existing) {
+            const countEl = existing.querySelector('.rc-count');
+            countEl.textContent = parseInt(countEl.textContent) + 1;
+        } else {
+            const badge = document.createElement('span');
+            badge.className = 'reaction-badge';
+            badge.dataset.emoji = emoji;
+            badge.innerHTML = `${emoji}<span class="rc-count">1</span>`;
+            badge.onclick = () => {
+                const c = badge.querySelector('.rc-count');
+                c.textContent = parseInt(c.textContent) + 1;
+            };
+            container.appendChild(badge);
+        }
+
+        // Picker schließen
+        document.querySelectorAll('.reaction-picker').forEach(el => el.remove());
+
+        // Socket sync
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('chat_reaction', { msgId, emoji });
+        }
     },
 
     getStringColor(str) {

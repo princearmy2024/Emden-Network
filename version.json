@@ -1,6 +1,6 @@
 {
-    "version": "2.2.0",
+    "version": "2.3.0",
     "releaseDate": "2026-04-02",
-    "notes": "v2.2.0: PTT-Fix, Webhook-Fix, Chat-Reparatur, Spam-Schutz, Custom Background.",
+    "notes": "v2.3.0: Emoji-Reactions, GIF-Support, User-Persistenz, Custom Background.",
     "forceUpdate": true
 }
