@@ -2346,6 +2346,40 @@ svg { display: block; flex-shrink: 0; }
     color: var(--status-online);
 }
 
+/* Voice Controls (Leave + Radio Toggle) */
+.wt-voice-controls {
+    display: flex; gap: 8px; justify-content: center;
+    margin-top: 12px;
+}
+.wt-ctrl-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 14px; border-radius: 8px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+    font-family: var(--font-mono); text-transform: uppercase;
+    background: rgba(0,136,255,0.08);
+    border: 1px solid rgba(0,136,255,0.2);
+    color: var(--status-online);
+    cursor: pointer; transition: all 0.2s;
+}
+.wt-ctrl-btn:hover {
+    background: rgba(0,136,255,0.15);
+    border-color: rgba(0,136,255,0.35);
+}
+.wt-ctrl-btn.off {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+    color: var(--text-muted);
+}
+.wt-ctrl-btn.danger {
+    background: rgba(255,60,60,0.08);
+    border: 1px solid rgba(255,60,60,0.2);
+    color: #ff6b6b;
+}
+.wt-ctrl-btn.danger:hover {
+    background: rgba(255,60,60,0.18);
+    border-color: rgba(255,60,60,0.4);
+}
+
 /* ── Participants panel (modern) ─────────────── */
 .wt-member-list { display: flex; flex-direction: column; gap: 3px; }
 .wt-empty-msg { padding: 24px 0; text-align: center; color: var(--text-muted); font-size: 12px; }

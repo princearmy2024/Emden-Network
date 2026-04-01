@@ -1,6 +1,6 @@
 {
-    "version": "2.0.0",
+    "version": "2.0.1",
     "releaseDate": "2026-04-02",
-    "notes": "v2.0.0: Komplettes Redesign — Echtes Logo, blaue Farbpalette, neuer Splash-Screen.",
+    "notes": "v2.0.1: Besserer Funk-Effekt, Verlassen-Button, Radio-Effekt Toggle.",
     "forceUpdate": true
 }

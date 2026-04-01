@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.0.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.0.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1372,6 +1372,23 @@ const App = {
         NotificationService.show('Kanal verlassen', `Du hast #${vc.name} verlassen.`, 'info');
     },
 
+    // Verlässt den aktuell aktiven Voice-Kanal (Button im PTT-Panel)
+    leaveCurrentVoice() {
+        const vc = MockData.voiceChannels.find(v => v.active);
+        if (vc) this.leaveVoiceChannel(vc.id);
+    },
+
+    // Radio-Effekt an/aus toggeln
+    toggleRadioEffect() {
+        this.radioEffectEnabled = !this.radioEffectEnabled;
+        localStorage.setItem('radio_effect', this.radioEffectEnabled ? 'true' : 'false');
+        const label = document.getElementById('radioEffectLabel');
+        const btn = document.getElementById('btnRadioEffect');
+        if (label) label.textContent = this.radioEffectEnabled ? 'FUNK AN' : 'FUNK AUS';
+        if (btn) btn.classList.toggle('off', !this.radioEffectEnabled);
+        NotificationService.show('Funk-Effekt', this.radioEffectEnabled ? 'Radio-Effekt aktiviert' : 'Radio-Effekt deaktiviert — normale Stimme', 'info');
+    },
+
     // --- SETTINGS ---
     setAccent(color) {
         const map = {
@@ -1960,6 +1977,7 @@ Object.assign(App, {
     pttKey: localStorage.getItem('ptt_key') || 'v',
     pttSoundUrl: localStorage.getItem('ptt_sound_url') || './walkie-talkie-start.mp3.wav',
     pttVolume: parseFloat(localStorage.getItem('ptt_volume') || '0.5'),
+    radioEffectEnabled: localStorage.getItem('radio_effect') !== 'false', // Default: an
     selectedMicId: localStorage.getItem('selected_mic') || 'default',
     isMonitoring: false,
     _staticLoop: null,
@@ -2063,6 +2081,12 @@ Object.assign(App, {
         if (vInp) vInp.value = this.pttVolume;
 
         this.refreshMicList();
+
+        // Radio-Effekt Toggle UI sync
+        const radioLabel = document.getElementById('radioEffectLabel');
+        const radioBtn = document.getElementById('btnRadioEffect');
+        if (radioLabel) radioLabel.textContent = this.radioEffectEnabled ? 'FUNK AN' : 'FUNK AUS';
+        if (radioBtn) radioBtn.classList.toggle('off', !this.radioEffectEnabled);
     },
 
     // Monitoring wurde in v1.2.8 entfernt/deaktiviert
@@ -2339,48 +2363,91 @@ Object.assign(App, {
 
             // ── Walkie-Talkie Radio-Effekt via Web Audio ─────────
             let radioConnected = false;
-            const applyRadioEffect = () => {
+            const vol = Math.min(1.0, this.pttVolume * 2.0);
+
+            if (this.radioEffectEnabled) {
                 try {
                     if (!this._radioCtx || this._radioCtx.state === 'closed') {
                         this._radioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     }
                     if (this._radioCtx.state === 'suspended') this._radioCtx.resume().catch(() => {});
+                    const ctx = this._radioCtx;
 
-                    const src = this._radioCtx.createMediaElementSource(audio);
+                    const src = ctx.createMediaElementSource(audio);
 
-                    // Bandpass (typisches Funkgerät: 300–3000 Hz)
-                    const bpf = this._radioCtx.createBiquadFilter();
-                    bpf.type = 'bandpass';
-                    bpf.frequency.value = 1400;
-                    bpf.Q.value = 0.6;
+                    // 1) Highpass — alles unter 300 Hz weg (Funk hat keine Bässe)
+                    const hp = ctx.createBiquadFilter();
+                    hp.type = 'highpass';
+                    hp.frequency.value = 300;
+                    hp.Q.value = 0.7;
 
-                    // Leichte Verzerrung für den "Funk-Crunch"
-                    const ws = this._radioCtx.createWaveShaper();
-                    const n = 256, amount = 25;
+                    // 2) Lowpass — alles über 3400 Hz weg (schmaler Funk-Kanal)
+                    const lp = ctx.createBiquadFilter();
+                    lp.type = 'lowpass';
+                    lp.frequency.value = 3400;
+                    lp.Q.value = 0.7;
+
+                    // 3) Mid-Boost bei 1.5 kHz (typischer Funk-Nasal-Sound)
+                    const peak = ctx.createBiquadFilter();
+                    peak.type = 'peaking';
+                    peak.frequency.value = 1500;
+                    peak.Q.value = 1.5;
+                    peak.gain.value = 6;
+
+                    // 4) Verzerrung (stärkerer Funk-Crunch)
+                    const ws = ctx.createWaveShaper();
+                    const n = 512, amount = 40;
                     const curve = new Float32Array(n);
                     for (let i = 0; i < n; i++) {
                         const x = (i * 2) / n - 1;
                         curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
                     }
                     ws.curve = curve;
-                    ws.oversample = '2x';
+                    ws.oversample = '4x';
 
-                    // Ausgangslautstärke
-                    const gain = this._radioCtx.createGain();
-                    gain.gain.value = Math.min(1.0, this.pttVolume * 2.2);
+                    // 5) Leises Rauschen (Funk-Static im Hintergrund)
+                    const noiseLen = ctx.sampleRate * 2;
+                    const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+                    const noiseData = noiseBuf.getChannelData(0);
+                    for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1);
+                    const noiseNode = ctx.createBufferSource();
+                    noiseNode.buffer = noiseBuf;
+                    noiseNode.loop = true;
+                    const noiseBpf = ctx.createBiquadFilter();
+                    noiseBpf.type = 'bandpass';
+                    noiseBpf.frequency.value = 2000;
+                    noiseBpf.Q.value = 0.5;
+                    const noiseGain = ctx.createGain();
+                    noiseGain.gain.value = 0.012; // sehr leise — nur Atmosphäre
 
-                    src.connect(bpf);
-                    bpf.connect(ws);
-                    ws.connect(gain);
-                    gain.connect(this._radioCtx.destination);
-                    audio.volume = 1; // Web Audio regelt die Lautstärke
+                    noiseNode.connect(noiseBpf);
+                    noiseBpf.connect(noiseGain);
+
+                    // 6) Master Gain
+                    const masterGain = ctx.createGain();
+                    masterGain.gain.value = vol * 1.1;
+
+                    // Chain: src → hp → lp → peak → waveshaper → masterGain → out
+                    src.connect(hp);
+                    hp.connect(lp);
+                    lp.connect(peak);
+                    peak.connect(ws);
+                    ws.connect(masterGain);
+                    noiseGain.connect(masterGain); // Rauschen zum Master mixen
+                    masterGain.connect(ctx.destination);
+
+                    noiseNode.start();
+                    audio.volume = 1;
                     radioConnected = true;
+
+                    // Noise stoppen wenn Stream endet
+                    audio.addEventListener('pause', () => { try { noiseNode.stop(); } catch(e) {} }, { once: true });
                 } catch(e) {
-                    // Fallback ohne Effekt
-                    if (!radioConnected) audio.volume = Math.min(1.0, this.pttVolume * 2.0);
+                    if (!radioConnected) audio.volume = vol;
                 }
-            };
-            applyRadioEffect();
+            } else {
+                audio.volume = vol;
+            }
 
             const stream = { ms, audio, sb: null, queue: [], url: audio.src };
             this._incomingStreams[username] = stream;
