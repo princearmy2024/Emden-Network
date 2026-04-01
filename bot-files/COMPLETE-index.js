@@ -1,15 +1,17 @@
 // index.js — Emden Network Bot (finale, einfache Version)
 import {
     Client, GatewayIntentBits, REST, Routes,
-    Collection, Partials, ActivityType
+    Partials, ActivityType, SlashCommandBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
-import { verificationCodes } from "./data/verificationStore.js";
 import { Server as SocketIOServer } from "socket.io";
 import crypto from "node:crypto";
+
+// In-Memory Code Store (alles in einer Datei — kein extra File nötig)
+const verificationCodes = new Map();
 
 dotenv.config();
 
@@ -64,45 +66,51 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
-client.commands = new Collection();
-const commandsForDiscord = [];
+// === /verify Command (inline — kein extra File nötig) ===
+const verifyCommand = new SlashCommandBuilder()
+    .setName("verify")
+    .setDescription("Erhalte deinen Verifikationscode für das Emden Network Dashboard");
 
-// === Commands laden ===
-const commandsPath = path.join(path.resolve(), "commands");
-if (fs.existsSync(commandsPath)) {
-    for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"))) {
-        const cmd = (await import(`file://${path.join(commandsPath, file)}`)).default;
-        if (cmd && "data" in cmd && "execute" in cmd) {
-            client.commands.set(cmd.data.name, cmd);
-            commandsForDiscord.push(cmd.data.toJSON());
-            console.log(`✅ Command geladen: /${cmd.data.name}`);
-        }
-    }
-}
-
-// === Events laden ===
-const eventsPath = path.join(path.resolve(), "events");
-if (fs.existsSync(eventsPath)) {
-    for (const file of fs.readdirSync(eventsPath).filter(f => f.endsWith(".js"))) {
-        const evt = (await import(`file://${path.join(eventsPath, file)}`)).default;
-        if (!evt?.name || !evt?.execute) continue;
-        evt.once
-            ? client.once(evt.name, (...a) => evt.execute(...a))
-            : client.on(evt.name, (...a) => evt.execute(...a));
-        console.log(`✅ Event geladen: ${evt.name}`);
-    }
-}
+const commandsForDiscord = [verifyCommand.toJSON()];
 
 // === Slash Command Handler ===
 client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
-    const cmd = client.commands.get(interaction.commandName);
-    if (!cmd) return;
+    if (interaction.commandName !== "verify") return;
     try {
-        await cmd.execute(interaction);
+        await interaction.deferReply({ ephemeral: true });
+
+        // Alten Code dieses Users löschen
+        for (const [k, v] of verificationCodes.entries()) {
+            if (v.discordId === interaction.user.id) verificationCodes.delete(k);
+        }
+
+        const code      = `EN-${crypto.randomInt(100000, 999999)}`;
+        const expiresAt = Date.now() + 10 * 60 * 1000;
+
+        verificationCodes.set(code, {
+            discordId: interaction.user.id,
+            username:  interaction.user.displayName || interaction.user.username,
+            tag:       interaction.user.tag,
+            avatar:    interaction.user.displayAvatarURL({ size: 128 }),
+            expiresAt,
+        });
+
+        console.log(`[VERIFY] Code ${code} → ${interaction.user.tag} | Store: ${verificationCodes.size} Codes`);
+
+        await interaction.editReply({
+            content: [
+                "## 🔐 Emden Network Dashboard",
+                "",
+                "Dein persönlicher Verifikationscode:",
+                `\`\`\`${code}\`\`\``,
+                "⏱️ Gültig für **10 Minuten**",
+                "⚠️ Teile diesen Code mit **niemandem**!",
+            ].join("\n"),
+        });
     } catch (e) {
-        console.error(`[CMD] Fehler bei /${interaction.commandName}:`, e);
-        const reply = { content: "❌ Fehler beim Ausführen des Befehls.", ephemeral: true };
+        console.error("[VERIFY] Fehler:", e);
+        const reply = { content: "❌ Fehler beim Erstellen des Codes.", ephemeral: true };
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply(reply).catch(() => {});
         } else {
