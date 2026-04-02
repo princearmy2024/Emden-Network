@@ -962,16 +962,12 @@ const App = {
         // UI im Header aktualisieren
         const headTitle = document.getElementById('activeChatName');
         if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
-        
+
         const headSub = document.getElementById('chatHeaderOnlineText');
         if (headSub) {
-            if (name.startsWith('@')) {
-                headSub.textContent = 'Privatchat mit ' + name.substring(1);
-            } else {
-                // Standard-Handling...
-            }
+            headSub.textContent = name.startsWith('@') ? 'Privatchat mit ' + name.substring(1) : '';
         }
-        
+
         // Aktiven User in der Liste highlighten
         document.querySelectorAll('.ovn-node').forEach(node => {
             const userNameNode = node.querySelector('.ovn-name');
@@ -981,12 +977,16 @@ const App = {
                 node.classList.remove('active');
             }
         });
-        
-        // Sound-Feedback (Walkie-Talkie Vibe)
+
         this.playBlip(700, 0.05);
 
-        // Gespeicherten Chat-Verlauf laden
-        this._loadChatHistory(name);
+        // Chat-Box leeren und gespeicherte Nachrichten laden (mit kurzem Delay für View-Transition)
+        setTimeout(() => {
+            const chatBox = document.getElementById('chatMessages');
+            if (chatBox) chatBox.innerHTML = '';
+            this._loadChatHistory(name);
+            console.log('[Chat] Gewechselt zu:', name);
+        }, 100);
     },
 
     appendChatMessage(msg) {
