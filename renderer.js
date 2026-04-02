@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1205,30 +1205,39 @@ const App = {
           <button class="btn btn-ghost" style="width:auto;flex:1" onclick="App.closeModal()">Abbrechen</button>
         </div>`;
         } else if (type === 'createVoice') {
-            title.textContent = '🔊 Sprachkanal erstellen';
+            title.textContent = 'Neuer Sprachkanal';
             body.innerHTML = `
-                <div class="input-group">
-                    <label class="input-label">KANAL-NAME</label>
-                    <input type="text" id="newVoiceName" class="input-field" placeholder="z.B. team-call">
-                </div>
-                <div class="input-group" style="margin-top:15px;">
-                    <label class="input-label">KANAL-TYP</label>
-                    <div style="display:flex; gap:10px; margin-top:8px;">
-                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='public'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active')">
-                            <div class="v-type-opt active">🌐 Öffentlich</div>
-                        </label>
-                        <label style="flex:1; cursor:pointer;" onclick="App._tempVoiceType='private'; document.querySelectorAll('.v-type-opt').forEach(el=>el.classList.remove('active')); this.querySelector('.v-type-opt').classList.add('active'); document.getElementById('vcPasswordGroup').classList.remove('hidden')">
-                            <div class="v-type-opt">🔒 Privat</div>
-                        </label>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div>
+                        <label class="input-label" style="font-size:10px;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;display:block;">KANAL-NAME</label>
+                        <div style="display:flex;align-items:center;gap:8px;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" width="16" height="16"><path d="M11 5L6 9H2v6h4l5 4V5z"/></svg>
+                            <input type="text" id="newVoiceName" style="flex:1;background:none;border:none;color:var(--text);font-size:14px;font-weight:600;outline:none;" placeholder="z.B. team-call">
+                        </div>
                     </div>
-                </div>
-                <div class="input-group hidden" id="vcPasswordGroup" style="margin-top:15px; animation: slideDown 0.3s ease;">
-                    <label class="input-label">KANAL-PASSWORT</label>
-                    <input type="password" id="newVoicePassword" class="input-field" placeholder="Passwort festlegen">
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:20px;">
-                    <button class="btn btn-primary" onclick="App.createVoiceChannel()" style="width:100%;">Erstellen</button>
-                    <button class="btn btn-ghost" onclick="App.closeModal()" style="width:100%;">Abbrechen</button>
+                    <div>
+                        <label class="input-label" style="font-size:10px;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;display:block;">KANAL-TYP</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <button class="vc-type-card active" id="vcTypePublic" onclick="App._tempVoiceType='public';document.querySelectorAll('.vc-type-card').forEach(e=>e.classList.remove('active'));this.classList.add('active');document.getElementById('vcPasswordGroup').classList.add('hidden');">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                <span style="font-size:12px;font-weight:700;">Öffentlich</span>
+                                <span style="font-size:9px;color:var(--text-muted);">Jeder kann beitreten</span>
+                            </button>
+                            <button class="vc-type-card" id="vcTypePrivate" onclick="App._tempVoiceType='private';document.querySelectorAll('.vc-type-card').forEach(e=>e.classList.remove('active'));this.classList.add('active');document.getElementById('vcPasswordGroup').classList.remove('hidden');">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                <span style="font-size:12px;font-weight:700;">Privat</span>
+                                <span style="font-size:9px;color:var(--text-muted);">Passwort nötig</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="hidden" id="vcPasswordGroup" style="animation:slideDown 0.2s ease;">
+                        <label class="input-label" style="font-size:10px;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;display:block;">PASSWORT</label>
+                        <input type="password" id="newVoicePassword" class="input-field" placeholder="Kanal-Passwort" style="border-radius:10px;padding:10px 14px;">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:4px;">
+                        <button class="btn btn-primary" onclick="App.createVoiceChannel()" style="flex:1;border-radius:10px;padding:11px;">Kanal erstellen</button>
+                        <button class="btn btn-ghost" onclick="App.closeModal()" style="width:auto;padding:11px 20px;border-radius:10px;">Abbrechen</button>
+                    </div>
                 </div>
             `;
             App._tempVoiceType = 'public';
@@ -1294,23 +1303,41 @@ const App = {
         const listContainer = document.querySelector('.voice-channels');
         if (!listContainer) return;
 
-        const title = '<div class="section-title">Sprachkanäle</div>';
-        const activeVC = MockData.voiceChannels.find(vc => vc.active);
         const html = MockData.voiceChannels.map(vc => {
             const count = vc.members ? vc.members.length : 0;
+            const iconSvg = vc.active
+                ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`
+                : vc.type === 'private'
+                    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 5L6 9H2v6h4l5 4V5z"/></svg>`;
+
+            // Member-Avatare gestapelt
+            const memberAvatars = (vc.members || []).slice(0, 4).map((m, i) => {
+                const init = (m || '?')[0].toUpperCase();
+                return `<div class="vc-stacked-avatar" style="z-index:${4-i}">${init}</div>`;
+            }).join('');
+            const extra = count > 4 ? `<div class="vc-stacked-avatar vc-extra">+${count - 4}</div>` : '';
+
             return `
             <div class="voice-channel-item ${vc.active ? 'active' : ''}" onclick="App.selectVoiceChannel('${vc.id}')">
                 <div class="vc-info">
-                    <div class="vc-icon">${vc.active ? '🔊' : vc.type === 'private' ? '🔒' : '📻'}</div>
-                    <div class="vc-name">#${escHtml(vc.name)}</div>
-                    ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
-                    ${count > 0 ? `<span class="vc-member-count">${count}</span>` : ''}
+                    <div class="vc-icon-svg">${iconSvg}</div>
+                    <div class="vc-details">
+                        <div class="vc-name">#${escHtml(vc.name)}</div>
+                        <div class="vc-sub">${vc.type === 'private' ? 'Privat' : 'Offen'}${count > 0 ? ' · ' + count + ' User' : ''}</div>
+                    </div>
                 </div>
-                ${vc.active ? `<button class="vc-leave-btn" onclick="event.stopPropagation(); App.leaveVoiceChannel('${vc.id}')" title="Kanal verlassen">✕</button>` : ''}
+                <div class="vc-right">
+                    ${vc.active ? '<span class="status-live-badge">LIVE</span>' : ''}
+                    ${count > 0 ? `<div class="vc-stacked-avatars">${memberAvatars}${extra}</div>` : ''}
+                    ${vc.active ? `<button class="vc-leave-btn" onclick="event.stopPropagation(); App.leaveVoiceChannel('${vc.id}')" title="Verlassen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>` : ''}
+                </div>
             </div>`;
         }).join('');
 
-        listContainer.innerHTML = title + html;
+        listContainer.innerHTML = html;
     },
 
     selectVoiceChannel(id) {
