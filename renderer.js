@@ -1801,6 +1801,9 @@ const App = {
     resetBackground() {
         localStorage.removeItem('custom_bg');
         localStorage.removeItem('bg_blur');
+        document.documentElement.style.backgroundImage = '';
+        document.documentElement.style.backgroundSize = '';
+        document.documentElement.style.backgroundPosition = '';
         const el = document.getElementById('customBgLayer');
         if (el) { el.style.backgroundImage = 'none'; el.style.filter = 'none'; }
         document.body.classList.remove('has-custom-bg');
@@ -1812,22 +1815,31 @@ const App = {
 
     setBgBlur(val) {
         localStorage.setItem('bg_blur', val);
-        const el = document.getElementById('customBgLayer');
-        if (el) el.style.filter = val > 0 ? `blur(${val}px)` : 'none';
+        const bg = localStorage.getItem('custom_bg');
+        if (bg) this._applyBackground(bg);
     },
 
     _applyBackground(dataUrl) {
-        let el = document.getElementById('customBgLayer');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'customBgLayer';
-            document.body.prepend(el);
-        }
-        el.style.backgroundImage = `url(${dataUrl})`;
+        // Direkt auf html setzen — kein separater Layer nötig
+        const html = document.documentElement;
+        html.style.backgroundImage = `url(${dataUrl})`;
+        html.style.backgroundSize = 'cover';
+        html.style.backgroundPosition = 'center';
+        html.style.backgroundRepeat = 'no-repeat';
         const blur = localStorage.getItem('bg_blur') || 0;
-        if (blur > 0) el.style.filter = `blur(${blur}px)`;
+        // Blur via separatem Layer (html selbst kann nicht geblurred werden)
+        let el = document.getElementById('customBgLayer');
+        if (blur > 0) {
+            if (!el) { el = document.createElement('div'); el.id = 'customBgLayer'; document.body.prepend(el); }
+            el.style.backgroundImage = `url(${dataUrl})`;
+            el.style.filter = `blur(${blur}px)`;
+            html.style.backgroundImage = 'none';
+        } else if (el) {
+            el.style.backgroundImage = 'none';
+            el.style.filter = 'none';
+        }
         document.body.classList.add('has-custom-bg');
-        document.documentElement.classList.add('has-custom-bg');
+        html.classList.add('has-custom-bg');
     },
 
     _loadSavedBackground() {
