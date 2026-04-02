@@ -1102,6 +1102,9 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 }
 .accent-opt:hover { transform: scale(1.15); }
 .accent-opt.active { border-color: #fff; transform: scale(1.1); }
+.accent-custom-wrap { cursor: pointer; position: relative; display: flex; }
+.accent-color-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.accent-opt.custom-color { display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(255,255,255,0.3); }
 .account-card {
     display: flex; align-items: center; gap: 12px;
     padding: 14px; background: rgba(255,255,255,0.02);

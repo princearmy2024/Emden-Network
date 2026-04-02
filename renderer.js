@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.6.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.7.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -677,6 +677,7 @@ const App = {
         this.navigate('overview');
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
         this._loadSavedBackground(); // Custom Wallpaper laden
+        this._loadSavedAccent(); // Gespeicherte Akzentfarbe laden
 
         // Gespeicherte User-Liste sofort laden (Offline-Anzeige)
         const savedUsers = Object.values(UserRegistry.get());
@@ -1412,12 +1413,46 @@ const App = {
             pink: ['#f857a6', '#ff5858'],
         };
         const [a, b] = map[color] || map.blue;
-        document.documentElement.style.setProperty('--brand-blue', a);
-        document.documentElement.style.setProperty('--brand-blue-3', b);
-        document.documentElement.style.setProperty('--brand-glow', a + '40');
+        this._applyAccent(a, b);
         document.querySelectorAll('.accent-opt').forEach((el, i) => {
             el.classList.toggle('active', Object.keys(map)[i] === color);
         });
+        document.querySelector('.accent-opt.custom-color')?.classList.remove('active');
+        localStorage.setItem('accent_color', color);
+    },
+
+    setCustomAccent(hex) {
+        // Dunklere Variante berechnen
+        const darken = (h, pct) => {
+            const r = Math.max(0, Math.round(parseInt(h.slice(1,3),16) * pct));
+            const g = Math.max(0, Math.round(parseInt(h.slice(3,5),16) * pct));
+            const b = Math.max(0, Math.round(parseInt(h.slice(5,7),16) * pct));
+            return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+        };
+        this._applyAccent(hex, darken(hex, 0.6));
+        document.querySelectorAll('.accent-opt').forEach(el => el.classList.remove('active'));
+        const preview = document.getElementById('customAccentPreview');
+        if (preview) { preview.style.background = hex; preview.classList.add('active'); }
+        localStorage.setItem('accent_color', 'custom:' + hex);
+    },
+
+    _applyAccent(primary, dark) {
+        document.documentElement.style.setProperty('--brand-blue', primary);
+        document.documentElement.style.setProperty('--brand-blue-3', dark);
+        document.documentElement.style.setProperty('--brand-glow', primary + '40');
+        document.documentElement.style.setProperty('--status-online', primary);
+    },
+
+    _loadSavedAccent() {
+        const saved = localStorage.getItem('accent_color');
+        if (!saved) return;
+        if (saved.startsWith('custom:')) {
+            this.setCustomAccent(saved.replace('custom:', ''));
+            const inp = document.getElementById('customAccentColor');
+            if (inp) inp.value = saved.replace('custom:', '');
+        } else {
+            this.setAccent(saved);
+        }
     },
 
     toggleSetting(key, val) {
