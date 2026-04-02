@@ -1459,32 +1459,110 @@ const App = {
     // ── Theme ────────────────────────────────────────────────
     setTheme(theme) {
         const themes = {
-            midnight: { base: '#13151e', surface: '#1a1d2e', card: '#1f2235', sidebar: '#111320' },
-            ocean:    { base: '#0a1628', surface: '#0f2040', card: '#132a4a', sidebar: '#081322' },
-            neon:     { base: '#0d0015', surface: '#170028', card: '#1f0035', sidebar: '#0a0012' },
-            amoled:   { base: '#000000', surface: '#0a0a0a', card: '#111111', sidebar: '#000000' },
+            midnight: { base: '#13151e', surface: '#1a1d2e', card: '#1f2235', cardHover: '#252840', sidebar: '#111320', input: '#1a1d2e', modal: '#1f2235' },
+            ocean:    { base: '#0a1628', surface: '#0f2040', card: '#132a4a', cardHover: '#173560', sidebar: '#081322', input: '#0f2040', modal: '#132a4a' },
+            neon:     { base: '#0d0015', surface: '#170028', card: '#1f0035', cardHover: '#2a0048', sidebar: '#0a0012', input: '#170028', modal: '#1f0035' },
+            amoled:   { base: '#000000', surface: '#0a0a0a', card: '#111111', cardHover: '#1a1a1a', sidebar: '#000000', input: '#0a0a0a', modal: '#111111' },
         };
         const t = themes[theme] || themes.midnight;
-        document.documentElement.style.setProperty('--bg-base', t.base);
-        document.documentElement.style.setProperty('--bg-surface', t.surface);
-        document.documentElement.style.setProperty('--bg-card', t.card);
-        document.documentElement.style.setProperty('--bg-sidebar', t.sidebar);
+        const r = document.documentElement;
+        r.style.setProperty('--bg-base', t.base);
+        r.style.setProperty('--bg-surface', t.surface);
+        r.style.setProperty('--bg-card', t.card);
+        r.style.setProperty('--bg-card-hover', t.cardHover);
+        r.style.setProperty('--bg-sidebar', t.sidebar);
+        r.style.setProperty('--bg-input', t.input);
+        r.style.setProperty('--bg-modal', t.modal);
+        // Auch html/body direkt updaten (für den Fall ohne Custom-BG)
+        if (!document.body.classList.contains('has-custom-bg')) {
+            document.body.style.background = t.base;
+            r.style.background = t.base;
+        }
         document.querySelectorAll('.theme-opt').forEach(el => el.classList.toggle('active', el.dataset.theme === theme));
         localStorage.setItem('app_theme', theme);
     },
 
     // ── Schriftgröße ─────────────────────────────────────────
     setFontSize(px) {
-        document.documentElement.style.fontSize = px + 'px';
+        // zoom skaliert ALLES proportional (besser als font-size)
+        const scale = px / 14; // 14px = 100%
+        document.querySelector('.main-content').style.zoom = scale;
         const label = document.getElementById('fontSizeValue');
         if (label) label.textContent = px + 'px';
         localStorage.setItem('font_size', px);
     },
 
-    // ── Sprache (Grundstruktur) ──────────────────────────────
+    // ── Sprache ──────────────────────────────────────────────
+    _translations: {
+        en: {
+            'Dashboard': 'Dashboard', 'Übersicht': 'Overview', 'Nachrichten': 'Messages',
+            'Kommunikation': 'Communication', 'Einstellungen': 'Settings', 'Konfiguration': 'Configuration',
+            'Benachrichtigungen': 'Notifications', 'Guten Morgen,': 'Good Morning,', 'Guten Tag,': 'Good Day,',
+            'Guten Abend,': 'Good Evening,', 'Alle Systeme aktiv': 'All Systems Active',
+            'Mitglieder gesamt': 'Total Members', 'Ungelesene Chats': 'Unread Chats',
+            'Dashboard online': 'Dashboard Online', 'Discord Bot-Status': 'Discord Bot Status',
+            'Verbunden': 'Connected', 'Nicht verbunden': 'Not Connected',
+            'DARSTELLUNG': 'APPEARANCE', 'Akzentfarbe': 'Accent Color',
+            'Hauptfarbe der Benutzeroberfläche': 'Main color of the user interface',
+            'Animationen': 'Animations', 'UI-Übergänge und Effekte': 'UI transitions and effects',
+            'Hintergrundbild': 'Background Image', 'Eigenes Wallpaper als App-Hintergrund': 'Custom wallpaper as app background',
+            'Bild wählen': 'Choose Image', 'Hintergrund-Blur': 'Background Blur',
+            'Glass-Blur Effekt auf dem Wallpaper': 'Glass blur effect on wallpaper',
+            'Theme': 'Theme', 'Farbschema der App': 'App color scheme',
+            'Schriftgröße': 'Font Size', 'UI-Text skalieren': 'Scale UI text',
+            'Sprache': 'Language', 'Anzeigesprache der App': 'App display language',
+            'BENACHRICHTIGUNGEN': 'NOTIFICATIONS', 'Desktop Benachrichtigungen': 'Desktop Notifications',
+            'Native Systembenachrichtigungen': 'Native system notifications',
+            'Sound': 'Sound', 'Akustische Benachrichtigungen': 'Audio notifications',
+            'AUDIO & MIKROFON': 'AUDIO & MICROPHONE', 'Eingabegerät': 'Input Device',
+            'Wähle dein Mikrofon aus': 'Choose your microphone', 'Funk-Lautstärke': 'Radio Volume',
+            'Lautstärke der Funk-Sounds & Static': 'Volume of radio sounds & static',
+            'WALKIE-TALKIE': 'WALKIE-TALKIE', 'Push-to-Talk Hotkey': 'Push-to-Talk Hotkey',
+            'Taste zum Sprechen (Standard: V)': 'Key to talk (Default: V)',
+            'Radio-Effekt Stärke': 'Radio Effect Strength', 'Wie stark der Funk-Sound klingt': 'How strong the radio sound is',
+            'SYSTEM': 'SYSTEM', 'Autostart': 'Autostart',
+            'App beim Windows-Start automatisch öffnen': 'Open app automatically at Windows start',
+            'TASTENKÜRZEL': 'KEYBOARD SHORTCUTS', 'App fokussieren': 'Focus App',
+            'ACCOUNT': 'ACCOUNT', 'Abmelden': 'Logout', 'Profil öffnen': 'Open Profile',
+            'Verbindung trennen': 'Disconnect', 'Nachricht eingeben...': 'Type a message...',
+            'GIFs suchen...': 'Search GIFs...', 'Suchen...': 'Search...',
+            'Live verbunden': 'Live connected', 'PUSH TO TALK': 'PUSH TO TALK',
+            'zum Sprechen': 'to speak', 'Gedrückt halten oder': 'Hold or',
+            'TEILNEHMER': 'PARTICIPANTS', 'FREQUENZEN': 'FREQUENCIES',
+            'SPRACHKANÄLE': 'VOICE CHANNELS', 'VERLASSEN': 'LEAVE',
+            'FUNK AN': 'RADIO ON', 'FUNK AUS': 'RADIO OFF',
+            'BEREIT': 'READY', 'SENDET GERADE': 'TRANSMITTING', 'EMPFÄNGT AUDIO': 'RECEIVING',
+            'Keinem Kanal beigetreten': 'Not joined any channel',
+        }
+    },
+
     setLanguage(lang) {
         localStorage.setItem('app_lang', lang);
-        NotificationService.show(lang === 'de' ? 'Sprache' : 'Language', lang === 'de' ? 'Deutsch ausgewählt. Neustart empfohlen.' : 'English selected. Restart recommended.', 'info');
+        if (lang === 'de') {
+            // Seite neu laden für Deutsch (Original-HTML)
+            location.reload();
+            return;
+        }
+        this._applyTranslations(lang);
+    },
+
+    _applyTranslations(lang) {
+        const dict = this._translations[lang];
+        if (!dict) return;
+        // Alle Text-Nodes durchgehen und übersetzen
+        const walk = (el) => {
+            for (const node of el.childNodes) {
+                if (node.nodeType === 3) { // Text Node
+                    const trimmed = node.textContent.trim();
+                    if (dict[trimmed]) node.textContent = node.textContent.replace(trimmed, dict[trimmed]);
+                } else if (node.nodeType === 1 && !['SCRIPT','STYLE','SVG'].includes(node.tagName)) {
+                    // Placeholder
+                    if (node.placeholder && dict[node.placeholder]) node.placeholder = dict[node.placeholder];
+                    walk(node);
+                }
+            }
+        };
+        walk(document.body);
     },
 
     // ── Radio-Effekt Stärke ──────────────────────────────────
@@ -1513,7 +1591,11 @@ const App = {
         if (fs) { this.setFontSize(fs); const sl = document.getElementById('fontSizeSlider'); if (sl) sl.value = fs; }
         // Language
         const lang = localStorage.getItem('app_lang');
-        if (lang) { const sel = document.getElementById('langSelect'); if (sel) sel.value = lang; }
+        if (lang) {
+            const sel = document.getElementById('langSelect');
+            if (sel) sel.value = lang;
+            if (lang !== 'de') setTimeout(() => this._applyTranslations(lang), 500);
+        }
         // Radio Strength
         const rs = localStorage.getItem('radio_strength');
         if (rs) { const sl = document.getElementById('radioStrengthSlider'); if (sl) sl.value = rs; const lb = document.getElementById('radioStrengthValue'); if (lb) lb.textContent = rs + '%'; }
