@@ -6,7 +6,7 @@
 
 const UpdateManager = (() => {
     // --- KONFIGURATION ---
-    let currentAppVersion = '3.1.0'; // Fallback
+    let currentAppVersion = '3.2.0'; // Fallback
     const CHECK_INTERVAL = 1000 * 60 * 60; // Alle 1 Stunde prüfen
 
     let isChecking = false;
