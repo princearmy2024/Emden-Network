@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.9.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.0.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -216,9 +216,11 @@ const WebSocketService = {
                 console.log('[Socket] Getrennt.');
             });
             
-            this.socket.on('chat_message', (data) => {
-                if (window.App && App.appendChatMessage) {
-                    App.appendChatMessage(data);
+            // Eingehende Nachrichten von anderen Usern
+            this.socket.on('receive_message', (msg) => {
+                if (window.App) {
+                    App._displayMessage(msg);
+                    App._saveChatMessage(msg, msg.to || 'general');
                 }
             });
 
@@ -226,24 +228,12 @@ const WebSocketService = {
             if (this._announceInterval) clearInterval(this._announceInterval);
             this._announceInterval = setInterval(announceOnline, 20000);
 
+            // Chat-Historie vom Server laden
             this.socket.on('chat_history', (msgs) => {
+                if (!Array.isArray(msgs)) return;
                 const chatBox = document.getElementById('chatMessages');
                 if (chatBox) chatBox.innerHTML = '';
-
-                const now = Date.now();
-                const oneDay = 24 * 60 * 60 * 1000;
-
-                // 24h FILTER: Nur Nachrichten der letzten 24 Stunden anzeigen
-                const freshMsgs = msgs.filter(m => {
-                    const msgTime = (m.id && !isNaN(m.id)) ? parseInt(m.id) : now;
-                    return (now - msgTime) < oneDay;
-                });
-
-                freshMsgs.forEach(m => App.appendChatMessage(m));
-            });
-
-            this.socket.on('receive_message', (msg) => {
-                App.appendChatMessage(msg);
+                msgs.forEach(m => { if (window.App) App._displayMessage(m); });
             });
 
             // OAuth Callbacks
@@ -783,6 +773,11 @@ const App = {
             if (typeof UpdateManager !== 'undefined' && UpdateManager.fetchChangelog) {
                 UpdateManager.fetchChangelog();
             }
+        }
+
+        // Chat laden wenn man zur Messages-View navigiert
+        if (view === 'messages') {
+            this._loadChatHistory(this.currentChat || 'general');
         }
     },
 
@@ -1707,14 +1702,14 @@ const App = {
     _chatSpamTimestamps: [],
     _chatSpamBlocked: false,
 
-    // Chat-Verlauf laden (max 20 pro Channel)
+    // Chat-Verlauf aus localStorage laden
     _loadChatHistory(channel) {
         try {
             const key = 'chat_history_' + (channel || 'general');
             const msgs = JSON.parse(localStorage.getItem(key) || '[]');
-            const chatBox = document.querySelector('.chat-messages');
+            const chatBox = document.getElementById('chatMessages');
             if (chatBox) chatBox.innerHTML = '';
-            msgs.forEach(m => this.appendChatMessage(m, true)); // true = kein erneutes Speichern
+            msgs.forEach(m => this._displayMessage(m));
         } catch(e) {}
     },
 
@@ -1722,7 +1717,16 @@ const App = {
         try {
             const key = 'chat_history_' + (channel || 'general');
             const msgs = JSON.parse(localStorage.getItem(key) || '[]');
-            msgs.push({ username: data.username, message: data.message, time: Date.now() });
+            msgs.push({
+                id: data.id || Date.now(),
+                username: data.username,
+                userId: data.userId || '',
+                avatar: data.avatar || '',
+                text: data.text || data.message || '',
+                message: data.text || data.message || '',
+                to: data.to || channel,
+                timestamp: data.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+            });
             while (msgs.length > 20) msgs.shift();
             localStorage.setItem(key, JSON.stringify(msgs));
         } catch(e) {}
@@ -1747,22 +1751,73 @@ const App = {
             return;
         }
 
-        const msg = input.value.trim();
+        const text = input.value.trim();
         input.value = '';
+        const user = AuthService.getUser();
+        const channel = this.currentChat || 'general';
 
-        // Nachricht an Server senden (wenn verbunden)
+        const msgData = {
+            id: Date.now(),
+            username: user?.username || 'User',
+            userId: user?.discordId || '',
+            avatar: user?.avatar || '',
+            text: text,
+            message: text,
+            to: channel,
+            timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        // An Server senden (send_message = was der Server erwartet!)
         if (WebSocketService.socket?.connected) {
-            WebSocketService.socket.emit('chat_message', {
-                channel: this.currentChat || 'general',
-                message: msg
-            });
+            WebSocketService.socket.emit('send_message', msgData);
         }
 
-        // Eigene Nachricht immer lokal anzeigen (auch offline)
-        this.appendChatMessage({
-            username: AuthService.getUser()?.username,
-            message: msg
-        });
+        // Lokal anzeigen + speichern
+        this._displayMessage(msgData);
+        this._saveChatMessage(msgData, channel);
+    },
+
+    // Nachricht im Chat anzeigen (einheitlich für eigene + fremde)
+    _displayMessage(data) {
+        const chatBox = document.getElementById('chatMessages');
+        if (!chatBox) return;
+
+        const user = AuthService.getUser();
+        const isOwn = data.username === user?.username || data.userId === user?.discordId;
+        const text = data.text || data.message || '';
+        const content = this._renderMessageContent(text);
+        const time = data.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const initial = (data.username || 'U')[0].toUpperCase();
+        const msgId = 'msg-' + (data.id || ++this._msgIdCounter);
+
+        // Duplikate vermeiden
+        if (chatBox.querySelector(`[id="${msgId}"]`)) return;
+
+        const avatarUrl = data.avatar || '';
+        const avatarHtml = avatarUrl
+            ? `<img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${initial}'">`
+            : initial;
+
+        const html = `
+            <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
+                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${avatarHtml}</div>` : ''}
+                <div class="msg-body">
+                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span></div>
+                    <div class="msg-text">${content}</div>
+                    <div class="msg-reactions" id="${msgId}-reactions"></div>
+                    <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
+                </div>
+                ${isOwn ? `<div class="msg-avatar you" style="background:var(--brand-blue)">${avatarHtml}</div>` : ''}
+            </div>
+        `;
+        chatBox.insertAdjacentHTML('beforeend', html);
+
+        // Max 20 Nachrichten
+        while (chatBox.children.length > 20) chatBox.removeChild(chatBox.firstChild);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Sound bei fremden Nachrichten
+        if (!isOwn) this.playBlip(900, 0.06);
     },
 
     _msgIdCounter: 0,
