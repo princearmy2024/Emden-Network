@@ -549,14 +549,18 @@ svg { display: block; flex-shrink: 0; }
 
 /* Custom Background Layer */
 #customBgLayer {
-    position: fixed; inset: 0; z-index: -1;
+    position: fixed; inset: 0; z-index: 0;
     background-size: cover; background-position: center;
     pointer-events: none;
 }
-body.has-custom-bg .sidebar { background: rgba(17,19,32,0.85); backdrop-filter: blur(12px); }
-body.has-custom-bg .topbar { background: rgba(26,29,46,0.8); backdrop-filter: blur(12px); }
-body.has-custom-bg .view { background: rgba(19,21,30,0.75); }
-body.has-custom-bg .titlebar { background: rgba(19,21,30,0.9); }
+body.has-custom-bg { background: transparent !important; }
+body.has-custom-bg .sidebar { background: rgba(17,19,32,0.82) !important; backdrop-filter: blur(14px); }
+body.has-custom-bg .topbar { background: rgba(26,29,46,0.78) !important; backdrop-filter: blur(14px); }
+body.has-custom-bg .main-content { background: transparent; }
+body.has-custom-bg .view { background: rgba(19,21,30,0.7); }
+body.has-custom-bg .titlebar { background: rgba(19,21,30,0.88) !important; }
+body.has-custom-bg .settings-section { background: rgba(19,21,30,0.6); backdrop-filter: blur(10px); }
+body.has-custom-bg .ov-metric { background: rgba(19,21,30,0.6); backdrop-filter: blur(8px); }
 
 /* Main Content */
 .main-content {
@@ -1557,9 +1561,9 @@ body.has-custom-bg .titlebar { background: rgba(19,21,30,0.9); }
 /* ── USER PREVIEW TOOLTIP ────────────────────────────────── */
 .ovn-node { position: relative; }
 .ovn-preview {
-    position: absolute; left: calc(100% + 12px); top: 50%;
+    position: absolute; right: calc(100% + 12px); top: 50%;
     transform: translateY(-50%) scale(0.9);
-    width: 200px; padding: 16px;
+    width: 200px; padding: 16px; z-index: 999;
     background: rgba(19, 21, 30, 0.95);
     backdrop-filter: blur(20px);
     border: 1px solid var(--border-blue);
@@ -1572,7 +1576,7 @@ body.has-custom-bg .titlebar { background: rgba(19,21,30,0.9); }
 }
 .ovn-node:hover .ovn-preview {
     opacity: 1; transform: translateY(-50%) scale(1);
-    left: calc(100% + 8px);
+    right: calc(100% + 8px);
 }
 .ovnp-avatar {
     width: 60px; height: 60px; border-radius: 50%;

@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.5.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -955,6 +955,9 @@ const App = {
         // Sound-Feedback (Walkie-Talkie Vibe)
         this.playBlip(700, 0.05);
 
+        // Gespeicherten Chat-Verlauf laden
+        this._loadChatHistory(name);
+
         // Chat-Verlauf neu rendern
         this.renderCurrentChat();
     },
@@ -1520,6 +1523,27 @@ const App = {
     _chatSpamTimestamps: [],
     _chatSpamBlocked: false,
 
+    // Chat-Verlauf laden (max 20 pro Channel)
+    _loadChatHistory(channel) {
+        try {
+            const key = 'chat_history_' + (channel || 'general');
+            const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+            const chatBox = document.querySelector('.chat-messages');
+            if (chatBox) chatBox.innerHTML = '';
+            msgs.forEach(m => this.appendChatMessage(m, true)); // true = kein erneutes Speichern
+        } catch(e) {}
+    },
+
+    _saveChatMessage(data, channel) {
+        try {
+            const key = 'chat_history_' + (channel || 'general');
+            const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+            msgs.push({ username: data.username, message: data.message, time: Date.now() });
+            while (msgs.length > 20) msgs.shift();
+            localStorage.setItem(key, JSON.stringify(msgs));
+        } catch(e) {}
+    },
+
     sendMessage() {
         const input = document.getElementById('chatInput');
         if (!input || !input.value.trim()) return;
@@ -1575,7 +1599,7 @@ const App = {
         return escaped;
     },
 
-    appendChatMessage(data) {
+    appendChatMessage(data, skipSave = false) {
         const chatBox = document.querySelector('.chat-messages');
         if (!chatBox) return;
 
@@ -1612,6 +1636,11 @@ const App = {
         }
 
         chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Nachricht speichern (außer beim Laden aus History)
+        if (!skipSave) {
+            this._saveChatMessage(data, this.currentChat || 'general');
+        }
     },
 
     // Emoji Reaction Picker
