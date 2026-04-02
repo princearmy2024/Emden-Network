@@ -982,32 +982,6 @@ const App = {
 
         // Gespeicherten Chat-Verlauf laden
         this._loadChatHistory(name);
-
-        // Chat-Verlauf neu rendern
-        this.renderCurrentChat();
-    },
-
-    renderCurrentChat() {
-        const msgs = document.getElementById('chatMessages');
-        if (!msgs) return;
-        msgs.innerHTML = '';
-        
-        const user = AuthService.getUser();
-        const filtered = this.messages.filter(m => {
-            if (this.currentChat.startsWith('@')) {
-                // PN Logik: (An @User und von mir) ODER (An mich und von @User)
-                const targetName = this.currentChat.substring(1);
-                return (m.to === this.currentChat && m.userId === user.discordId) || 
-                       (m.to === '@' + user.username && m.username === targetName);
-            } else {
-                // Global/Channel Logik
-                return m.to === this.currentChat || (!m.to && this.currentChat === 'general');
-            }
-        });
-
-        // Die letzten 50 Nachrichten rendern
-        filtered.slice(-50).forEach(m => this._renderSingleMessage(m));
-        msgs.scrollTop = msgs.scrollHeight;
     },
 
     appendChatMessage(msg) {
@@ -1743,7 +1717,16 @@ const App = {
 
     _saveChatMessage(data, channel) {
         try {
-            const key = 'chat_history_' + (channel || 'general');
+            // Bei PNs: immer unter dem Chat-Partner speichern
+            let saveKey = channel || 'general';
+            if (saveKey.startsWith('@')) {
+                const me = AuthService.getUser();
+                // Wenn die Nachricht AN mich ist, speichere unter @Absender
+                if (saveKey === '@' + me?.username) {
+                    saveKey = '@' + data.username;
+                }
+            }
+            const key = 'chat_history_' + saveKey;
             const msgs = JSON.parse(localStorage.getItem(key) || '[]');
             msgs.push({
                 id: data.id || Date.now(),
