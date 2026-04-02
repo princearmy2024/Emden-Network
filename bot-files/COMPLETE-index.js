@@ -135,6 +135,28 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 // Wer gerade im Dashboard ist (Heartbeat-System)
 const dashboardUsers = new Map(); // discordId → { username, avatar, lastSeen }
 
+// Persistente User-Registry (ALLE jemals gesehenen User)
+const ALL_USERS_FILE = path.join(path.resolve(), "data", "allUsers.json");
+const allKnownUsers = new Map();
+if (fs.existsSync(ALL_USERS_FILE)) {
+    try {
+        const data = JSON.parse(fs.readFileSync(ALL_USERS_FILE, "utf-8"));
+        for (const [id, u] of Object.entries(data)) allKnownUsers.set(id, u);
+        console.log(`✅ ${allKnownUsers.size} bekannte User geladen.`);
+    } catch(e) {}
+}
+function saveAllUsers() {
+    try {
+        if (!fs.existsSync(path.dirname(ALL_USERS_FILE))) fs.mkdirSync(path.dirname(ALL_USERS_FILE), { recursive: true });
+        fs.writeFileSync(ALL_USERS_FILE, JSON.stringify(Object.fromEntries(allKnownUsers), null, 2));
+    } catch(e) {}
+}
+function registerUser(discordId, username, avatar, role) {
+    if (!discordId) return;
+    allKnownUsers.set(discordId, { discordId, username, avatar, role, lastSeen: Date.now() });
+    saveAllUsers();
+}
+
 const apiServer = http.createServer(async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
@@ -196,6 +218,9 @@ const apiServer = http.createServer(async (req, res) => {
 
                 console.log(`[API] ✅ ${entry.username} eingeloggt — ${isAdmin ? "ADMIN" : "USER"}`);
 
+                // User in globaler Registry speichern
+                registerUser(entry.discordId, entry.username, entry.avatar, isAdmin ? 'admin' : 'user');
+
                 res.writeHead(200);
                 return res.end(JSON.stringify({
                     success: true,
@@ -222,6 +247,7 @@ const apiServer = http.createServer(async (req, res) => {
                 const { discordId, username, avatar, role } = JSON.parse(body || "{}");
                 if (discordId) {
                     dashboardUsers.set(discordId, { username, avatar, role, lastSeen: Date.now() });
+                    registerUser(discordId, username, avatar, role);
                 }
                 // Alte User (> 90s keine Meldung) entfernen
                 const cutoff = Date.now() - 90000;
@@ -304,8 +330,9 @@ const apiServer = http.createServer(async (req, res) => {
                 online: true, guildName: guild?.name || "Emden Network",
                 members, onlineMembers: online,
                 dashboardOnline: dashboardUsers.size,
-                dashboardUsers: [...dashboardUsers.values()].map(u => ({
-                    username: u.username, avatar: u.avatar, role: u.role
+                dashboardUsers: [...allKnownUsers.values()].map(u => ({
+                    discordId: u.discordId, username: u.username, avatar: u.avatar, role: u.role,
+                    online: dashboardUsers.has(u.discordId),
                 })),
                 botTag: client.user?.tag || "—",
                 uptimeSec: Math.floor(process.uptime()),
@@ -586,17 +613,25 @@ function broadcastVoiceState() {
 }
 
 function broadcastOnlineUsers() {
-    // Alte User (> 30s) entfernen
+    // Alte Dashboard-User (> 35s) entfernen
     const cutoff = Date.now() - 35000;
     for (const [id, u] of dashboardUsers.entries()) {
         if (u.lastSeen < cutoff) dashboardUsers.delete(id);
     }
 
-    const users = [...dashboardUsers.values()].map(u => ({
-        username: u.username, avatar: u.avatar, role: u.role
+    // Online User IDs sammeln
+    const onlineIds = new Set(dashboardUsers.keys());
+
+    // ALLE bekannten User senden (mit online/offline Status)
+    const allUsers = [...allKnownUsers.values()].map(u => ({
+        discordId: u.discordId,
+        username: u.username,
+        avatar: u.avatar,
+        role: u.role,
+        online: onlineIds.has(u.discordId),
     }));
 
-    io.emit("online_users", users);
+    io.emit("online_users", allUsers);
 }
 
 io.on("connection", (socket) => {
@@ -632,6 +667,7 @@ io.on("connection", (socket) => {
                 role: user.role,
                 lastSeen: Date.now()
             });
+            registerUser(user.discordId, user.username, user.avatar, user.role);
             broadcastOnlineUsers();
         }
     });
