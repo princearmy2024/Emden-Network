@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.0.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.1.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -168,6 +168,9 @@ const UserRegistry = {
             }
         });
         localStorage.setItem('en_members', JSON.stringify(registry));
+    },
+    save(registry) {
+        try { localStorage.setItem('en_members', JSON.stringify(registry)); } catch(e) {}
     }
 };
 
@@ -799,13 +802,11 @@ const App = {
         // 2. Online-IDs für den grünen Punkt sammeln
         const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
 
-        // 3. Die Liste erst JETZT aus der Registry ziehen (nachdem die neuen drin sind!)
-        const now = Date.now();
-        const CUTOFF = 30 * 60 * 1000;  // 30 minutes
-        const allMembers = Object.values(registry).filter(u => 
-            onlineIds.has(u.discordId) || 
-            (now - u.lastSeen) < CUTOFF
-        );
+        // 3. Registry speichern mit neuen Daten
+        UserRegistry.save(registry);
+
+        // 4. ALLE bekannten User anzeigen (online + offline)
+        const allMembers = Object.values(registry);
 
         // Zähler nur für ECHTE online Leute
         const onlineCount = onlineUsers.length;

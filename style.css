@@ -757,7 +757,7 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 /* ── Messages ─────────────────────────────────────────────── */
 .messages-layout {
     display: grid; grid-template-columns: 240px 1fr;
-    gap: 0; height: calc(100vh - var(--titlebar-h) - var(--topbar-h) - 96px);
+    gap: 0; height: calc(100vh - var(--titlebar-h) - var(--topbar-h) - 120px);
     background: transparent; border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
 }
