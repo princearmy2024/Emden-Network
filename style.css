@@ -556,11 +556,19 @@ svg { display: block; flex-shrink: 0; }
 body.has-custom-bg { background: transparent !important; }
 body.has-custom-bg .sidebar { background: rgba(17,19,32,0.82) !important; backdrop-filter: blur(14px); }
 body.has-custom-bg .topbar { background: rgba(26,29,46,0.78) !important; backdrop-filter: blur(14px); }
-body.has-custom-bg .main-content { background: transparent; }
-body.has-custom-bg .view { background: rgba(19,21,30,0.7); }
+body.has-custom-bg .main-content { background: transparent !important; }
+body.has-custom-bg .view { background: transparent !important; }
 body.has-custom-bg .titlebar { background: rgba(19,21,30,0.88) !important; }
 body.has-custom-bg .settings-section { background: rgba(19,21,30,0.6); backdrop-filter: blur(10px); }
 body.has-custom-bg .ov-metric { background: rgba(19,21,30,0.6); backdrop-filter: blur(8px); }
+body.has-custom-bg .chat-messages { background: transparent; }
+body.has-custom-bg .chat-header { background: rgba(26,29,46,0.7) !important; backdrop-filter: blur(10px); }
+body.has-custom-bg .chat-input-area { background: rgba(26,29,46,0.7) !important; backdrop-filter: blur(10px); }
+body.has-custom-bg .chat-sidebar { background: rgba(17,19,32,0.7) !important; backdrop-filter: blur(10px); }
+body.has-custom-bg .voice-channels { background: transparent; }
+body.has-custom-bg .wt-participants { background: transparent; }
+body.has-custom-bg .msg-text { background: rgba(26,29,46,0.6) !important; backdrop-filter: blur(6px); }
+body.has-custom-bg .active-voice-card { background: rgba(0,136,255,0.08) !important; backdrop-filter: blur(8px); }
 
 /* Main Content */
 .main-content {
