@@ -561,14 +561,30 @@ body.has-custom-bg .view { background: transparent !important; }
 body.has-custom-bg .titlebar { background: rgba(19,21,30,0.88) !important; }
 body.has-custom-bg .settings-section { background: rgba(19,21,30,0.6); backdrop-filter: blur(10px); }
 body.has-custom-bg .ov-metric { background: rgba(19,21,30,0.6); backdrop-filter: blur(8px); }
-body.has-custom-bg .chat-messages { background: transparent; }
-body.has-custom-bg .chat-header { background: rgba(26,29,46,0.7) !important; backdrop-filter: blur(10px); }
-body.has-custom-bg .chat-input-area { background: rgba(26,29,46,0.7) !important; backdrop-filter: blur(10px); }
-body.has-custom-bg .chat-sidebar { background: rgba(17,19,32,0.7) !important; backdrop-filter: blur(10px); }
-body.has-custom-bg .voice-channels { background: transparent; }
-body.has-custom-bg .wt-participants { background: transparent; }
-body.has-custom-bg .msg-text { background: rgba(26,29,46,0.6) !important; backdrop-filter: blur(6px); }
+/* Chat & Messages */
+body.has-custom-bg .messages-layout { background: transparent !important; border-color: rgba(255,255,255,0.06); }
+body.has-custom-bg .chat-list { background: rgba(17,19,32,0.65) !important; backdrop-filter: blur(12px); }
+body.has-custom-bg .chat-panel { background: transparent !important; }
+body.has-custom-bg .chat-messages { background: transparent !important; }
+body.has-custom-bg .chat-header { background: rgba(26,29,46,0.6) !important; backdrop-filter: blur(12px); }
+body.has-custom-bg .chat-input-area { background: rgba(26,29,46,0.6) !important; backdrop-filter: blur(12px); }
+body.has-custom-bg .msg-text { background: rgba(26,29,46,0.5) !important; backdrop-filter: blur(6px); }
+/* Voice */
+body.has-custom-bg .voice-channels { background: transparent !important; }
+body.has-custom-bg .wt-participants { background: transparent !important; }
+body.has-custom-bg .walkie-layout { background: transparent !important; }
 body.has-custom-bg .active-voice-card { background: rgba(0,136,255,0.08) !important; backdrop-filter: blur(8px); }
+/* Dashboard */
+body.has-custom-bg .ov-hero { background: rgba(19,21,30,0.5) !important; backdrop-filter: blur(10px); }
+body.has-custom-bg .ov-section-head { background: transparent !important; }
+body.has-custom-bg .changelog-list { background: transparent !important; }
+body.has-custom-bg .cl-item { background: rgba(19,21,30,0.4) !important; backdrop-filter: blur(6px); }
+body.has-custom-bg .live-panel { background: rgba(17,19,32,0.65) !important; backdrop-filter: blur(12px); }
+/* Allgemein */
+body.has-custom-bg .view-content { background: transparent !important; }
+body.has-custom-bg .server-card { background: rgba(19,21,30,0.5) !important; backdrop-filter: blur(8px); }
+body.has-custom-bg .channel-item { background: rgba(19,21,30,0.4) !important; }
+body.has-custom-bg .voice-channel-item { background: rgba(19,21,30,0.4) !important; }
 
 /* Main Content */
 .main-content {
