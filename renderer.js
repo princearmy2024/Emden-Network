@@ -1804,6 +1804,7 @@ const App = {
         const el = document.getElementById('customBgLayer');
         if (el) { el.style.backgroundImage = 'none'; el.style.filter = 'none'; }
         document.body.classList.remove('has-custom-bg');
+        document.documentElement.classList.remove('has-custom-bg');
         const slider = document.getElementById('bgBlurSlider');
         if (slider) slider.value = 0;
         NotificationService.show('Hintergrund', 'Wallpaper wurde zurückgesetzt.', 'info');
@@ -1826,6 +1827,7 @@ const App = {
         const blur = localStorage.getItem('bg_blur') || 0;
         if (blur > 0) el.style.filter = `blur(${blur}px)`;
         document.body.classList.add('has-custom-bg');
+        document.documentElement.classList.add('has-custom-bg');
     },
 
     _loadSavedBackground() {

@@ -553,11 +553,14 @@ svg { display: block; flex-shrink: 0; }
     background-size: cover; background-position: center;
     pointer-events: none;
 }
+html.has-custom-bg,
 body.has-custom-bg,
 body.has-custom-bg .main-content,
 body.has-custom-bg .view-container,
 body.has-custom-bg .view,
-body.has-custom-bg .view.active { background: transparent !important; }
+body.has-custom-bg .view.active,
+body.has-custom-bg .screen,
+body.has-custom-bg .screen.active { background: transparent !important; }
 body.has-custom-bg .sidebar { background: rgba(17,19,32,0.82) !important; backdrop-filter: blur(14px); }
 body.has-custom-bg .topbar { background: rgba(26,29,46,0.78) !important; backdrop-filter: blur(14px); }
 body.has-custom-bg .titlebar { background: rgba(19,21,30,0.88) !important; }
