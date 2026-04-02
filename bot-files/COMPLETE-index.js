@@ -821,8 +821,6 @@ async function checkGithubRelease() {
         const version = release.tag_name.replace('v', '');
         const notes = (release.body || 'Keine Änderungen angegeben.')
             .split('\n').slice(0, 8).join('\n').trim();
-        const downloadUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/EmdenNetworkSetup.exe`;
-        const releaseUrl  = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/${release.tag_name}`;
         const avatarUrl   = `https://github.com/${GITHUB_OWNER}.png`;
         const now         = new Date();
         const dateStr     = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -837,14 +835,12 @@ async function checkGithubRelease() {
                 },
                 title:       `⬆️  Emden Network Control Center — ${release.tag_name}`,
                 description: '> Eine neue Version ist verfügbar. Bitte aktualisiere dein Dashboard.',
-                color:       0x00D1A7,
+                color:       0x0088FF,
                 fields: [
                     { name: '📦  Version',   value: `\`${version}\``,  inline: true  },
                     { name: '✅  Status',    value: '`Stabil`',         inline: true  },
                     { name: '📅  Datum',     value: `\`${dateStr}\``,   inline: true  },
-                    { name: '📝  Änderungen', value: notes.length > 0 ? `\`\`\`\n${notes}\n\`\`\`` : '_Keine Beschreibung_', inline: false },
-                    { name: '📥  Download',  value: `[Setup herunterladen](${downloadUrl})`, inline: true  },
-                    { name: '🔗  Release',   value: `[GitHub Release](${releaseUrl})`,        inline: true  }
+                    { name: '📝  Änderungen', value: notes.length > 0 ? `\`\`\`\n${notes}\n\`\`\`` : '_Keine Beschreibung_', inline: false }
                 ],
                 footer: {
                     text:     'Emden Network • Control Center',
