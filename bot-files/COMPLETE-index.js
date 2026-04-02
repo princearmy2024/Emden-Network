@@ -1,7 +1,9 @@
 // index.js — Emden Network Bot (finale, einfache Version)
 import {
     Client, GatewayIntentBits, REST, Routes,
-    Partials, ActivityType, SlashCommandBuilder
+    Partials, ActivityType, SlashCommandBuilder,
+    ModalBuilder, TextInputBuilder, TextInputStyle,
+    ActionRowBuilder, EmbedBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -24,14 +26,13 @@ const STATUS_UPDATE_INTERVAL = 60 * 1000;
 const ROBLOX_CLIENT_ID = process.env.ROBLOX_CLIENT_ID || '';
 const ROBLOX_CLIENT_SECRET = process.env.ROBLOX_CLIENT_SECRET || '';
 const ROBLOX_REDIRECT_URI = process.env.ROBLOX_REDIRECT_URI || 'http://localhost:7329/roblox-callback';
-const robloxStates = new Map(); // state → { discordId, expires }
+const robloxStates = new Map();
 
 // === Overlay & Roblox Link Tracking ===
 const ON_DUTY_ROLE_ID = "1367160344992284803";
 const LINKS_FILE = path.join(path.resolve(), "data", "robloxLinks.json");
-const robloxLinks = new Map(); // discordId -> roblox userId
+const robloxLinks = new Map();
 
-// Links beim Start laden
 if (fs.existsSync(LINKS_FILE)) {
     try {
         const data = JSON.parse(fs.readFileSync(LINKS_FILE, "utf-8"));
@@ -52,8 +53,8 @@ function saveLinks() {
     } catch (e) { console.error("❌ Fehler beim Speichern der Roblox-Links:", e.message); }
 }
 
-const robloxPresenceState = new Map(); // discordId -> boolean (isPlaying)
-const overlayClients = new Map(); // socket.id -> { discordId, isAdmin }
+const robloxPresenceState = new Map();
+const overlayClients = new Map();
 
 // === Bot ===
 const client = new Client({
@@ -66,56 +67,222 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
-// === /verify Command (inline — kein extra File nötig) ===
+// === /verify Command (inline) ===
 const verifyCommand = new SlashCommandBuilder()
     .setName("verify")
     .setDescription("Erhalte deinen Verifikationscode für das Emden Network Dashboard");
 
+// ================================================================
+// 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
+// ================================================================
 const commandsForDiscord = [verifyCommand.toJSON()];
+const commandHandlers = new Map();
 
-// === Slash Command Handler ===
+const commandsPath = path.join(path.resolve(), "commands");
+if (fs.existsSync(commandsPath)) {
+    const entries = fs.readdirSync(commandsPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith(".js")) {
+            try {
+                const mod = await import(`./commands/${entry.name}`);
+                const cmd = mod.default;
+                if (cmd?.data) {
+                    if (commandsForDiscord.some(c => c.name === cmd.data.name)) {
+                        console.log(`⏭️ Übersprungen (Duplikat): /${cmd.data.name}`);
+                    } else {
+                        commandsForDiscord.push(cmd.data.toJSON());
+                        commandHandlers.set(cmd.data.name, cmd);
+                        console.log(`📦 Command geladen: /${cmd.data.name} (commands/${entry.name})`);
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ Fehler beim Laden von commands/${entry.name}:`, e.message);
+            }
+        }
+    }
+
+    for (const entry of entries) {
+        if (entry.isDirectory()) {
+            const subFiles = fs.readdirSync(path.join(commandsPath, entry.name)).filter(f => f.endsWith(".js"));
+            for (const file of subFiles) {
+                try {
+                    const mod = await import(`./commands/${entry.name}/${file}`);
+                    const cmd = mod.default;
+                    if (cmd?.data) {
+                        if (commandsForDiscord.some(c => c.name === cmd.data.name)) {
+                            console.log(`⏭️ Übersprungen (Duplikat): /${cmd.data.name}`);
+                        } else {
+                            commandsForDiscord.push(cmd.data.toJSON());
+                            commandHandlers.set(cmd.data.name, cmd);
+                            console.log(`📦 Command geladen: /${cmd.data.name} (commands/${entry.name}/${file})`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`❌ Fehler beim Laden von commands/${entry.name}/${file}:`, e.message);
+                }
+            }
+        }
+    }
+}
+
+console.log(`📋 ${commandHandlers.size} Commands aus Ordner geladen, ${commandsForDiscord.length} total registriert.`);
+
+// ================================================================
+// ⚡ INTERACTION HANDLER (Buttons, Modals, Slash Commands)
+// ================================================================
 client.on("interactionCreate", async interaction => {
+
+    // ============================================
+    // 🔘 BUTTON: Termin vorschlagen → Modal öffnen
+    // ============================================
+    if (interaction.isButton() && interaction.customId.startsWith("phase2_termin_")) {
+        const parts = interaction.customId.split("_");
+        // Format: phase2_termin_{bewerberId}_{prueferId}
+        const bewerberId = parts[2];
+        const prueferId = parts[3];
+
+        // Nur der Bewerber darf den Button drücken
+        if (interaction.user.id !== bewerberId) {
+            return interaction.reply({
+                content: "❌ Nur der Bewerber kann einen Termin vorschlagen!",
+                ephemeral: true
+            });
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId(`phase2_modal_${bewerberId}_${prueferId}`)
+            .setTitle("📅 Termin vorschlagen");
+
+        const datumInput = new TextInputBuilder()
+            .setCustomId("datum")
+            .setLabel("Datum (z.B. 15.04.2026)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("TT.MM.JJJJ")
+            .setRequired(true);
+
+        const uhrzeitInput = new TextInputBuilder()
+            .setCustomId("uhrzeit")
+            .setLabel("Uhrzeit (z.B. 18:00)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("HH:MM")
+            .setRequired(true);
+
+        const anmerkungInput = new TextInputBuilder()
+            .setCustomId("anmerkung")
+            .setLabel("Anmerkungen (optional)")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("z.B. bevorzugte Wochentage, Zeitfenster...")
+            .setRequired(false);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(datumInput),
+            new ActionRowBuilder().addComponents(uhrzeitInput),
+            new ActionRowBuilder().addComponents(anmerkungInput)
+        );
+
+        return interaction.showModal(modal);
+    }
+
+    // ============================================
+    // 📋 MODAL: Termin wird im Channel gepostet
+    // ============================================
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("phase2_modal_")) {
+        const parts = interaction.customId.split("_");
+        // Format: phase2_modal_{bewerberId}_{prueferId}
+        const bewerberId = parts[2];
+        const prueferId = parts[3];
+
+        const datum = interaction.fields.getTextInputValue("datum");
+        const uhrzeit = interaction.fields.getTextInputValue("uhrzeit");
+        const anmerkung = interaction.fields.getTextInputValue("anmerkung") || "Keine";
+
+        const embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle("📅 Terminvorschlag — Phase 2 Gespräch")
+            .setDescription(
+                `**Bewerber:** <@${bewerberId}>\n` +
+                `**Prüfer:** <@${prueferId}>\n\n` +
+                `📆 **Datum:** ${datum}\n` +
+                `🕐 **Uhrzeit:** ${uhrzeit} Uhr\n` +
+                `📝 **Anmerkung:** ${anmerkung}\n\n` +
+                `_Bitte bestätigt den Termin oder schlagt eine Alternative vor._`
+            )
+            .setFooter({ text: "Emden Network • Bewerbungssystem" })
+            .setTimestamp();
+
+        // Direkt im Channel posten, sodass alle es sehen
+        await interaction.reply({
+            content: `📅 <@${bewerberId}> hat einen Termin vorgeschlagen! <@${prueferId}>`,
+            embeds: [embed]
+        });
+        return;
+    }
+
+    // ============================================
+    // ⚡ SLASH COMMANDS
+    // ============================================
     if (!interaction.isChatInputCommand()) return;
-    if (interaction.commandName !== "verify") return;
-    try {
-        await interaction.deferReply({ ephemeral: true });
 
-        // Alten Code dieses Users löschen
-        for (const [k, v] of verificationCodes.entries()) {
-            if (v.discordId === interaction.user.id) verificationCodes.delete(k);
+    // /verify — inline behandeln
+    if (interaction.commandName === "verify") {
+        try {
+            await interaction.deferReply({ ephemeral: true });
+
+            for (const [k, v] of verificationCodes.entries()) {
+                if (v.discordId === interaction.user.id) verificationCodes.delete(k);
+            }
+
+            const code      = `EN-${crypto.randomInt(100000, 999999)}`;
+            const expiresAt = Date.now() + 10 * 60 * 1000;
+
+            verificationCodes.set(code, {
+                discordId: interaction.user.id,
+                username:  interaction.user.displayName || interaction.user.username,
+                tag:       interaction.user.tag,
+                avatar:    interaction.user.displayAvatarURL({ size: 128 }),
+                expiresAt,
+            });
+
+            console.log(`[VERIFY] Code ${code} → ${interaction.user.tag} | Store: ${verificationCodes.size} Codes`);
+
+            await interaction.editReply({
+                content: [
+                    "## 🔐 Emden Network Dashboard",
+                    "",
+                    "Dein persönlicher Verifikationscode:",
+                    `\`\`\`${code}\`\`\``,
+                    "⏱️ Gültig für **10 Minuten**",
+                    "⚠️ Teile diesen Code mit **niemandem**!",
+                ].join("\n"),
+            });
+        } catch (e) {
+            console.error("[VERIFY] Fehler:", e);
+            const reply = { content: "❌ Fehler beim Erstellen des Codes.", ephemeral: true };
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(reply).catch(() => {});
+            } else {
+                await interaction.reply(reply).catch(() => {});
+            }
         }
+        return;
+    }
 
-        const code      = `EN-${crypto.randomInt(100000, 999999)}`;
-        const expiresAt = Date.now() + 10 * 60 * 1000;
-
-        verificationCodes.set(code, {
-            discordId: interaction.user.id,
-            username:  interaction.user.displayName || interaction.user.username,
-            tag:       interaction.user.tag,
-            avatar:    interaction.user.displayAvatarURL({ size: 128 }),
-            expiresAt,
-        });
-
-        console.log(`[VERIFY] Code ${code} → ${interaction.user.tag} | Store: ${verificationCodes.size} Codes`);
-
-        await interaction.editReply({
-            content: [
-                "## 🔐 Emden Network Dashboard",
-                "",
-                "Dein persönlicher Verifikationscode:",
-                `\`\`\`${code}\`\`\``,
-                "⏱️ Gültig für **10 Minuten**",
-                "⚠️ Teile diesen Code mit **niemandem**!",
-            ].join("\n"),
-        });
-    } catch (e) {
-        console.error("[VERIFY] Fehler:", e);
-        const reply = { content: "❌ Fehler beim Erstellen des Codes.", ephemeral: true };
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(reply).catch(() => {});
-        } else {
-            await interaction.reply(reply).catch(() => {});
+    // Alle anderen Commands aus commands/-Ordner
+    const handler = commandHandlers.get(interaction.commandName);
+    if (handler) {
+        try {
+            await handler.execute(interaction);
+        } catch (e) {
+            console.error(`[CMD] Fehler bei /${interaction.commandName}:`, e);
+            const reply = { content: "❌ Fehler beim Ausführen des Commands.", ephemeral: true };
+            if (interaction.replied || interaction.deferred) {
+                await interaction.editReply(reply).catch(() => {});
+            } else {
+                await interaction.reply(reply).catch(() => {});
+            }
         }
+        return;
     }
 });
 
@@ -132,8 +299,7 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 })();
 
 // === 🌐 API Server ===
-// Wer gerade im Dashboard ist (Heartbeat-System)
-const dashboardUsers = new Map(); // discordId → { username, avatar, lastSeen }
+const dashboardUsers = new Map();
 
 // Persistente User-Registry (ALLE jemals gesehenen User)
 const ALL_USERS_FILE = path.join(path.resolve(), "data", "allUsers.json");
@@ -166,8 +332,6 @@ const apiServer = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, "http://localhost");
 
-    // === Öffentliche Roblox OAuth Endpoints (kein API-Key nötig) ===
-    // Diese werden direkt vom Browser aufgerufen (OAuth Callback)
     const publicPaths = ["/api/roblox/auth", "/api/roblox/callback", "/api/roblox/start-verify", "/api/roblox/confirm-verify"];
     const isPublic = publicPaths.some(p => url.pathname === p);
 
@@ -217,8 +381,6 @@ const apiServer = http.createServer(async (req, res) => {
                 } catch (_) { }
 
                 console.log(`[API] ✅ ${entry.username} eingeloggt — ${isAdmin ? "ADMIN" : "USER"}`);
-
-                // User in globaler Registry speichern
                 registerUser(entry.discordId, entry.username, entry.avatar, isAdmin ? 'admin' : 'user');
 
                 res.writeHead(200);
@@ -238,7 +400,7 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
-    // POST /api/heartbeat — App meldet sich alle 30s
+    // POST /api/heartbeat
     if (req.method === "POST" && url.pathname === "/api/heartbeat") {
         let body = "";
         req.on("data", c => (body += c));
@@ -249,7 +411,6 @@ const apiServer = http.createServer(async (req, res) => {
                     dashboardUsers.set(discordId, { username, avatar, role, lastSeen: Date.now() });
                     registerUser(discordId, username, avatar, role);
                 }
-                // Alte User (> 90s keine Meldung) entfernen
                 const cutoff = Date.now() - 90000;
                 for (const [id, u] of dashboardUsers.entries()) {
                     if (u.lastSeen < cutoff) dashboardUsers.delete(id);
@@ -264,7 +425,7 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
-    // POST /api/link-roblox — Verbindet Roblox Account
+    // POST /api/link-roblox
     if (req.method === "POST" && url.pathname === "/api/link-roblox") {
         let body = "";
         req.on("data", c => (body += c));
@@ -276,7 +437,6 @@ const apiServer = http.createServer(async (req, res) => {
                     return res.end(JSON.stringify({ success: false, error: "Fehlende Parameter" }));
                 }
 
-                // Roblox API abfragen
                 const r = await fetch(`https://users.roblox.com/v1/usernames/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -298,8 +458,6 @@ const apiServer = http.createServer(async (req, res) => {
                 const robloxId = data.data[0].id;
                 const robloxName = data.data[0].name;
 
-                // Hier könnte man den User in der jsondb oder mysql speichern
-                // ... für jetzt geben wir nur den Avatar und Erfolg zurück
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, robloxId, robloxName }));
             } catch (e) {
@@ -319,7 +477,6 @@ const apiServer = http.createServer(async (req, res) => {
                 ["online", "dnd", "idle"].includes(m.presence?.status)
             ).size || 0;
 
-            // Alte Dashboard-User aufräumen
             const cutoff = Date.now() - 90000;
             for (const [id, u] of dashboardUsers.entries()) {
                 if (u.lastSeen < cutoff) dashboardUsers.delete(id);
@@ -343,16 +500,12 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
-    // ===================================================
     // GET /api/roblox/auth?discordId=xxx
-    // Gibt eine OAuth URL zurück — kein API-Key nötig weil nur URL generiert wird
-    // ===================================================
     if (req.method === "GET" && url.pathname === "/api/roblox/auth") {
         const discordId = url.searchParams.get("discordId");
         if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
         if (!ROBLOX_CLIENT_ID) { res.writeHead(503); return res.end(JSON.stringify({ error: "Roblox OAuth nicht konfiguriert" })); }
 
-        // CSRF State generieren (10 Minuten gültig)
         const state = crypto.randomBytes(16).toString("hex");
         robloxStates.set(state, { discordId, expires: Date.now() + 10 * 60 * 1000 });
 
@@ -368,10 +521,7 @@ const apiServer = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ url: `https://apis.roblox.com/oauth/v1/authorize?${params}` }));
     }
 
-    // ===================================================
     // GET /api/roblox/callback?code=xxx&state=xxx
-    // Roblox leitet hierher nach dem Login
-    // ===================================================
     if (req.method === "GET" && url.pathname === "/api/roblox/callback") {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         const code = url.searchParams.get("code");
@@ -402,7 +552,6 @@ const apiServer = http.createServer(async (req, res) => {
         }
 
         try {
-            // 1. Code gegen Token tauschen
             const tokenRes = await fetch("https://apis.roblox.com/oauth/v1/token", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -417,14 +566,12 @@ const apiServer = http.createServer(async (req, res) => {
             const tokenData = await tokenRes.json();
             if (!tokenData.access_token) throw new Error("Token ungültig: " + JSON.stringify(tokenData));
 
-            // 2. OAuth UserInfo laden
             const userInfoRes = await fetch("https://apis.roblox.com/oauth/v1/userinfo", {
                 headers: { Authorization: `Bearer ${tokenData.access_token}` },
             });
             const userInfo = await userInfoRes.json();
             const userId = userInfo.sub;
 
-            // 3. Öffentliche Roblox-Daten + Avatar laden
             const [publicRes, avatarRes] = await Promise.allSettled([
                 fetch(`https://users.roblox.com/v1/users/${userId}`),
                 fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`),
@@ -443,7 +590,6 @@ const apiServer = http.createServer(async (req, res) => {
                 connectedAt: new Date().toISOString(),
             };
 
-            // 4. Profil ans Dashboard senden
             robloxLinks.set(stateEntry.discordId, profile.userId);
             saveLinks();
             io.emit(`roblox_connected_${stateEntry.discordId}`, profile);
@@ -459,10 +605,7 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
-    // ===================================================
-    // POST /api/roblox/start-verify  { discordId, robloxUsername }
-    // Schritt 1: Generiert einen Code, den der User in seine Bio einträgt
-    // ===================================================
+    // POST /api/roblox/start-verify
     if (req.method === "POST" && url.pathname === "/api/roblox/start-verify") {
         let body = "";
         req.on("data", c => (body += c));
@@ -471,7 +614,6 @@ const apiServer = http.createServer(async (req, res) => {
                 const { discordId, robloxUsername } = JSON.parse(body || "{}");
                 if (!discordId || !robloxUsername) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId und robloxUsername erforderlich" })); }
 
-                // Roblox User-ID per Benutzername suchen
                 const searchRes = await fetch(`https://users.roblox.com/v1/usernames/users`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -494,10 +636,7 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
-    // ===================================================
-    // POST /api/roblox/confirm-verify  { discordId }
-    // Schritt 2: Prüft ob der Code in der Roblox-Bio steht
-    // ===================================================
+    // POST /api/roblox/confirm-verify
     if (req.method === "POST" && url.pathname === "/api/roblox/confirm-verify") {
         let body = "";
         req.on("data", c => (body += c));
@@ -508,7 +647,6 @@ const apiServer = http.createServer(async (req, res) => {
                 if (!entry) { res.writeHead(400); return res.end(JSON.stringify({ error: "Kein Verifikations-Code gefunden. Bitte neu starten." })); }
                 if (Date.now() > entry.expires) { robloxStates.delete(`verify_${discordId}`); res.writeHead(410); return res.end(JSON.stringify({ error: "Code abgelaufen. Bitte neu starten." })); }
 
-                // Roblox-Bio prüfen
                 const profileRes = await fetch(`https://users.roblox.com/v1/users/${entry.userId}`);
                 const profileData = await profileRes.json();
                 if (!profileData.description?.includes(entry.code)) {
@@ -516,7 +654,6 @@ const apiServer = http.createServer(async (req, res) => {
                     return res.end(JSON.stringify({ error: `Code nicht in Bio gefunden. Füge "${entry.code}" zu deiner Roblox-Bio hinzu.` }));
                 }
 
-                // Avatar laden
                 const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${entry.userId}&size=420x420&format=Png&isCircular=false`);
                 const avatarData = await avatarRes.json();
 
@@ -554,7 +691,6 @@ const apiServer = http.createServer(async (req, res) => {
         }
 
         try {
-            // Profil von Roblox laden
             const [pRes, aRes] = await Promise.allSettled([
                 fetch(`https://users.roblox.com/v1/users/${rId}`),
                 fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${rId}&size=420x420&format=Png&isCircular=false`)
@@ -588,15 +724,13 @@ const io = new SocketIOServer(apiServer, {
     cors: { origin: "*" }
 });
 
-const chatHistory = []; // max 50 Nachrichten
+const chatHistory = [];
 
 // ================================================================
-// 🎙️ GLOBALE Voice-User Tracking Map (MUSS global sein!)
-// Vorher war diese Map lokal pro Socket → kritischer Bug behoben
+// 🎙️ GLOBALE Voice-User Tracking Map
 // ================================================================
-const activeVoiceUsers = new Map(); // socketId → { channelId, username, discordId }
+const activeVoiceUsers = new Map();
 
-// Hilfsfunktion: Aktuellen Voice-Status als Array bauen und an alle senden
 function broadcastVoiceState() {
     const voiceChannels = [
         { id: 'vc-1', name: 'voice-general', type: 'public', active: false, members: [] },
@@ -613,42 +747,33 @@ function broadcastVoiceState() {
 }
 
 function broadcastOnlineUsers() {
-    // Alte Dashboard-User (> 35s) entfernen
     const cutoff = Date.now() - 35000;
     for (const [id, u] of dashboardUsers.entries()) {
         if (u.lastSeen < cutoff) dashboardUsers.delete(id);
     }
 
-    // Online User IDs sammeln
     const onlineIds = new Set(dashboardUsers.keys());
 
     // ALLE bekannten User senden (mit online/offline Status)
-    const allUsers = [...allKnownUsers.values()].map(u => ({
-        discordId: u.discordId,
-        username: u.username,
-        avatar: u.avatar,
-        role: u.role,
+    const users = [...allKnownUsers.values()].map(u => ({
+        discordId: u.discordId, username: u.username, avatar: u.avatar, role: u.role,
         online: onlineIds.has(u.discordId),
     }));
 
-    io.emit("online_users", allUsers);
+    io.emit("online_users", users);
 }
 
 io.on("connection", (socket) => {
-    // Wenn ein Dashboard-User sich verbindet, sende die Historie
     socket.emit("chat_history", chatHistory);
 
     socket.on("overlay_client_connect", ({ discordId, robloxId, isAdmin }) => {
         if (discordId) overlayClients.set(socket.id, { discordId, isAdmin });
 
-        // Re-verknüpfung im Speicher, falls Bot neugestartet ist
         if (discordId && robloxId) {
             robloxLinks.set(discordId, robloxId);
         }
 
-        // Force update für den Supporter-Count beim Verbinden
         socket.emit("overlay_supporter_count", { count: Math.max(0, lastSupporterCount) });
-        // Sende aktuellen Spiel-Status, falls schon aktiv 
         if (discordId && robloxPresenceState.get(discordId)) {
             socket.emit(`overlay_game_start_${discordId}`, { startTime: Date.now() });
         }
@@ -658,7 +783,6 @@ io.on("connection", (socket) => {
         overlayClients.delete(socket.id);
     });
 
-    // User schickt Heartbeat via Socket für sofortiges Update
     socket.on("client_online", (user) => {
         if (user && user.discordId) {
             dashboardUsers.set(user.discordId, {
@@ -673,23 +797,15 @@ io.on("connection", (socket) => {
     });
 
     socket.on("send_message", (msgData) => {
-        // Nachricht speichern
         chatHistory.push(msgData);
         if (chatHistory.length > 50) chatHistory.shift();
-
-        // An ALLE anderen Dashboards senden
         socket.broadcast.emit("receive_message", msgData);
     });
 
-    // ================================================================
-    // 🎙️ WALKIE-TALKIE VOICE SYSTEM (v2 — Global Tracking)
-    // ================================================================
-
-    // User tritt einem Sprachkanal bei → socket.io "room" beitreten
+    // 🎙️ WALKIE-TALKIE VOICE SYSTEM
     socket.on("voice_channel_join", ({ channelId, username, discordId }) => {
         if (!channelId || !username) return;
 
-        // Alle alten Voice-Rooms verlassen
         for (const room of socket.rooms) {
             if (room.startsWith("voice:") && room !== socket.id) {
                 socket.leave(room);
@@ -703,22 +819,18 @@ io.on("connection", (socket) => {
         socket.voiceUsername        = username || "User";
         socket.voiceDiscordId       = discordId || "";
 
-        // Globale Map aktualisieren
         activeVoiceUsers.set(socket.id, { channelId, username, discordId: discordId || '' });
         console.log(`[Voice] ✅ ${username} ist #${channelId} beigetreten (${activeVoiceUsers.size} aktive User)`);
 
-        // Alle benachrichtigen wer wo ist
         broadcastVoiceState();
     });
 
-    // User verlässt Kanal manuell (ohne App zu schließen)
     socket.on("voice_channel_leave", ({ channelId, username, discordId }) => {
         if (!channelId) return;
 
         const room = `voice:${channelId}`;
         socket.leave(room);
 
-        // PTT-Stop senden falls noch aktiv
         socket.to(room).emit("voice_ptt_stop", {
             channelId, username: username || socket.voiceUsername || 'User',
             discordId: discordId || socket.voiceDiscordId || '',
@@ -732,32 +844,27 @@ io.on("connection", (socket) => {
         broadcastVoiceState();
     });
 
-    // Kanal erstellen → an alle broadcasten
     socket.on("voice_create_channel", (newVC) => {
         socket.broadcast.emit("voice_created", newVC);
     });
 
-    // PTT Start → nur an Leute im selben Voice-Channel
     socket.on("voice_ptt_start", (data) => {
         const room = `voice:${data.channelId}`;
         socket.to(room).emit("voice_ptt_start", data);
         console.log(`[Voice] 🔴 ${data.username} sendet in #${data.channelId}`);
     });
 
-    // PTT Stop → nur an Leute im selben Voice-Channel
     socket.on("voice_ptt_stop", (data) => {
         const room = `voice:${data.channelId}`;
         socket.to(room).emit("voice_ptt_stop", data);
         console.log(`[Voice] ⏹ ${data.username} stoppt in #${data.channelId}`);
     });
 
-    // Audio-Chunk → nur an Leute im selben Voice-Channel (NICHT zurück an Sender)
     socket.on("voice_audio_chunk", (data) => {
         const room = `voice:${data.channelId}`;
         socket.to(room).emit("voice_audio_chunk", data);
     });
 
-    // Beim Disconnect: Aufräumen
     socket.on("disconnect", () => {
         overlayClients.delete(socket.id);
 
@@ -765,7 +872,6 @@ io.on("connection", (socket) => {
             const user = activeVoiceUsers.get(socket.id);
             const room = `voice:${user.channelId}`;
 
-            // PTT-Stop an alle im Raum senden (falls User noch sprach)
             io.to(room).emit("voice_ptt_stop", {
                 channelId: user.channelId,
                 username:  user.username,
@@ -775,7 +881,6 @@ io.on("connection", (socket) => {
             activeVoiceUsers.delete(socket.id);
             console.log(`[Voice] 🔌 ${user.username} disconnected — aus #${user.channelId} entfernt`);
 
-            // Allen den neuen State senden
             broadcastVoiceState();
         }
     });
@@ -825,7 +930,7 @@ async function updateBotStatus(ci) {
 }
 
 // ================================================================
-// 🚀 GITHUB RELEASE MONITOR — Sendet schönes Embed bei neuem Tag
+// 🚀 GITHUB RELEASE MONITOR
 // ================================================================
 const GITHUB_OWNER = 'princearmy2024';
 const GITHUB_REPO  = 'Emden-Network';
@@ -843,7 +948,6 @@ async function checkGithubRelease() {
         const release = await res.json();
         if (!release?.tag_name) return;
 
-        // Beim ersten Check nur speichern, nicht senden
         if (!lastKnownTag) {
             lastKnownTag = release.tag_name;
             console.log(`[Update] Aktueller Tag: ${lastKnownTag}`);
@@ -852,7 +956,6 @@ async function checkGithubRelease() {
 
         if (release.tag_name === lastKnownTag) return;
 
-        // Neuer Tag → Embed senden
         lastKnownTag = release.tag_name;
         const version = release.tag_name.replace('v', '');
         const notes = (release.body || 'Keine Änderungen angegeben.')
@@ -905,9 +1008,8 @@ client.once("ready", async () => {
     setInterval(() => updateBotStatus(client), STATUS_UPDATE_INTERVAL);
     startOverlayDataLoop();
 
-    // GitHub Release Monitor starten
-    await checkGithubRelease(); // Beim Start: aktuellen Tag speichern
-    setInterval(checkGithubRelease, 5 * 60 * 1000); // Alle 5 Minuten prüfen
+    await checkGithubRelease();
+    setInterval(checkGithubRelease, 5 * 60 * 1000);
 });
 
 client.on("channelCreate", channel => {
@@ -921,7 +1023,6 @@ client.on("channelCreate", channel => {
 let lastSupporterCount = -1;
 function startOverlayDataLoop() {
     setInterval(async () => {
-        // 1. Supporter Count (On Duty Rolle)
         try {
             const guild = client.guilds.cache.get(GUILD_ID);
             if (guild) {
@@ -936,7 +1037,6 @@ function startOverlayDataLoop() {
             }
         } catch (e) { console.error("[Overlay] Fehler beim Supporter-Count:", e.message); }
 
-        // 2. Roblox Presence Tracker (Gespieltes Spiel == Emergency Emden)
         if (robloxLinks.size > 0 && overlayClients.size > 0) {
             try {
                 const userIds = Array.from(new Set(Array.from(robloxLinks.values())));
@@ -975,7 +1075,7 @@ function startOverlayDataLoop() {
                 // Leiser Fehlschlag bei Roblox API Errors
             }
         }
-    }, 15000); // Alle 15 Sekunden prüfen
+    }, 15000);
 }
 
-client.login(process.env.TOKEN).catch(e => console.error("❌ Login:", e));
+client.login(process.env.TOKEN).catch(e => console.error("❌ Login:", e));	
