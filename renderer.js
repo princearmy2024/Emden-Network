@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.0.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.0.1'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1793,31 +1793,33 @@ const App = {
         // Duplikate vermeiden
         if (chatBox.querySelector(`[id="${msgId}"]`)) return;
 
-        const avatarUrl = data.avatar || '';
-        const avatarHtml = avatarUrl
-            ? `<img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentElement.textContent='${initial}'">`
+        // Avatar: eigenes PFB oder vom User-Daten
+        const avatarUrl = isOwn ? (user?.avatar || data.avatar || '') : (data.avatar || '');
+        const avatarInner = avatarUrl
+            ? `<img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.textContent='${initial}'">`
             : initial;
+
+        const bgColor = isOwn ? 'var(--brand-blue)' : (this.getStringColor?.(data.username) || '#0088FF');
 
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
-                ${!isOwn ? `<div class="msg-avatar" style="background:${this.getStringColor?.(data.username) || '#0088FF'}">${avatarHtml}</div>` : ''}
+                ${!isOwn ? `<div class="msg-avatar" style="background:${bgColor}">${avatarInner}</div>` : ''}
                 <div class="msg-body">
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span></div>
                     <div class="msg-text">${content}</div>
                     <div class="msg-reactions" id="${msgId}-reactions"></div>
                     <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
                 </div>
-                ${isOwn ? `<div class="msg-avatar you" style="background:var(--brand-blue)">${avatarHtml}</div>` : ''}
+                ${isOwn ? `<div class="msg-avatar you" style="background:${bgColor}">${avatarInner}</div>` : ''}
             </div>
         `;
         chatBox.insertAdjacentHTML('beforeend', html);
 
         // Max 20 Nachrichten
         while (chatBox.children.length > 20) chatBox.removeChild(chatBox.firstChild);
-        chatBox.scrollTop = chatBox.scrollHeight;
 
-        // Sound bei fremden Nachrichten
-        if (!isOwn) this.playBlip(900, 0.06);
+        // Auto-scroll zum neuesten
+        requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
     },
 
     _msgIdCounter: 0,
