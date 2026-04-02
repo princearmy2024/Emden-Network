@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.2.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -402,6 +402,9 @@ const NotificationService = {
      * @param {'info'|'success'|'warn'|'error'} type
      */
     show(title, message, type = 'info') {
+        // In Notifications-Liste speichern
+        if (window.App?.addNotification) App.addNotification(title, message, type);
+
         // Sound abspielen (falls in Settings aktiviert)
         if (document.getElementById('toggleSound')?.checked !== false) {
             this.playSmoothSound(type);
@@ -699,6 +702,7 @@ const App = {
         this._loadSavedBackground(); // Custom Wallpaper laden
         this._loadSavedAccent(); // Gespeicherte Akzentfarbe laden
         this._loadAllSettings(); // Theme, Font, Sprache, etc.
+        this._loadNotifications(); // Gespeicherte Benachrichtigungen laden
 
         // Gespeicherte User-Liste sofort laden (Offline-Anzeige)
         const savedUsers = Object.values(UserRegistry.get());
@@ -989,79 +993,8 @@ const App = {
         }, 100);
     },
 
-    appendChatMessage(msg) {
-        // In Speicher ablegen
-        const isExists = this.messages.some(m => m.id === msg.id);
-        if (!isExists) {
-            this.messages.push(msg);
-            // Retention: Nur Nachrichten von heute behalten (ca. 24h)
-            const oneDay = 24 * 60 * 60 * 1000;
-            const now = Date.now();
-            this.messages = this.messages.filter(m => {
-                const msgTime = typeof m.id === 'number' ? m.id : now;
-                return (now - msgTime) < oneDay;
-            });
-        }
-
-        // Falls Nachricht für aktuellen Chat bestimmt ist -> sofort anzeigen
-        const user = AuthService.getUser();
-        let shouldShow = false;
-        if (this.currentChat.startsWith('@')) {
-            const targetName = this.currentChat.substring(1);
-            shouldShow = (msg.to === this.currentChat && msg.userId === user.discordId) || 
-                         (msg.to === '@' + user.username && msg.username === targetName);
-        } else {
-            shouldShow = (msg.to === this.currentChat || (!msg.to && this.currentChat === 'general'));
-        }
-
-        if (shouldShow) {
-            this._renderSingleMessage(msg);
-            // Sound bei fremden Nachrichten
-            if (msg.username !== user.username) this.playBlip(900, 0.08);
-        }
-    },
-
-    _renderSingleMessage(msg) {
-        const msgs = document.getElementById('chatMessages');
-        if (!msgs) return;
-        const user = AuthService.getUser();
-        const isOwn = user?.discordId === msg.userId;
-
-        // Vermeiden, dass Nachrichten doppelt im DOM auftauchen
-        if (msgs.querySelector(`[data-msgid="${msg.id}"]`)) return;
-
-        const initial = (msg.username || 'U')[0].toUpperCase();
-        const el = document.createElement('div');
-        el.className = 'msg-item ' + (isOwn ? 'own' : '');
-        el.setAttribute('data-msgid', msg.id);
-
-        const imgUrl = msg.avatar || msg.PFB || msg.pfb;
-        const avatarHtml = imgUrl
-            ? `<img src="${imgUrl}" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\'>${initial}</div>';">`
-            : `<div class="avatar-fallback-inner">${initial}</div>`;
-        
-        const timestamp = msg.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-        if (isOwn) {
-            el.innerHTML = `
-              <div class="msg-body">
-                <div class="msg-meta"><span class="msg-user">Du</span><span class="msg-time">${timestamp}</span></div>
-                <div class="msg-text">${escHtml(msg.text)}</div>
-              </div>
-              <div class="msg-avatar you">${avatarHtml}</div>
-            `;
-        } else {
-            el.innerHTML = `
-              <div class="msg-avatar">${avatarHtml}</div>
-              <div class="msg-body">
-                <div class="msg-meta"><span class="msg-user">${escHtml(msg.username)}</span><span class="msg-time">${timestamp}</span></div>
-                <div class="msg-text">${escHtml(msg.text)}</div>
-              </div>
-            `;
-        }
-        msgs.appendChild(el);
-        msgs.scrollTop = msgs.scrollHeight;
-    },
+    // Legacy — redirects zum neuen System
+    appendChatMessage(msg) { this._displayMessage(msg); },
 
     // --- SOUND ENGINE (Walkie-Talkie Effects) ---
     playBlip(freq = 800, duration = 0.1) {
@@ -1149,13 +1082,89 @@ const App = {
     // (Actual PTT logic is further down in initPTTHandlers/startPTT/stopPTT)
 
     // --- NOTIFICATIONS VIEW ---
+    _notifications: [],
+
     clearNotifications() {
-        document.getElementById('notifList').innerHTML = `
-      <div style="text-align:center;padding:40px;color:var(--text-muted);font-family:var(--font-mono);font-size:12px;">
-        KEINE BENACHRICHTIGUNGEN
-      </div>`;
-        document.getElementById('notifBadge')?.remove();
-        NotificationService.show('Benachrichtigungen', 'Alle gelöscht.', 'success');
+        this._notifications = [];
+        localStorage.removeItem('en_notifications');
+        this._renderNotifications();
+    },
+
+    addNotification(title, msg, type = 'info') {
+        this._notifications.unshift({ title, msg, type, time: Date.now() });
+        if (this._notifications.length > 30) this._notifications.pop();
+        localStorage.setItem('en_notifications', JSON.stringify(this._notifications));
+        this._renderNotifications();
+    },
+
+    _renderNotifications() {
+        const list = document.getElementById('notifList');
+        if (!list) return;
+
+        if (this._notifications.length === 0) {
+            list.innerHTML = `<div class="notif-empty" style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40" style="margin:0 auto 12px;opacity:0.3;display:block;">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>Keine Benachrichtigungen</div>`;
+            return;
+        }
+
+        const icons = {
+            warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+            info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+            success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+            error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+        };
+        const timeAgo = (ts) => {
+            const s = Math.floor((Date.now() - ts) / 1000);
+            if (s < 60) return 'gerade eben';
+            if (s < 3600) return `vor ${Math.floor(s / 60)} Min`;
+            if (s < 86400) return `vor ${Math.floor(s / 3600)} Std`;
+            return `vor ${Math.floor(s / 86400)} Tagen`;
+        };
+
+        list.innerHTML = this._notifications.map((n, i) => `
+            <div class="notif-item ${n.type}">
+                <div class="notif-icon ${n.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">${icons[n.type] || icons.info}</svg></div>
+                <div class="notif-content">
+                    <div class="notif-title">${escHtml(n.title)}</div>
+                    <div class="notif-msg">${escHtml(n.msg)}</div>
+                    <div class="notif-time">${timeAgo(n.time)}</div>
+                </div>
+                <button class="notif-dismiss" onclick="App._notifications.splice(${i},1);localStorage.setItem('en_notifications',JSON.stringify(App._notifications));App._renderNotifications();">✕</button>
+            </div>
+        `).join('');
+    },
+
+    _loadNotifications() {
+        try {
+            this._notifications = JSON.parse(localStorage.getItem('en_notifications') || '[]');
+            this._renderNotifications();
+        } catch(e) {}
+    },
+
+    // ── Global Search ────────────────────────────────────────
+    globalSearch(query) {
+        if (!query || query.length < 2) return;
+        const q = query.toLowerCase();
+        // User suchen
+        const registry = UserRegistry.get();
+        const users = Object.values(registry).filter(u => u.username?.toLowerCase().includes(q));
+        if (users.length > 0) {
+            this.navigate('messages');
+            this.selectChat('@' + users[0].username);
+            document.getElementById('globalSearchInput').value = '';
+            return;
+        }
+        // Views suchen
+        const views = { dashboard: 'overview', nachrichten: 'messages', chat: 'messages', einstellungen: 'settings', settings: 'settings', walkie: 'walkie', funk: 'walkie', server: 'servers', benachrichtigungen: 'notifications' };
+        for (const [key, view] of Object.entries(views)) {
+            if (key.includes(q)) {
+                this.navigate(view);
+                document.getElementById('globalSearchInput').value = '';
+                return;
+            }
+        }
     },
 
     // --- MODAL ---
