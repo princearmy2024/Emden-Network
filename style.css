@@ -1105,6 +1105,34 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 .accent-custom-wrap { cursor: pointer; position: relative; display: flex; }
 .accent-color-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 .accent-opt.custom-color { display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(255,255,255,0.3); }
+
+/* Theme Picker */
+.theme-picker { display: flex; gap: 6px; }
+.theme-opt {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 4px; border-radius: 8px; border: 2px solid transparent;
+    background: none; cursor: pointer; transition: all 0.2s;
+}
+.theme-opt:hover { border-color: rgba(255,255,255,0.15); }
+.theme-opt.active { border-color: var(--brand-blue); }
+.theme-preview { width: 32px; height: 22px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); }
+.theme-label { font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.5px; text-transform: uppercase; }
+.theme-opt.active .theme-label { color: var(--brand-blue); }
+
+/* Hotkey Grid */
+.hotkey-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.hotkey-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+}
+.hotkey-item kbd {
+    display: inline-block; padding: 2px 8px; border-radius: 5px;
+    background: rgba(0,136,255,0.08); border: 1px solid rgba(0,136,255,0.2);
+    border-bottom-width: 2px; font-size: 10px; font-weight: 800;
+    font-family: var(--font-mono); color: var(--brand-blue); min-width: 32px; text-align: center;
+}
+.hotkey-item span { font-size: 11px; color: var(--text-sub); }
 .account-card {
     display: flex; align-items: center; gap: 12px;
     padding: 14px; background: rgba(255,255,255,0.02);

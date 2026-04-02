@@ -769,6 +769,52 @@
                                 </div>
                                 <input type="range" class="volume-slider" id="bgBlurSlider" min="0" max="30" value="0" oninput="App.setBgBlur(this.value)" style="width:100px;">
                             </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Theme</div>
+                                    <div class="setting-desc">Farbschema der App</div>
+                                </div>
+                                <div class="theme-picker">
+                                    <button class="theme-opt active" data-theme="midnight" onclick="App.setTheme('midnight')">
+                                        <span class="theme-preview" style="background:linear-gradient(135deg,#13151e,#1a1d2e)"></span>
+                                        <span class="theme-label">Midnight</span>
+                                    </button>
+                                    <button class="theme-opt" data-theme="ocean" onclick="App.setTheme('ocean')">
+                                        <span class="theme-preview" style="background:linear-gradient(135deg,#0a1628,#0f2847)"></span>
+                                        <span class="theme-label">Ocean</span>
+                                    </button>
+                                    <button class="theme-opt" data-theme="neon" onclick="App.setTheme('neon')">
+                                        <span class="theme-preview" style="background:linear-gradient(135deg,#0d0015,#1a0030)"></span>
+                                        <span class="theme-label">Neon</span>
+                                    </button>
+                                    <button class="theme-opt" data-theme="amoled" onclick="App.setTheme('amoled')">
+                                        <span class="theme-preview" style="background:#000000"></span>
+                                        <span class="theme-label">AMOLED</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Schriftgröße</div>
+                                    <div class="setting-desc">UI-Text skalieren</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <span style="font-size:10px;color:var(--text-muted)">A</span>
+                                    <input type="range" class="volume-slider" id="fontSizeSlider" min="12" max="18" value="14" step="1" oninput="App.setFontSize(this.value)" style="width:90px;">
+                                    <span style="font-size:16px;color:var(--text-muted)">A</span>
+                                    <span id="fontSizeValue" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);min-width:28px;">14px</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Sprache</div>
+                                    <div class="setting-desc">Anzeigesprache der App</div>
+                                </div>
+                                <select id="langSelect" class="input-field" style="width:130px;font-size:12px;" onchange="App.setLanguage(this.value)">
+                                    <option value="de" selected>Deutsch</option>
+                                    <option value="en">English</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="settings-section">
                             <h3 class="settings-title">Benachrichtigungen</h3>
@@ -838,7 +884,7 @@
                                     <span style="font-size:11px; color:var(--text-muted);">Ein Buchstabe</span>
                                 </div>
                             </div>
-                            <!-- NEW: Funk-Sound URL -->
+                            <!-- Funk-Sound URL -->
                             <div class="setting-row">
                                 <div class="setting-info">
                                     <div class="setting-name">Funk-Sound (Start)</div>
@@ -846,8 +892,48 @@
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:6px; flex:1; max-width:300px;">
                                     <input type="text" id="pttSoundInput" class="input-field" placeholder="https://..." onchange="App.setPTTSound(this.value)">
-                                    <span style="font-size:10px; color:var(--brand-blue); cursor:pointer;" onclick="window.electronAPI.openExternal('https://pixabay.com/sound-effects/search/walkie-talkie/')">🔗 Sounds auf Pixabay suchen</span>
+                                    <span style="font-size:10px; color:var(--brand-blue); cursor:pointer;" onclick="window.electronAPI.openExternal('https://pixabay.com/sound-effects/search/walkie-talkie/')">Sounds auf Pixabay suchen</span>
                                 </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Radio-Effekt Stärke</div>
+                                    <div class="setting-desc">Wie stark der Funk-Sound klingt</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <span style="font-size:10px;color:var(--text-muted)">Leicht</span>
+                                    <input type="range" class="volume-slider" id="radioStrengthSlider" min="0" max="100" value="30" step="5" oninput="App.setRadioStrength(this.value)" style="width:90px;">
+                                    <span style="font-size:10px;color:var(--text-muted)">Heavy</span>
+                                    <span id="radioStrengthValue" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);min-width:28px;">30%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 class="settings-title">System</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Autostart</div>
+                                    <div class="setting-desc">App beim Windows-Start automatisch öffnen</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" id="toggleAutostart" onchange="App.toggleAutostart(this.checked)" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 class="settings-title">Tastenkürzel</h3>
+                            <div class="hotkey-grid">
+                                <div class="hotkey-item"><kbd>V</kbd><span>Push-to-Talk (Funk)</span></div>
+                                <div class="hotkey-item"><kbd>F2</kbd><span>App fokussieren</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+1</kbd><span>Dashboard</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+2</kbd><span>Nachrichten</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+3</kbd><span>Benachrichtigungen</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+5</kbd><span>Walkie-Talkie</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+6</kbd><span>Server</span></div>
+                                <div class="hotkey-item"><kbd>Ctrl+9</kbd><span>Einstellungen</span></div>
                             </div>
                         </div>
 

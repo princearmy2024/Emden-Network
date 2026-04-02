@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '2.7.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '2.8.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -678,6 +678,7 @@ const App = {
         this.loadRobloxState(); // Roblox-Status laden (Overlay-Start)
         this._loadSavedBackground(); // Custom Wallpaper laden
         this._loadSavedAccent(); // Gespeicherte Akzentfarbe laden
+        this._loadAllSettings(); // Theme, Font, Sprache, etc.
 
         // Gespeicherte User-Liste sofort laden (Offline-Anzeige)
         const savedUsers = Object.values(UserRegistry.get());
@@ -1453,6 +1454,72 @@ const App = {
         } else {
             this.setAccent(saved);
         }
+    },
+
+    // ── Theme ────────────────────────────────────────────────
+    setTheme(theme) {
+        const themes = {
+            midnight: { base: '#13151e', surface: '#1a1d2e', card: '#1f2235', sidebar: '#111320' },
+            ocean:    { base: '#0a1628', surface: '#0f2040', card: '#132a4a', sidebar: '#081322' },
+            neon:     { base: '#0d0015', surface: '#170028', card: '#1f0035', sidebar: '#0a0012' },
+            amoled:   { base: '#000000', surface: '#0a0a0a', card: '#111111', sidebar: '#000000' },
+        };
+        const t = themes[theme] || themes.midnight;
+        document.documentElement.style.setProperty('--bg-base', t.base);
+        document.documentElement.style.setProperty('--bg-surface', t.surface);
+        document.documentElement.style.setProperty('--bg-card', t.card);
+        document.documentElement.style.setProperty('--bg-sidebar', t.sidebar);
+        document.querySelectorAll('.theme-opt').forEach(el => el.classList.toggle('active', el.dataset.theme === theme));
+        localStorage.setItem('app_theme', theme);
+    },
+
+    // ── Schriftgröße ─────────────────────────────────────────
+    setFontSize(px) {
+        document.documentElement.style.fontSize = px + 'px';
+        const label = document.getElementById('fontSizeValue');
+        if (label) label.textContent = px + 'px';
+        localStorage.setItem('font_size', px);
+    },
+
+    // ── Sprache (Grundstruktur) ──────────────────────────────
+    setLanguage(lang) {
+        localStorage.setItem('app_lang', lang);
+        NotificationService.show(lang === 'de' ? 'Sprache' : 'Language', lang === 'de' ? 'Deutsch ausgewählt. Neustart empfohlen.' : 'English selected. Restart recommended.', 'info');
+    },
+
+    // ── Radio-Effekt Stärke ──────────────────────────────────
+    setRadioStrength(val) {
+        localStorage.setItem('radio_strength', val);
+        const label = document.getElementById('radioStrengthValue');
+        if (label) label.textContent = val + '%';
+    },
+
+    // ── Autostart ────────────────────────────────────────────
+    toggleAutostart(enabled) {
+        if (window.electronAPI?.setAutostart) {
+            window.electronAPI.setAutostart(enabled);
+        }
+        localStorage.setItem('autostart', enabled ? 'true' : 'false');
+        NotificationService.show('Autostart', enabled ? 'App startet mit Windows' : 'Autostart deaktiviert', 'info');
+    },
+
+    // ── Alle Settings beim Start laden ───────────────────────
+    _loadAllSettings() {
+        // Theme
+        const theme = localStorage.getItem('app_theme');
+        if (theme) this.setTheme(theme);
+        // Font Size
+        const fs = localStorage.getItem('font_size');
+        if (fs) { this.setFontSize(fs); const sl = document.getElementById('fontSizeSlider'); if (sl) sl.value = fs; }
+        // Language
+        const lang = localStorage.getItem('app_lang');
+        if (lang) { const sel = document.getElementById('langSelect'); if (sel) sel.value = lang; }
+        // Radio Strength
+        const rs = localStorage.getItem('radio_strength');
+        if (rs) { const sl = document.getElementById('radioStrengthSlider'); if (sl) sl.value = rs; const lb = document.getElementById('radioStrengthValue'); if (lb) lb.textContent = rs + '%'; }
+        // Autostart
+        const as = localStorage.getItem('autostart');
+        if (as) { const cb = document.getElementById('toggleAutostart'); if (cb) cb.checked = as === 'true'; }
     },
 
     toggleSetting(key, val) {

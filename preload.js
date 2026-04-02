@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Tenor GIF Search (via Main-Prozess, umgeht CSP)
     searchTenorGifs: (query) => ipcRenderer.invoke('search-tenor-gifs', query),
 
+    // Autostart
+    setAutostart: (enabled) => ipcRenderer.send('set-autostart', enabled),
+
     // Öffnet URLs im System-Browser (für Roblox OAuth)
     openExternal: (url) => ipcRenderer.send('open-external', url),
 

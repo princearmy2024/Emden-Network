@@ -112,6 +112,12 @@ ipcMain.on('show-native-notification', (event, { title, body }) => {
     }
 });
 
+// Autostart
+ipcMain.on('set-autostart', (event, enabled) => {
+    app.setLoginItemSettings({ openAtLogin: enabled });
+    console.log('[Autostart]', enabled ? 'Aktiviert' : 'Deaktiviert');
+});
+
 // Custom Desktop Overlay Notification
 ipcMain.on('send-overlay-notification', (event, data) => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
