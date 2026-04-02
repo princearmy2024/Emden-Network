@@ -65,8 +65,8 @@ function createWindow() {
         minWidth: 960,
         minHeight: 600,
         frame: false,           // Custom Titlebar
-        transparent: false,
-        backgroundColor: '#0a0a0f',
+        transparent: true,
+        backgroundColor: '#00000000',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,   // Sicherheit: immer aktiv lassen
