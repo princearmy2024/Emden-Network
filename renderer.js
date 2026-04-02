@@ -221,9 +221,36 @@ const WebSocketService = {
             
             // Eingehende Nachrichten von anderen Usern
             this.socket.on('receive_message', (msg) => {
-                if (window.App) {
-                    App._displayMessage(msg);
-                    App._saveChatMessage(msg, msg.to || 'general');
+                if (!window.App) return;
+                const me = AuthService.getUser();
+                const channel = msg.to || 'general';
+
+                // Prüfen ob die Nachricht für mich relevant ist
+                let isForMe = false;
+                if (channel.startsWith('@')) {
+                    // PN: nur anzeigen wenn an mich oder von mir
+                    isForMe = channel === '@' + me?.username || msg.username === me?.username;
+                } else {
+                    // Channel-Nachricht: immer relevant
+                    isForMe = true;
+                }
+
+                if (isForMe) {
+                    // Nur anzeigen wenn der aktuelle Chat passt
+                    const currentChat = App.currentChat || 'general';
+                    const shouldDisplay = (channel === currentChat) ||
+                        (channel.startsWith('@') && channel === '@' + me?.username && currentChat === '@' + msg.username);
+
+                    if (shouldDisplay) {
+                        App._displayMessage(msg);
+                    }
+                    App._saveChatMessage(msg, channel);
+
+                    // Notification wenn nicht im richtigen Chat
+                    if (!shouldDisplay && msg.username !== me?.username) {
+                        NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                        App.playBlip(900, 0.06);
+                    }
                 }
             });
 
