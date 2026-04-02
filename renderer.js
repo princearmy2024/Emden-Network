@@ -953,7 +953,12 @@ const App = {
     // --- MESSAGES ---
     selectChat(name) {
         this.currentChat = name;
-        
+
+        // Zur Messages-View navigieren falls nicht dort
+        if (this.currentView !== 'messages') {
+            this.navigate('messages');
+        }
+
         // UI im Header aktualisieren
         const headTitle = document.getElementById('activeChatName');
         if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
@@ -1784,14 +1789,19 @@ const App = {
         }
 
         // Lokal anzeigen + speichern
+        console.log('[Chat] Sende:', msgData);
         this._displayMessage(msgData);
         this._saveChatMessage(msgData, channel);
+
+        // Input refokussieren
+        input.focus();
     },
 
     // Nachricht im Chat anzeigen (einheitlich für eigene + fremde)
     _displayMessage(data) {
         const chatBox = document.getElementById('chatMessages');
-        if (!chatBox) return;
+        if (!chatBox) { console.warn('[Chat] chatMessages Element nicht gefunden!'); return; }
+        console.log('[Chat] _displayMessage:', data.username, data.text || data.message);
 
         const user = AuthService.getUser();
         const isOwn = data.username === user?.username || data.userId === user?.discordId;
