@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.8.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.9.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -208,10 +208,9 @@ const WebSocketService = {
 
             // Direkt beim Verbinden (und bei Reconnects)
             this.socket.on('connect', () => {
+                console.log('[Socket] Verbunden! ID:', this.socket.id);
                 announceOnline();
-                // Nach Socket-Verbindung sofort Status neu holen (für frische User-Liste)
                 setTimeout(() => this._fetchStatus(), 2000);
-                // ── VOICE EVENTS registrieren (nach jeder Verbindung) ──
                 App.initVoiceSocketEvents(this.socket);
             });
 
@@ -1821,12 +1820,14 @@ const App = {
             timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
         };
 
-        // An Server senden
+        // An Server senden (beide Event-Namen für Kompatibilität)
         if (WebSocketService.socket?.connected) {
             WebSocketService.socket.emit('send_message', msgData);
-            console.log('[Chat] Gesendet via Socket:', text);
+            WebSocketService.socket.emit('chat_message', msgData);
+            console.log('[Chat] Gesendet via Socket:', text, '(connected:', WebSocketService.socket.connected, 'id:', WebSocketService.socket.id, ')');
         } else {
-            console.warn('[Chat] Socket nicht verbunden!');
+            console.warn('[Chat] Socket NICHT verbunden!');
+            NotificationService.show('Fehler', 'Keine Verbindung zum Chat-Server!', 'error');
         }
 
         // Lokal anzeigen + speichern

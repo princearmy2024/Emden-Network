@@ -332,7 +332,7 @@ const apiServer = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, "http://localhost");
 
-    const publicPaths = ["/api/roblox/auth", "/api/roblox/callback", "/api/roblox/start-verify", "/api/roblox/confirm-verify"];
+    const publicPaths = ["/api/roblox/auth", "/api/roblox/callback", "/api/roblox/start-verify", "/api/roblox/confirm-verify", "/api/team"];
     const isPublic = publicPaths.some(p => url.pathname === p);
 
     if (!isPublic && req.headers["x-api-key"] !== API_SECRET) {
@@ -834,6 +834,15 @@ io.on("connection", (socket) => {
     });
 
     socket.on("send_message", (msgData) => {
+        console.log(`[Chat] ${msgData.username}: "${msgData.text || msgData.message}" → broadcast an ${io.sockets.sockets.size - 1} andere`);
+        chatHistory.push(msgData);
+        if (chatHistory.length > 50) chatHistory.shift();
+        socket.broadcast.emit("receive_message", msgData);
+    });
+
+    // AUCH chat_message Event (falls alte Clients das senden)
+    socket.on("chat_message", (msgData) => {
+        console.log(`[Chat] (legacy) ${msgData.username}: "${msgData.text || msgData.message}"`);
         chatHistory.push(msgData);
         if (chatHistory.length > 50) chatHistory.shift();
         socket.broadcast.emit("receive_message", msgData);
