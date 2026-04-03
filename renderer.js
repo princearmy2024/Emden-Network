@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.2.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '4.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
