@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.5.2'; // Stand: 03.04.2026 (GIF-Picker Design konsistent)
+let CURRENT_VERSION = '4.5.3'; // Stand: 03.04.2026 (GIF Masonry Layout)
 
 // =============================================================
 // CONFIG — Bot-API
