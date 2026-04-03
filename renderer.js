@@ -1083,7 +1083,17 @@ const App = window.App = {
 
         // UI Header
         const headTitle = document.getElementById('activeChatName');
-        if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
+        if (headTitle) {
+            if (name.startsWith('@')) {
+                const tName = name.substring(1);
+                const reg = UserRegistry.get();
+                const tUser = Object.values(reg).find(u => u.username === tName);
+                const robloxBadge = tUser?.discordId ? this._getRobloxBadge(tUser.discordId, false) : '';
+                headTitle.innerHTML = `${escHtml(name)} ${robloxBadge}`;
+            } else {
+                headTitle.textContent = '#' + name;
+            }
+        }
 
         const headSub = document.getElementById('chatHeaderOnlineText');
         if (headSub) headSub.textContent = name.startsWith('@') ? 'Privatchat' : 'Gruppenchat';
