@@ -821,22 +821,38 @@ const App = {
 
         const registry = UserRegistry.get();
 
-        // 1. Online-User in die Registry aufnehmen (falls sie noch nicht da sind)
+        // 1. Online-User in die Registry aufnehmen — NUR mit discordId als Key
         onlineUsers.forEach(u => {
-            const id = u.discordId || u.id || u.username;
-            if (id) {
-                // Wir aktualisieren hier auch die echten Daten, falls der Server was neues geschickt hat
-                registry[id] = { ...u, discordId: id, lastSeen: Date.now() };
+            const id = u.discordId;
+            if (!id) return;
+            registry[id] = { ...u, discordId: id, lastSeen: Date.now() };
+        });
+
+        // 2. Duplikate entfernen — User mit username als Key löschen wenn discordId existiert
+        const usernames = new Set();
+        Object.entries(registry).forEach(([key, u]) => {
+            if (u.discordId && key === u.discordId) {
+                usernames.add(u.username);
+            }
+        });
+        Object.entries(registry).forEach(([key, u]) => {
+            if (key !== u.discordId && usernames.has(u.username)) {
+                delete registry[key];
             }
         });
 
-        // 2. Online-IDs für den grünen Punkt sammeln
-        const onlineIds = new Set(onlineUsers.map(u => u.discordId || u.id || u.username));
+        // 3. Online-IDs sammeln (nutze online Flag vom Server wenn vorhanden)
+        const onlineIds = new Set();
+        onlineUsers.forEach(u => {
+            if (u.online === true || u.online === undefined) {
+                onlineIds.add(u.discordId || u.id || u.username);
+            }
+        });
 
-        // 3. Registry speichern mit neuen Daten
+        // 4. Registry speichern
         UserRegistry.save(registry);
 
-        // 4. ALLE bekannten User anzeigen (online + offline)
+        // 5. ALLE bekannten User anzeigen (online + offline)
         const allMembers = Object.values(registry);
 
         // Zähler nur für ECHTE online Leute
