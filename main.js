@@ -199,6 +199,29 @@ function getLocalChangelog() {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// Chat-Backup: Speichert/Lädt Chat-History in userData (überlebt Updates)
+const CHAT_BACKUP_FILE = path.join(app.getPath('userData'), 'chat-backup.json');
+
+ipcMain.handle('save-chat-backup', async (event, data) => {
+    try {
+        fs.writeFileSync(CHAT_BACKUP_FILE, JSON.stringify(data));
+        return { success: true };
+    } catch(e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('load-chat-backup', async () => {
+    try {
+        if (fs.existsSync(CHAT_BACKUP_FILE)) {
+            return JSON.parse(fs.readFileSync(CHAT_BACKUP_FILE, 'utf-8'));
+        }
+        return null;
+    } catch(e) {
+        return null;
+    }
+});
+
 // Tenor GIF Search (via Main-Prozess, umgeht CSP)
 ipcMain.handle('search-tenor-gifs', async (event, query) => {
     return new Promise((resolve) => {

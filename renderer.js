@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.9.0'; // Stand: 04.04.2026 (Forward Glass, Reply Puls, Bild-Reply Fix)
+let CURRENT_VERSION = '4.10.0'; // Stand: 04.04.2026 (Chat-Backup, Paste, Badge Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -624,9 +624,9 @@ const App = window.App = {
             if (lastVer !== CURRENT_VERSION) {
                 console.log(`[App] Version geändert: ${lastVer} → ${CURRENT_VERSION}`);
                 localStorage.setItem('last_app_version', CURRENT_VERSION);
-                // Alte Chat-History clearen (neues Chat-System)
-                Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => localStorage.removeItem(k));
             }
+            // Chat-Backup wiederherstellen falls localStorage leer (nach Update)
+            await this._restoreChatBackup();
 
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
@@ -2014,6 +2014,55 @@ const App = window.App = {
             });
             while (msgs.length > 20) msgs.shift();
             localStorage.setItem(key, JSON.stringify(msgs));
+            // Debounced Backup in Datei (überlebt Updates)
+            this._scheduleChatBackup();
+        } catch(e) {}
+    },
+
+    _chatBackupTimer: null,
+    _scheduleChatBackup() {
+        clearTimeout(this._chatBackupTimer);
+        this._chatBackupTimer = setTimeout(() => this._performChatBackup(), 5000);
+    },
+
+    async _performChatBackup() {
+        if (!window.electronAPI?.saveChatBackup) return;
+        try {
+            const backup = {};
+            Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
+                backup[k] = localStorage.getItem(k);
+            });
+            // Auch User-Registry und Roblox-Profil sichern
+            backup['en_members'] = localStorage.getItem('en_members');
+            backup['rblx_profile'] = localStorage.getItem('rblx_profile');
+            backup['gif_favorites'] = localStorage.getItem('gif_favorites');
+            backup['custom_bg'] = localStorage.getItem('custom_bg');
+            backup['bg_blur'] = localStorage.getItem('bg_blur');
+            await window.electronAPI.saveChatBackup(backup);
+        } catch(e) {}
+    },
+
+    async _restoreChatBackup() {
+        if (!window.electronAPI?.loadChatBackup) return;
+        try {
+            // Nur wiederherstellen wenn localStorage leer ist (= nach Update/Neuinstall)
+            const hasChats = Object.keys(localStorage).some(k => k.startsWith('chat_history_'));
+            if (hasChats) return;
+
+            const backup = await window.electronAPI.loadChatBackup();
+            if (!backup) return;
+
+            let restored = 0;
+            Object.entries(backup).forEach(([key, value]) => {
+                if (value && !localStorage.getItem(key)) {
+                    localStorage.setItem(key, value);
+                    restored++;
+                }
+            });
+            if (restored > 0) {
+                console.log(`[Backup] ${restored} Einträge aus Backup wiederhergestellt`);
+                NotificationService.show('Backup', 'Chat-History aus Backup wiederhergestellt!', 'success');
+            }
         } catch(e) {}
     },
 

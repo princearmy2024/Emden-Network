@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Tenor GIF Search (via Main-Prozess, umgeht CSP)
     searchTenorGifs: (query) => ipcRenderer.invoke('search-tenor-gifs', query),
 
+    // Chat-Backup (überlebt Updates)
+    saveChatBackup: (data) => ipcRenderer.invoke('save-chat-backup', data),
+    loadChatBackup: () => ipcRenderer.invoke('load-chat-backup'),
+
     // Autostart
     setAutostart: (enabled) => ipcRenderer.send('set-autostart', enabled),
 
