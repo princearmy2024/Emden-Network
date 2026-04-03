@@ -859,8 +859,9 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 }
 .msg-roblox-badge {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 16px; height: 16px; border-radius: 3px;
-    color: #00b2ff; transition: color 0.15s; margin-left: 2px;
+    width: 14px; height: 14px; border-radius: 3px;
+    color: #00b2ff; transition: color 0.15s;
+    flex-shrink: 0; vertical-align: middle;
 }
 .msg-roblox-badge:hover { color: #fff; }
 
@@ -1799,7 +1800,9 @@ body.has-custom-bg .gif-picker-panel {
     color: var(--brand-blue);
     font-weight: 600;
 }
-.ovn-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.ovn-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; overflow: hidden; }
+.ovn-info .msg-roblox-badge { width: 12px; height: 12px; }
+.ovn-info .msg-roblox-badge svg { width: 10px; height: 10px; }
 
 /* Avatar instead of plain dot */
 .ovn-avatar {
