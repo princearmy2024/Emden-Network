@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.5.0'; // Stand: 03.04.2026 (GIF-Picker, Typing Indicator, Reactions Fix, Chat Design)
+let CURRENT_VERSION = '4.5.1'; // Stand: 03.04.2026 (GIF-Picker Design Fix)
 
 // =============================================================
 // CONFIG — Bot-API
