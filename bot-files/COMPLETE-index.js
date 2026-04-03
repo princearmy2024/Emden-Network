@@ -842,35 +842,32 @@ io.on("connection", (socket) => {
 
     socket.on("send_message", (msgData) => {
         const to = msgData.to || 'general';
-        console.log(`[Chat] ${msgData.username} → ${to}: "${msgData.text || msgData.message}"`);
+        const otherCount = io.sockets.sockets.size - 1;
+        console.log(`[Chat] ${msgData.username} → ${to}: "${msgData.text || msgData.message}" (${otherCount} andere online)`);
 
         if (to === 'general') {
-            // Broadcast an alle
+            // Broadcast an alle ANDEREN
             chatHistory.push(msgData);
             if (chatHistory.length > 50) chatHistory.shift();
             socket.broadcast.emit("receive_message", msgData);
+            // Delivery-Status: zugestellt wenn andere online sind
+            socket.emit("msg_status", { id: msgData.id, status: otherCount > 0 ? 'delivered' : 'sent' });
         } else if (to.startsWith('@')) {
-            // PN: Nur an den Empfänger senden
+            // PN: NUR an den Empfänger senden
             const targetUsername = to.substring(1);
             let sent = false;
-            for (const [sid, s] of io.sockets.sockets) {
-                if (s.chatUsername === targetUsername && sid !== socket.id) {
+            for (const [, s] of io.sockets.sockets) {
+                if (s.chatUsername === targetUsername && s.id !== socket.id) {
                     s.emit("receive_message", msgData);
                     sent = true;
                     break;
                 }
             }
-            // Delivery-Status zurück an Sender
             socket.emit("msg_status", { id: msgData.id, status: sent ? 'delivered' : 'sent' });
         }
     });
 
-    // AUCH chat_message Event (Kompatibilität)
-    socket.on("chat_message", (msgData) => {
-        chatHistory.push(msgData);
-        if (chatHistory.length > 50) chatHistory.shift();
-        socket.broadcast.emit("receive_message", msgData);
-    });
+    // Legacy chat_message ignoriert — nur send_message nutzen
 
     // Typing Indicator
     socket.on("typing_start", ({ to, username }) => {
