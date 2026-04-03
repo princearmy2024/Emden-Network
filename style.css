@@ -1849,8 +1849,7 @@ body.has-custom-bg .gif-picker-panel {
     display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .ovn-node:hover .ovn-preview {
-    opacity: 1; transform: translateY(-50%) scale(1);
-    right: calc(100% + 8px);
+    display: none;
 }
 .ovnp-avatar {
     width: 60px; height: 60px; border-radius: 50%;

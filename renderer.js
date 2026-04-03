@@ -2680,10 +2680,7 @@ const App = window.App = {
 // =============================================================
 // UI SOUNDS — Hover + Click auf interaktive Elemente
 // =============================================================
-document.addEventListener('mouseenter', (e) => {
-    const target = e.target.closest('button, .ovn-node, .fwd-user-item, .ctx-item, .gif-tab, .chat-item');
-    if (target && window.App) App.playHoverSound();
-}, true);
+// Hover-Sound deaktiviert
 document.addEventListener('click', (e) => {
     const target = e.target.closest('button, .ovn-node, .fwd-user-item, .ctx-item, .gif-tab');
     if (target && window.App) App.playClickSound();
