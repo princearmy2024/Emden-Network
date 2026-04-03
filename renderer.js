@@ -2869,12 +2869,21 @@ Object.assign(App, {
     },
 
     // "Verknüpfen" geklickt → OAuth2 Flow starten
+    _robloxOAuthCooldown: false,
     async startRobloxVerify() {
+        if (this._robloxOAuthCooldown) {
+            NotificationService.show('Bitte warten', 'Warte 30 Sekunden bevor du es erneut versuchst.', 'warn');
+            return;
+        }
+
         const user = AuthService.getUser();
         if (!user?.discordId) {
             NotificationService.show('Fehler', 'Nicht eingeloggt.', 'error');
             return;
         }
+
+        this._robloxOAuthCooldown = true;
+        setTimeout(() => { this._robloxOAuthCooldown = false; }, 30000);
 
         const btn = document.querySelector('#rblxStateDisconnected button');
         if (btn) { btn.disabled = true; btn.textContent = 'Öffne Roblox...'; }
