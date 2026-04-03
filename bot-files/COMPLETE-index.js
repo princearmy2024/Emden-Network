@@ -507,6 +507,36 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
+    // GET /api/team — Gibt alle Rollen + Members mit Status zurück
+    if (req.method === "GET" && url.pathname === "/api/team") {
+        try {
+            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            await guild.members.fetch();
+
+            // Wichtige Rollen (Reihenfolge = Hierarchie)
+            const teamRoles = guild.roles.cache
+                .filter(r => r.members.size > 0 && !r.name.startsWith('@') && r.position > 1)
+                .sort((a, b) => b.position - a.position)
+                .slice(0, 15)
+                .map(role => ({
+                    name: role.name,
+                    color: role.hexColor !== '#000000' ? role.hexColor : '#5B9AFF',
+                    members: role.members.map(m => ({
+                        username: m.displayName || m.user.username,
+                        avatar: m.user.displayAvatarURL({ size: 64 }),
+                        status: m.presence?.status || 'offline',
+                        id: m.user.id,
+                    }))
+                }));
+
+            res.writeHead(200);
+            return res.end(JSON.stringify({ success: true, roles: teamRoles }));
+        } catch (e) {
+            res.writeHead(500);
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+    }
+
     // GET /api/roblox/auth?discordId=xxx
     if (req.method === "GET" && url.pathname === "/api/roblox/auth") {
         const discordId = url.searchParams.get("discordId");
