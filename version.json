@@ -1,6 +1,6 @@
 {
-    "version": "4.5.3",
+    "version": "4.6.0",
     "releaseDate": "2026-04-03",
-    "notes": "v4.5.0: GIF-Picker (Tabs, Favoriten, Emojis), Typing Indicator in Sidebar, Reactions Bugfix, Chat Design Update.",
+    "notes": "v4.6.0: GIF-Picker Glass Design, Bild-Upload, Rechtsklick-Menü, Sidebar Suchleiste, Background Fix.",
     "forceUpdate": true
 }

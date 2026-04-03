@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.5.3'; // Stand: 03.04.2026 (GIF Masonry Layout)
+let CURRENT_VERSION = '4.6.0'; // Stand: 03.04.2026 (Glass GIF, Upload, Sidebar, BG Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -977,6 +977,15 @@ const App = window.App = {
 
         const chatList = document.getElementById('chatOnlineUsersList');
         if (chatList) chatList.innerHTML = html;
+    },
+
+    // --- USER SEARCH FILTER ---
+    filterUserList(query) {
+        const q = (query || '').toLowerCase();
+        document.querySelectorAll('#chatOnlineUsersList .ovn-node').forEach(node => {
+            const name = node.querySelector('.ovn-name')?.textContent.toLowerCase() || '';
+            node.style.display = name.includes(q) ? '' : 'none';
+        });
     },
 
     // --- SIDEBAR TYPING INDICATOR ---
@@ -2185,6 +2194,10 @@ const App = window.App = {
         const searchInput = document.getElementById('gifSearchInput');
         const grid = document.getElementById('gifGrid');
         if (!grid) return;
+        // Tab-Wechsel Animation
+        grid.classList.remove('gif-grid-fade');
+        void grid.offsetWidth;
+        grid.classList.add('gif-grid-fade');
 
         if (tab === 'emojis') {
             if (searchInput) searchInput.placeholder = 'Emoji suchen...';
@@ -2320,6 +2333,51 @@ const App = window.App = {
         document.getElementById('gifPickerPanel')?.classList.add('hidden');
     },
 
+    // ── Datei/Bild Upload (max 10MB) ──
+    attachFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,.gif,.png,.jpg,.jpeg,.webp';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 10 * 1024 * 1024) {
+                NotificationService.show('Zu groß', 'Max. 10 MB erlaubt!', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const chatInput = document.getElementById('chatInput');
+                if (chatInput) chatInput.value = reader.result;
+                this.sendMessage();
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    },
+
+    // ── Rechtsklick Kontextmenü für Bilder ──
+    _ctxTarget: null,
+    ctxDownload() {
+        if (!this._ctxTarget) return;
+        const a = document.createElement('a');
+        a.href = this._ctxTarget;
+        a.download = 'image_' + Date.now() + '.gif';
+        a.click();
+        document.getElementById('ctxMenu')?.classList.add('hidden');
+    },
+    ctxForward() {
+        if (!this._ctxTarget) return;
+        document.getElementById('ctxMenu')?.classList.add('hidden');
+        // URL ins Input setzen — User wählt dann den Chat
+        const input = document.getElementById('chatInput');
+        if (input) {
+            input.value = this._ctxTarget;
+            input.focus();
+            NotificationService.show('Weiterleiten', 'Bild im Input — wähle einen Chat und sende!', 'info');
+        }
+    },
+
     // ── Custom Background ──────────────────────────────────────
     setCustomBackground() {
         const input = document.createElement('input');
@@ -2380,6 +2438,7 @@ const App = window.App = {
         html.style.backgroundSize = 'cover';
         html.style.backgroundPosition = 'center';
         html.style.backgroundRepeat = 'no-repeat';
+        html.style.backgroundAttachment = 'fixed';
         const blur = localStorage.getItem('bg_blur') || 0;
         // Blur via separatem Layer (html selbst kann nicht geblurred werden)
         let el = document.getElementById('customBgLayer');
@@ -2404,6 +2463,23 @@ const App = window.App = {
         if (slider) slider.value = blur;
     }
 };
+
+// =============================================================
+// RECHTSKLICK KONTEXTMENÜ FÜR CHAT-BILDER
+// =============================================================
+document.addEventListener('contextmenu', (e) => {
+    const img = e.target.closest('.chat-embed-img, .gif-item');
+    const ctx = document.getElementById('ctxMenu');
+    if (!img || !ctx) return;
+    e.preventDefault();
+    App._ctxTarget = img.src;
+    ctx.style.left = e.clientX + 'px';
+    ctx.style.top = e.clientY + 'px';
+    ctx.classList.remove('hidden');
+});
+document.addEventListener('click', () => {
+    document.getElementById('ctxMenu')?.classList.add('hidden');
+});
 
 // =============================================================
 // KEYBOARD SHORTCUTS
