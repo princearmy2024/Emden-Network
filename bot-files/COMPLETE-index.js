@@ -482,6 +482,12 @@ const apiServer = http.createServer(async (req, res) => {
                 if (u.lastSeen < cutoff) dashboardUsers.delete(id);
             }
 
+            // Online Discord-Usernamen sammeln
+            const onlineDiscordUsers = guild?.members.cache
+                .filter(m => ["online", "dnd", "idle"].includes(m.presence?.status) && !m.user.bot)
+                .map(m => m.displayName || m.user.username)
+                .slice(0, 50) || [];
+
             res.writeHead(200);
             return res.end(JSON.stringify({
                 online: true, guildName: guild?.name || "Emden Network",
@@ -491,6 +497,7 @@ const apiServer = http.createServer(async (req, res) => {
                     discordId: u.discordId, username: u.username, avatar: u.avatar, role: u.role,
                     online: dashboardUsers.has(u.discordId),
                 })),
+                onlineDiscordUsers,
                 botTag: client.user?.tag || "—",
                 uptimeSec: Math.floor(process.uptime()),
             }));
