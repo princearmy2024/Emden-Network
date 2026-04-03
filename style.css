@@ -1604,9 +1604,10 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
     border: 1px solid rgba(255,255,255,0.08);
 }
 .ovn-avatar::after {
-    content: ''; position: absolute; bottom: 0; right: 0;
-    width: 8px; height: 8px; border-radius: 50%;
+    content: ''; position: absolute; bottom: -1px; right: -1px;
+    width: 10px; height: 10px; border-radius: 50%;
     background: var(--status-online); border: 2px solid var(--bg-surface);
+    z-index: 5;
 }
 .ovn-avatar.offline::after { background: var(--text-muted); }
 

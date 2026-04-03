@@ -1,5 +1,5 @@
 {
-    "version": "3.4.0",
+    "version": "3.5.0",
     "releaseDate": "2026-04-02",
     "notes": "v2.5.0: Chat-Persistenz, Background-Fix, Tooltip-Fix.",
     "forceUpdate": true

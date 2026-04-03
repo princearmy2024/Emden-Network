@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.5.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -878,7 +878,7 @@ const App = {
             const statusClass = isOnline ? '' : 'offline';
             if (u.avatar) {
                 return `<div class="ovn-avatar ${statusClass}" style="background:none;overflow:visible;">
-                    <img src="${u.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;position:relative;z-index:1;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <img src="${u.avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
                     <span style="display:none;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#0088FF);align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;">${escHtml(initial)}</span>
                 </div>`;
             }
