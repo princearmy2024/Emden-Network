@@ -226,17 +226,23 @@ const WebSocketService = {
             // Eingehende Nachrichten — SIMPEL: Alles anzeigen
             this.socket.on('receive_message', (msg) => {
                 console.log('[Chat] RAW receive_message:', JSON.stringify(msg));
-                if (!window.App) { console.warn('[Chat] App nicht bereit'); return; }
 
-                // Immer anzeigen (auch eigene — Server sendet nur an ANDERE)
-                App._displayMessage(msg);
-                App._saveChatMessage(msg, 'general');
-                App.playBlip(900, 0.06);
-
-                // Notification wenn nicht auf Chat-Seite
-                if (App.currentView !== 'messages') {
-                    NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
-                }
+                // Warte bis App bereit ist (max 3s)
+                const tryDisplay = (retries) => {
+                    if (window.App && App._displayMessage) {
+                        App._displayMessage(msg);
+                        App._saveChatMessage(msg, 'general');
+                        App.playBlip(900, 0.06);
+                        if (App.currentView !== 'messages') {
+                            NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                        }
+                    } else if (retries > 0) {
+                        setTimeout(() => tryDisplay(retries - 1), 500);
+                    } else {
+                        console.warn('[Chat] App nach 3s immer noch nicht bereit');
+                    }
+                };
+                tryDisplay(6);
             });
 
             console.log('[Socket] receive_message Listener registriert');
