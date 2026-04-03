@@ -1,6 +1,6 @@
 {
-    "version": "4.11.0",
+    "version": "4.12.0",
     "releaseDate": "2026-04-04",
-    "notes": "v4.11.0: Roblox Card Redesign, PFP Fix, Session Backup.",
+    "notes": "v4.12.0: Overlay Button weg, PFP Fix, 404 Spam Fix, Bio-Code Button.",
     "forceUpdate": true
 }

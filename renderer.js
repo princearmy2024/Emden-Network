@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.11.0'; // Stand: 04.04.2026 (Roblox Card Redesign, PFP Fix)
+let CURRENT_VERSION = '4.12.0'; // Stand: 04.04.2026 (Overlay weg, PFP Fix, 404 Fix)
 
 // =============================================================
 // CONFIG — Bot-API
