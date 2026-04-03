@@ -912,17 +912,19 @@
 
                                 <!-- STATE: Nicht verbunden -->
                                 <div id="rblxStateDisconnected">
-                                    <div class="rblx-connect-card">
-                                        <div class="rblx-connect-icon">
-                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5.013 10.307 10.307 5.013 18.987 13.693 13.693 18.987z"/><path d="M2.196 8.085 8.085 2.196 10.282 4.393 4.393 10.282z" opacity=".5"/><path d="M13.718 19.607 19.607 13.718 21.804 15.915 15.915 21.804z" opacity=".5"/></svg>
+                                    <div class="rblx-connect-card" style="flex-direction:column;align-items:stretch;">
+                                        <div style="display:flex;align-items:center;gap:16px;">
+                                            <div class="rblx-connect-icon">
+                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5.013 10.307 10.307 5.013 18.987 13.693 13.693 18.987z"/><path d="M2.196 8.085 8.085 2.196 10.282 4.393 4.393 10.282z" opacity=".5"/><path d="M13.718 19.607 19.607 13.718 21.804 15.915 15.915 21.804z" opacity=".5"/></svg>
+                                            </div>
+                                            <div class="rblx-connect-text">
+                                                <div class="rblx-connect-title">Roblox verbinden</div>
+                                                <div class="rblx-connect-sub">Verknüpfe deinen Roblox-Account mit dem Dashboard</div>
+                                            </div>
                                         </div>
-                                        <div class="rblx-connect-text">
-                                            <div class="rblx-connect-title">Roblox verbinden</div>
-                                            <div class="rblx-connect-sub">Verknüpfe deinen Roblox-Account mit dem Dashboard</div>
-                                        </div>
-                                        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-                                            <button class="btn btn-primary" style="width:auto;padding:9px 20px;white-space:nowrap;" onclick="App.startRobloxVerify()">Verknüpfen</button>
-                                            <button class="btn" style="width:auto;padding:6px 16px;white-space:nowrap;font-size:11px;color:var(--text-muted);border:1px solid var(--border);" onclick="App.startBioVerify()">Manuell (Bio-Code)</button>
+                                        <div style="display:flex;gap:10px;margin-top:12px;">
+                                            <button class="btn btn-primary" style="flex:1;padding:10px 20px;" onclick="App.startRobloxVerify()">Mit Roblox verbinden</button>
+                                            <button class="btn" style="flex:1;padding:10px 16px;font-size:12px;color:var(--text-sub);border:1px solid var(--border);border-radius:var(--radius-sm);" onclick="App.startBioVerify()">Manuell (Bio-Code)</button>
                                         </div>
                                     </div>
                                 </div>
