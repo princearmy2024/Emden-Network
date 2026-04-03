@@ -529,7 +529,7 @@ function escHtml(str) { return String(str).replace(/[&<>"']/g, c => ({ '&': '&am
 // =============================================================
 // MAIN APP CONTROLLER
 // =============================================================
-const App = {
+const App = window.App = {
     currentView: 'overview',
     currentChat: 'general', // IMMER general — kein PN
     messages: [], // Zentraler Speicher für Filterung
