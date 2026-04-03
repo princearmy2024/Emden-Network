@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '3.7.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '3.8.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -224,33 +224,22 @@ const WebSocketService = {
                 if (window.App) App.renderFullUserList(users);
             });
 
-            // Eingehende Nachrichten von anderen Usern
+            // Eingehende Nachrichten — SIMPEL: Alles anzeigen
             this.socket.on('receive_message', (msg) => {
                 if (!window.App) return;
                 const me = AuthService.getUser();
-                if (msg.username === me?.username) return; // Eigene ignorieren
+                if (msg.username === me?.username) return;
 
                 console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);
 
-                // Immer anzeigen wenn im richtigen Chat
-                const currentChat = App.currentChat || 'general';
-                const msgChannel = msg.to || 'general';
-                const isCurrentChat = (msgChannel === currentChat) ||
-                    (msgChannel === '@' + me?.username && currentChat === '@' + msg.username) ||
-                    (msgChannel.startsWith('@') && '@' + msg.username === currentChat);
+                // Immer anzeigen + speichern + Sound
+                App._displayMessage(msg);
+                App._saveChatMessage(msg, 'general');
+                App.playBlip(900, 0.06);
 
-                if (isCurrentChat) {
-                    App._displayMessage(msg);
-                }
-
-                // Immer speichern
-                const saveKey = msgChannel === '@' + me?.username ? '@' + msg.username : msgChannel;
-                App._saveChatMessage(msg, saveKey);
-
-                // Notification wenn nicht im Chat
-                if (!isCurrentChat) {
+                // Notification wenn nicht auf Chat-Seite
+                if (App.currentView !== 'messages') {
                     NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
-                    App.playBlip(900, 0.06);
                 }
             });
 
@@ -1820,7 +1809,6 @@ const App = {
         const text = input.value.trim();
         input.value = '';
         const user = AuthService.getUser();
-        const channel = this.currentChat || 'general';
 
         const msgData = {
             id: Date.now(),
@@ -1829,21 +1817,21 @@ const App = {
             avatar: user?.avatar || '',
             text: text,
             message: text,
-            to: channel,
+            to: 'general',
             timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
         };
 
-        // An Server senden (send_message = was der Server erwartet!)
+        // An Server senden
         if (WebSocketService.socket?.connected) {
             WebSocketService.socket.emit('send_message', msgData);
+            console.log('[Chat] Gesendet via Socket:', text);
+        } else {
+            console.warn('[Chat] Socket nicht verbunden!');
         }
 
         // Lokal anzeigen + speichern
-        console.log('[Chat] Sende:', msgData);
         this._displayMessage(msgData);
-        this._saveChatMessage(msgData, channel);
-
-        // Input refokussieren
+        this._saveChatMessage(msgData, 'general');
         input.focus();
     },
 
