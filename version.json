@@ -1,6 +1,6 @@
 {
-    "version": "4.10.1",
+    "version": "4.11.0",
     "releaseDate": "2026-04-04",
-    "notes": "v4.10.0: Chat-History bleibt bei Updates, Strg+V Paste, Roblox Badge Sidebar.",
+    "notes": "v4.11.0: Roblox Card Redesign, PFP Fix, Session Backup.",
     "forceUpdate": true
 }

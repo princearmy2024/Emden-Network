@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.10.1'; // Stand: 04.04.2026 (Bio-Code Button, Layout Fix)
+let CURRENT_VERSION = '4.11.0'; // Stand: 04.04.2026 (Roblox Card Redesign, PFP Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -2032,7 +2032,8 @@ const App = window.App = {
             Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
                 backup[k] = localStorage.getItem(k);
             });
-            // Auch User-Registry und Roblox-Profil sichern
+            // Auch Session, User-Registry und Roblox-Profil sichern
+            backup['en_session'] = localStorage.getItem('en_session');
             backup['en_members'] = localStorage.getItem('en_members');
             backup['rblx_profile'] = localStorage.getItem('rblx_profile');
             backup['gif_favorites'] = localStorage.getItem('gif_favorites');
