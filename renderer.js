@@ -832,47 +832,29 @@ const App = {
     },
 
     renderFullUserList(onlineUsers) {
-        // Konsolen-Log für den Detektiv in dir (zum Debuggen)
-        console.log('[Presence] Online Users vom Server:', onlineUsers);
+        console.log('[Presence] Users vom Server:', onlineUsers);
 
-        const registry = UserRegistry.get();
+        // 1. Neue Registry nur aus Server-Daten bauen (kein Merge mit alten)
+        const registry = {};
+        const onlineIds = new Set();
 
-        // 1. Online-User in die Registry aufnehmen — NUR mit discordId als Key
         onlineUsers.forEach(u => {
             const id = u.discordId;
             if (!id) return;
+            // Nur einmal pro discordId (erstes Vorkommen gewinnt)
+            if (registry[id]) return;
             registry[id] = { ...u, discordId: id, lastSeen: Date.now() };
+            if (u.online === true) onlineIds.add(id);
         });
 
-        // 2. Duplikate entfernen — User mit username als Key löschen wenn discordId existiert
-        const usernames = new Set();
-        Object.entries(registry).forEach(([key, u]) => {
-            if (u.discordId && key === u.discordId) {
-                usernames.add(u.username);
-            }
-        });
-        Object.entries(registry).forEach(([key, u]) => {
-            if (key !== u.discordId && usernames.has(u.username)) {
-                delete registry[key];
-            }
-        });
-
-        // 3. Online-IDs sammeln (nutze online Flag vom Server wenn vorhanden)
-        const onlineIds = new Set();
-        onlineUsers.forEach(u => {
-            if (u.online === true || u.online === undefined) {
-                onlineIds.add(u.discordId || u.id || u.username);
-            }
-        });
-
-        // 4. Registry speichern
+        // 2. Registry speichern
         UserRegistry.save(registry);
 
-        // 5. ALLE bekannten User anzeigen (online + offline)
+        // 3. Alle User anzeigen
         const allMembers = Object.values(registry);
 
         // Zähler nur für ECHTE online Leute
-        const onlineCount = onlineUsers.length;
+        const onlineCount = onlineIds.size;
         const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
         setEl('statDashboardUsers', onlineCount);
         setEl('dashboardOnlineCount', onlineCount);
