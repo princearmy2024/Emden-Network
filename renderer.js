@@ -226,13 +226,10 @@ const WebSocketService = {
 
             // Eingehende Nachrichten — SIMPEL: Alles anzeigen
             this.socket.on('receive_message', (msg) => {
-                if (!window.App) return;
-                const me = AuthService.getUser();
-                if (msg.username === me?.username) return;
+                console.log('[Chat] RAW receive_message:', JSON.stringify(msg));
+                if (!window.App) { console.warn('[Chat] App nicht bereit'); return; }
 
-                console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);
-
-                // Immer anzeigen + speichern + Sound
+                // Immer anzeigen (auch eigene — Server sendet nur an ANDERE)
                 App._displayMessage(msg);
                 App._saveChatMessage(msg, 'general');
                 App.playBlip(900, 0.06);
@@ -242,6 +239,8 @@ const WebSocketService = {
                     NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
                 }
             });
+
+            console.log('[Socket] receive_message Listener registriert');
 
             // Alle 20s nochmal melden
             if (this._announceInterval) clearInterval(this._announceInterval);
