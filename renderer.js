@@ -971,7 +971,10 @@ const App = window.App = {
                 <div class="ovn-info">
                     ${avatarEl(u, isOnline)}
                     <div style="display:flex;flex-direction:column;min-width:0;">
-                        <span class="ovn-name">${escHtml(u.username)}</span>
+                        <div style="display:flex;align-items:center;gap:3px;">
+                            <span class="ovn-name">${escHtml(u.username)}</span>
+                            ${App._getRobloxBadge(u.discordId, false)}
+                        </div>
                     </div>
                 </div>
                 ${badgeEl(u)}
@@ -2714,6 +2717,44 @@ const App = window.App = {
 // =============================================================
 // UI SOUNDS — Hover + Click auf interaktive Elemente
 // =============================================================
+// =============================================================
+// STRG+V PASTE — Bilder aus Zwischenablage einfügen
+// =============================================================
+document.addEventListener('paste', (e) => {
+    if (document.activeElement?.id !== 'chatInput') return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (!file) return;
+            if (file.size > 10 * 1024 * 1024) {
+                NotificationService.show('Zu groß', 'Max. 10 MB!', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const scale = Math.min(1, 600 / img.width);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const compressed = canvas.toDataURL('image/jpeg', 0.75);
+                    const input = document.getElementById('chatInput');
+                    if (input) input.value = compressed;
+                    App.sendMessage();
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+    }
+});
+
 // Hover-Sound deaktiviert
 document.addEventListener('click', (e) => {
     const target = e.target.closest('button, .ovn-node, .fwd-user-item, .ctx-item, .gif-tab');
