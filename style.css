@@ -80,11 +80,8 @@ svg { display: block; flex-shrink: 0; }
 .sidebar-logo .en-logo-img { height: 28px; width: auto; }
 
 /* ── Screen System ────────────────────────────────────────── */
-.screen { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 10; background: var(--bg-base); }
-.screen.active { opacity: 1; pointer-events: all; z-index: 10; }
-#splashScreen { z-index: 30; }
-#loginScreen { z-index: 20; }
-#dashboardScreen { z-index: 10; }
+.screen { position: absolute; inset: 0; display: none; background: var(--bg-base); }
+.screen.active { display: block; opacity: 1; pointer-events: all; }
 .hidden { display: none !important; }
 
 /* ============================================================
