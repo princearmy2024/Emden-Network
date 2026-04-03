@@ -272,6 +272,7 @@ const WebSocketService = {
 
             // Message Status (Read Receipts)
             this.socket.on('msg_status', ({ id, status }) => {
+                // DOM updaten
                 const msgEl = document.getElementById('msg-' + id);
                 const check = msgEl?.querySelector('.msg-check');
                 if (check) {
@@ -279,6 +280,14 @@ const WebSocketService = {
                     else if (status === 'delivered') { check.innerHTML = '✓✓'; check.style.color = 'var(--text-muted)'; }
                     else { check.innerHTML = '✓'; check.style.color = 'var(--text-muted)'; }
                 }
+                // localStorage updaten
+                try {
+                    Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
+                        const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                        const msg = msgs.find(m => m.id === id);
+                        if (msg) { msg.status = status; localStorage.setItem(k, JSON.stringify(msgs)); }
+                    });
+                } catch(e) {}
             });
 
             console.log('[Socket] Chat-Listener registriert');
@@ -1841,6 +1850,8 @@ const App = window.App = {
                 text: data.text || data.message || '',
                 message: data.text || data.message || '',
                 to: data.to || channel,
+                status: data.status || 'sent',
+                replyTo: data.replyTo || null,
                 timestamp: data.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
             });
             while (msgs.length > 20) msgs.shift();
@@ -1923,7 +1934,10 @@ const App = window.App = {
 
         const bgColor = isOwn ? 'var(--brand-blue)' : (this.getStringColor?.(data.username) || '#0088FF');
 
-        const checkmark = isOwn ? `<span class="msg-check" style="color:var(--text-muted)">✓</span>` : '';
+        const st = data.status || 'sent';
+        const checkColor = st === 'read' ? '#3b82f6' : 'var(--text-muted)';
+        const checkText = (st === 'read' || st === 'delivered') ? '✓✓' : '✓';
+        const checkmark = isOwn ? `<span class="msg-check" style="color:${checkColor}">${checkText}</span>` : '';
         const replyRef = data.replyTo ? `<div class="msg-reply-ref" onclick="document.getElementById('msg-${data.replyTo.id}')?.scrollIntoView({behavior:'smooth'})"><span class="reply-user">${escHtml(data.replyTo.username)}</span><span class="reply-text">${escHtml((data.replyTo.text || '').substring(0, 60))}</span></div>` : '';
         const replyBtn = `<button class="msg-reply-btn" onclick="App.setReply('${data.id}','${escHtml(data.username || '')}','${escHtml((text || '').substring(0, 80).replace(/'/g, ''))}')" title="Antworten">↩</button>`;
 
