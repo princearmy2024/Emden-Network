@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.6.0'; // Stand: 03.04.2026 (Glass GIF, Upload, Sidebar, BG Fix)
+let CURRENT_VERSION = '4.6.1'; // Stand: 03.04.2026 (Upload Fix, Overflow Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -2041,6 +2041,10 @@ const App = window.App = {
     // Prüft ob Text eine Bild/GIF URL ist
     _renderMessageContent(text) {
         const escaped = escHtml(text);
+        // Data-URLs (hochgeladene Bilder) → als Bild rendern
+        if (text.startsWith('data:image/')) {
+            return `<img src="${text}" class="chat-embed-img" alt="Bild">`;
+        }
         // URLs die auf .gif/.png/.jpg/.jpeg/.webp enden → als Bild rendern
         const imgMatch = text.match(/^(https?:\/\/\S+\.(?:gif|png|jpe?g|webp))$/i);
         if (imgMatch) {
@@ -2335,10 +2339,10 @@ const App = window.App = {
 
     // ── Datei/Bild Upload (max 10MB) ──
     attachFile() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*,.gif,.png,.jpg,.jpeg,.webp';
-        input.onchange = (e) => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*,.gif,.png,.jpg,.jpeg,.webp';
+        fileInput.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
             if (file.size > 10 * 1024 * 1024) {
@@ -2347,13 +2351,25 @@ const App = window.App = {
             }
             const reader = new FileReader();
             reader.onload = () => {
-                const chatInput = document.getElementById('chatInput');
-                if (chatInput) chatInput.value = reader.result;
-                this.sendMessage();
+                // Bild komprimieren auf max 600px Breite
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 600;
+                    const scale = Math.min(1, maxW / img.width);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const compressed = canvas.toDataURL('image/jpeg', 0.75);
+                    const chatInput = document.getElementById('chatInput');
+                    if (chatInput) chatInput.value = compressed;
+                    this.sendMessage();
+                };
+                img.src = reader.result;
             };
             reader.readAsDataURL(file);
         };
-        input.click();
+        fileInput.click();
     },
 
     // ── Rechtsklick Kontextmenü für Bilder ──
