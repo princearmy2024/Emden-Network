@@ -219,38 +219,38 @@ const WebSocketService = {
                 console.log('[Socket] Getrennt.');
             });
             
+            // Live Online-User Updates
+            this.socket.on('online_users', (users) => {
+                if (window.App) App.renderFullUserList(users);
+            });
+
             // Eingehende Nachrichten von anderen Usern
             this.socket.on('receive_message', (msg) => {
                 if (!window.App) return;
                 const me = AuthService.getUser();
-                const channel = msg.to || 'general';
+                if (msg.username === me?.username) return; // Eigene ignorieren
 
-                // Prüfen ob die Nachricht für mich relevant ist
-                let isForMe = false;
-                if (channel.startsWith('@')) {
-                    // PN: nur anzeigen wenn an mich oder von mir
-                    isForMe = channel === '@' + me?.username || msg.username === me?.username;
-                } else {
-                    // Channel-Nachricht: immer relevant
-                    isForMe = true;
+                console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);
+
+                // Immer anzeigen wenn im richtigen Chat
+                const currentChat = App.currentChat || 'general';
+                const msgChannel = msg.to || 'general';
+                const isCurrentChat = (msgChannel === currentChat) ||
+                    (msgChannel === '@' + me?.username && currentChat === '@' + msg.username) ||
+                    (msgChannel.startsWith('@') && '@' + msg.username === currentChat);
+
+                if (isCurrentChat) {
+                    App._displayMessage(msg);
                 }
 
-                if (isForMe) {
-                    // Nur anzeigen wenn der aktuelle Chat passt
-                    const currentChat = App.currentChat || 'general';
-                    const shouldDisplay = (channel === currentChat) ||
-                        (channel.startsWith('@') && channel === '@' + me?.username && currentChat === '@' + msg.username);
+                // Immer speichern
+                const saveKey = msgChannel === '@' + me?.username ? '@' + msg.username : msgChannel;
+                App._saveChatMessage(msg, saveKey);
 
-                    if (shouldDisplay) {
-                        App._displayMessage(msg);
-                    }
-                    App._saveChatMessage(msg, channel);
-
-                    // Notification wenn nicht im richtigen Chat
-                    if (!shouldDisplay && msg.username !== me?.username) {
-                        NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
-                        App.playBlip(900, 0.06);
-                    }
+                // Notification wenn nicht im Chat
+                if (!isCurrentChat) {
+                    NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                    App.playBlip(900, 0.06);
                 }
             });
 
