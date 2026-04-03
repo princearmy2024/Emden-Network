@@ -950,7 +950,7 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 }
 .gif-search-input:focus { border-color: var(--border-active); outline: none; }
 .gif-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+    column-count: 2; column-gap: 6px;
     padding: 8px; overflow-y: auto; flex: 1; min-height: 0;
 }
 .gif-grid::-webkit-scrollbar { width: 4px; }
@@ -959,14 +959,12 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
     position: relative; border-radius: var(--radius-sm); overflow: hidden;
     cursor: pointer; transition: border-color 0.2s, transform 0.2s;
     background: var(--bg-surface); border: 1px solid var(--border);
-    height: 0; padding-bottom: 75%; /* 4:3 ratio forced */
+    margin-bottom: 6px; break-inside: avoid;
 }
 .gif-item-wrapper:hover { border-color: var(--border-blue); transform: translateY(-1px); }
 .gif-item-wrapper:hover .gif-fav-btn { opacity: 1; }
 .gif-item {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%; object-fit: cover;
-    display: block;
+    width: 100%; display: block;
 }
 .gif-fav-btn {
     position: absolute; top: 4px; right: 4px;
@@ -978,7 +976,7 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 }
 .gif-fav-btn:hover { color: #ffd700; background: rgba(0,0,0,0.7); }
 .gif-fav-btn.faved { color: #ffd700; opacity: 1; }
-.gif-loading { grid-column: 1/-1; text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
+.gif-loading { column-span: all; text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
 .gif-emoji-grid {
     display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
     padding: 8px; overflow-y: auto; flex: 1; min-height: 0;
