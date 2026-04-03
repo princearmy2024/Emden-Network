@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '4.5.0'; // Stand: 03.04.2026 (GIF-Picker, Typing Indicator, Reactions Fix, Chat Design)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -260,14 +260,31 @@ const WebSocketService = {
 
             // Typing Indicator
             this.socket.on('typing_indicator', ({ username, typing }) => {
+                // Chat-area indicator
                 const el = document.getElementById('typingIndicator');
-                if (!el) return;
-                if (typing) {
-                    el.textContent = `${username} tippt...`;
-                    el.style.display = 'block';
-                } else {
-                    el.style.display = 'none';
+                if (el) {
+                    if (typing) {
+                        el.textContent = `${username} tippt...`;
+                        el.style.display = 'block';
+                    } else {
+                        el.style.display = 'none';
+                    }
                 }
+                // Sidebar typing state
+                if (!window._typingUsers) window._typingUsers = new Map();
+                if (typing) {
+                    window._typingUsers.set(username, Date.now());
+                    // Auto-clear after 4s
+                    setTimeout(() => {
+                        if (window._typingUsers.get(username) <= Date.now() - 3500) {
+                            window._typingUsers.delete(username);
+                            App._updateSidebarTyping();
+                        }
+                    }, 4000);
+                } else {
+                    window._typingUsers.delete(username);
+                }
+                App._updateSidebarTyping();
             });
 
             // Message Status (Read Receipts)
@@ -939,7 +956,9 @@ const App = window.App = {
                  onclick="App.selectChat('@${u.username}')">
                 <div class="ovn-info">
                     ${avatarEl(u, isOnline)}
-                    <span class="ovn-name">${escHtml(u.username)}</span>
+                    <div style="display:flex;flex-direction:column;min-width:0;">
+                        <span class="ovn-name">${escHtml(u.username)}</span>
+                    </div>
                 </div>
                 ${badgeEl(u)}
                 
@@ -958,6 +977,29 @@ const App = window.App = {
 
         const chatList = document.getElementById('chatOnlineUsersList');
         if (chatList) chatList.innerHTML = html;
+    },
+
+    // --- SIDEBAR TYPING INDICATOR ---
+    _updateSidebarTyping() {
+        const typingUsers = window._typingUsers || new Map();
+        document.querySelectorAll('.ovn-node').forEach(node => {
+            const nameEl = node.querySelector('.ovn-name');
+            if (!nameEl) return;
+            const username = nameEl.textContent.trim();
+            const nameContainer = nameEl.parentElement;
+            let typingEl = nameContainer.querySelector('.ovn-typing');
+
+            if (typingUsers.has(username)) {
+                if (!typingEl) {
+                    typingEl = document.createElement('span');
+                    typingEl.className = 'ovn-typing';
+                    typingEl.textContent = 'tippt...';
+                    nameContainer.appendChild(typingEl);
+                }
+            } else if (typingEl) {
+                typingEl.remove();
+            }
+        });
     },
 
     // --- CONNECTION STATUS ---
@@ -1022,6 +1064,26 @@ const App = window.App = {
 
         const headSub = document.getElementById('chatHeaderOnlineText');
         if (headSub) headSub.textContent = name.startsWith('@') ? 'Privatchat' : 'Gruppenchat';
+
+        // PFP im Header bei DMs
+        const headerAvatar = document.getElementById('chatHeaderAvatar');
+        if (headerAvatar) {
+            if (name.startsWith('@')) {
+                const targetName = name.substring(1);
+                const registry = UserRegistry.get();
+                const targetUser = Object.values(registry).find(u => u.username === targetName);
+                const avatarUrl = targetUser?.avatar || '';
+                const initial = (targetName || '?')[0].toUpperCase();
+                if (avatarUrl) {
+                    headerAvatar.innerHTML = `<img src="${escHtml(avatarUrl)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.textContent='${initial}'">`;
+                } else {
+                    headerAvatar.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:15px;font-weight:700;color:#fff;">${initial}</span>`;
+                }
+                headerAvatar.style.display = 'flex';
+            } else {
+                headerAvatar.style.display = 'none';
+            }
+        }
 
         // Aktiven User in der Liste highlighten
         document.querySelectorAll('.ovn-node').forEach(node => {
@@ -1853,6 +1915,7 @@ const App = window.App = {
                 status: data.status || 'sent',
                 replyTo: data.replyTo || null,
                 timestamp: data.timestamp || new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+                reactions: data.reactions || {},
             });
             while (msgs.length > 20) msgs.shift();
             localStorage.setItem(key, JSON.stringify(msgs));
@@ -2066,10 +2129,7 @@ const App = window.App = {
             badge.className = 'reaction-badge';
             badge.dataset.emoji = emoji;
             badge.innerHTML = `${emoji}<span class="rc-count">1</span>`;
-            badge.onclick = () => {
-                const c = badge.querySelector('.rc-count');
-                c.textContent = parseInt(c.textContent) + 1;
-            };
+            badge.onclick = () => App.addReaction(msgId, emoji);
             container.appendChild(badge);
         }
 
@@ -2107,6 +2167,7 @@ const App = window.App = {
 
     // ── GIF Picker (Tenor API) ────────────────────────────────
     _gifSearchTimer: null,
+    _gifCurrentTab: 'gifs',
 
     toggleGifPicker() {
         const panel = document.getElementById('gifPickerPanel');
@@ -2114,52 +2175,148 @@ const App = window.App = {
         panel.classList.toggle('hidden');
         if (!panel.classList.contains('hidden')) {
             document.getElementById('gifSearchInput')?.focus();
-            // Trending GIFs laden
-            this._fetchGifs('trending');
+            this.switchGifTab('gifs');
+        }
+    },
+
+    switchGifTab(tab) {
+        this._gifCurrentTab = tab;
+        document.querySelectorAll('.gif-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        const searchInput = document.getElementById('gifSearchInput');
+        const grid = document.getElementById('gifGrid');
+        if (!grid) return;
+
+        if (tab === 'emojis') {
+            if (searchInput) searchInput.placeholder = 'Emoji suchen...';
+            this._renderEmojiGrid(searchInput?.value || '');
+        } else if (tab === 'favs') {
+            if (searchInput) searchInput.placeholder = 'Favoriten durchsuchen...';
+            this._renderFavorites();
+        } else if (tab === 'sticker') {
+            if (searchInput) searchInput.placeholder = 'Sticker suchen...';
+            searchInput.value = '';
+            this._fetchGifs('trending', 'sticker');
+        } else {
+            if (searchInput) searchInput.placeholder = 'GIFs suchen...';
+            searchInput.value = '';
+            this._fetchGifs('trending', 'gif');
         }
     },
 
     searchGifs(query) {
         clearTimeout(this._gifSearchTimer);
-        if (!query || query.length < 2) {
-            document.getElementById('gifGrid').innerHTML = '<div class="gif-loading">Suchbegriff eingeben...</div>';
+        const tab = this._gifCurrentTab;
+
+        if (tab === 'emojis') {
+            this._renderEmojiGrid(query);
             return;
         }
-        this._gifSearchTimer = setTimeout(() => this._fetchGifs(query), 400);
+        if (tab === 'favs') {
+            this._renderFavorites(query);
+            return;
+        }
+
+        if (!query || query.length < 2) {
+            this._fetchGifs('trending', tab === 'sticker' ? 'sticker' : 'gif');
+            return;
+        }
+        this._gifSearchTimer = setTimeout(() => this._fetchGifs(query, tab === 'sticker' ? 'sticker' : 'gif'), 400);
     },
 
-    async _fetchGifs(query) {
+    async _fetchGifs(query, type = 'gif') {
         const grid = document.getElementById('gifGrid');
         if (!grid) return;
+        grid.className = 'gif-grid';
         grid.innerHTML = '<div class="gif-loading">Laden...</div>';
 
         try {
-            // Via IPC durch Main-Prozess (umgeht CSP)
             const data = window.electronAPI
-                ? await window.electronAPI.searchTenorGifs(query)
+                ? await window.electronAPI.searchTenorGifs(query === 'trending' ? '' : query)
                 : { results: [] };
 
             if (!data.results || data.results.length === 0) {
-                grid.innerHTML = '<div class="gif-loading">Keine GIFs gefunden</div>';
+                grid.innerHTML = '<div class="gif-loading">Keine Ergebnisse gefunden</div>';
                 return;
             }
 
+            const favs = this._getGifFavorites();
             grid.innerHTML = data.results.map(gif => {
-                const url = gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url || '';
-                return `<img src="${url}" class="gif-item" onclick="App.sendGif('${url.replace(/'/g, '')}')" alt="GIF" loading="lazy">`;
+                const preview = gif.media_formats?.tinygif?.url || gif.media_formats?.nanogif?.url || '';
+                const full = gif.media_formats?.gif?.url || preview;
+                if (!preview) return '';
+                const isFav = favs.includes(full);
+                return `<div class="gif-item-wrapper" onclick="App.sendGif('${full.replace(/'/g, '')}')">
+                    <img src="${preview}" class="gif-item" alt="GIF" loading="lazy">
+                    <button class="gif-fav-btn ${isFav ? 'faved' : ''}" onclick="event.stopPropagation();App.toggleGifFav('${full.replace(/'/g, '')}','${preview.replace(/'/g, '')}',this)" title="Favorit">★</button>
+                </div>`;
             }).join('');
         } catch (e) {
             grid.innerHTML = '<div class="gif-loading">Fehler beim Laden</div>';
         }
     },
 
+    // ── GIF Favoriten (localStorage) ──
+    _getGifFavorites() {
+        try { return JSON.parse(localStorage.getItem('gif_favorites') || '[]'); } catch { return []; }
+    },
+
+    toggleGifFav(fullUrl, previewUrl, btn) {
+        let favs = this._getGifFavorites();
+        const idx = favs.indexOf(fullUrl);
+        if (idx > -1) {
+            favs.splice(idx, 1);
+            btn?.classList.remove('faved');
+        } else {
+            favs.unshift(fullUrl);
+            btn?.classList.add('faved');
+        }
+        localStorage.setItem('gif_favorites', JSON.stringify(favs));
+    },
+
+    _renderFavorites(filter) {
+        const grid = document.getElementById('gifGrid');
+        if (!grid) return;
+        grid.className = 'gif-grid';
+        let favs = this._getGifFavorites();
+        if (filter) favs = favs.filter(u => u.toLowerCase().includes(filter.toLowerCase()));
+        if (favs.length === 0) {
+            grid.innerHTML = '<div class="gif-loading">Keine Favoriten gespeichert.<br>Klicke ★ auf einem GIF!</div>';
+            return;
+        }
+        grid.innerHTML = favs.map(url => `<div class="gif-item-wrapper" onclick="App.sendGif('${url.replace(/'/g, '')}')">
+            <img src="${url}" class="gif-item" alt="Favorit" loading="lazy">
+            <button class="gif-fav-btn faved" onclick="event.stopPropagation();App.toggleGifFav('${url.replace(/'/g, '')}','',this);App._renderFavorites()" title="Entfernen">★</button>
+        </div>`).join('');
+    },
+
+    // ── Emoji Tab ──
+    _renderEmojiGrid(filter) {
+        const grid = document.getElementById('gifGrid');
+        if (!grid) return;
+        grid.className = 'gif-emoji-grid';
+        const allEmojis = ['😀','😂','🤣','😍','🥰','😘','😜','🤪','😎','🤩','🥳','😏','😒','😤','😡','🤬','😱','😨','😰','🥺','😢','😭','😤','🤮','🤢','💀','☠️','👻','👽','🤖','💩','😺','😸','😹','😻','👍','👎','✊','🤛','🤜','🤝','🙏','💪','🦾','🖕','✌️','🤞','🤟','🤘','👌','🤌','👈','👉','👆','👇','☝️','👋','🤚','🖐️','✋','🖖','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💝','💘','🔥','⭐','🌟','✨','💫','🎉','🎊','🎈','🎁','🏆','🥇','🥈','🥉','⚽','🏀','🏈','⚾','🎾','🎮','🕹️','🎯','🎲','🧩','🎭','🎬','🎤','🎧','🎵','🎶','💯','✅','❌','⚠️','🚀','💎','🔔','📌','💡','🔑','🛡️','⚡','☀️','🌙','⛅','🌈','☔'];
+        let emojis = allEmojis;
+        if (filter && filter.length > 0) {
+            // Simple keyword matching
+            emojis = allEmojis; // Emojis have no text name, just show all
+        }
+        grid.innerHTML = emojis.map(e => `<button class="gif-emoji-item" onclick="App.sendEmoji('${e}')">${e}</button>`).join('');
+    },
+
+    sendEmoji(emoji) {
+        if (!emoji) return;
+        const input = document.getElementById('chatInput');
+        if (input) {
+            input.value += emoji;
+            input.focus();
+        }
+    },
+
     sendGif(url) {
         if (!url) return;
-        // GIF als Nachricht senden
         const input = document.getElementById('chatInput');
         if (input) input.value = url;
         this.sendMessage();
-        // Picker schließen
         document.getElementById('gifPickerPanel')?.classList.add('hidden');
     },
 

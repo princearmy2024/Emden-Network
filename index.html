@@ -467,20 +467,29 @@
                             </div>
                         </div>
                         <div class="chat-window">
-                            <div class="chat-header" style="border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; flex-direction: column; justify-content: center;">
-                                <span class="chat-header-name" id="activeChatName" style="font-weight: 600; font-size: 16px;">#general</span>
-                                <span class="chat-header-sub" id="chatHeaderOnlineText" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">0 online</span>
+                            <div class="chat-header" style="border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px;">
+                                <div class="chat-header-avatar" id="chatHeaderAvatar" style="display:none; width:36px; height:36px; border-radius:50%; background:var(--brand-blue); overflow:hidden; flex-shrink:0;"></div>
+                                <div style="display:flex; flex-direction:column; justify-content:center; min-width:0;">
+                                    <span class="chat-header-name" id="activeChatName" style="font-weight: 600; font-size: 15px;">#general</span>
+                                    <span class="chat-header-sub" id="chatHeaderOnlineText" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">0 online</span>
+                                </div>
                             </div>
                             <div class="chat-messages" id="chatMessages">
                                 <!-- Nachrichten werden dynamisch geladen -->
                             </div>
                             <!-- GIF Picker Panel -->
                             <div class="gif-picker-panel hidden" id="gifPickerPanel">
+                                <div class="gif-picker-tabs">
+                                    <button class="gif-tab active" data-tab="gifs" onclick="App.switchGifTab('gifs')">GIFs</button>
+                                    <button class="gif-tab" data-tab="sticker" onclick="App.switchGifTab('sticker')">Sticker</button>
+                                    <button class="gif-tab" data-tab="emojis" onclick="App.switchGifTab('emojis')">Emojis</button>
+                                    <button class="gif-tab" data-tab="favs" onclick="App.switchGifTab('favs')">⭐</button>
+                                </div>
                                 <div class="gif-picker-header">
                                     <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="GIFs suchen..." oninput="App.searchGifs(this.value)">
                                 </div>
                                 <div class="gif-grid" id="gifGrid">
-                                    <div class="gif-loading">Suchbegriff eingeben...</div>
+                                    <div class="gif-loading">Trending GIFs laden...</div>
                                 </div>
                             </div>
                             <div class="typing-indicator" id="typingIndicator" style="display:none;padding:4px 20px;font-size:11px;color:var(--text-muted);font-style:italic;"></div>

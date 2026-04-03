@@ -204,8 +204,8 @@ ipcMain.handle('search-tenor-gifs', async (event, query) => {
     return new Promise((resolve) => {
         const isTrending = !query || query === 'trending';
         const apiPath = isTrending
-            ? '/v2/featured?key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif'
-            : `/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=12&media_filter=tinygif`;
+            ? '/v2/featured?key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=24&media_filter=tinygif,gif'
+            : `/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=24&media_filter=tinygif,gif`;
 
         https.get({ hostname: 'tenor.googleapis.com', path: apiPath, headers: { 'User-Agent': 'EmdenNetwork' } }, (res) => {
             let data = '';

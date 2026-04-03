@@ -444,7 +444,7 @@ async function loadLiveUsers(){
   let users=['LOL_TV','KILLER_JOE','Lauchman','TURLL','Fish','xNova','Dimi','Ghost','Player99','GamerDE','ShadowX','Nachtfalke','IceWolf','BlueFox','DarkRaven','StormRider','CyberPunk','NeonBlade','PixelKing','AceGamer'];
   try{
     // Versuche über enrp.princearmy.de Proxy oder direkt
-    const r=await fetch('https://enrp.princearmy.de/api/status');
+    const r=await fetch('api.php?e=status');
     const d=await r.json();
     if(d.onlineDiscordUsers?.length)users=d.onlineDiscordUsers;
   }catch(e){
@@ -508,7 +508,7 @@ document.head.appendChild(tlStyle);
 async function loadTeam(){
   const grid=document.getElementById('teamGrid');
   try{
-    const r=await fetch('https://enrp.princearmy.de/api/team');
+    const r=await fetch('api.php?e=team');
     const d=await r.json();
     if(!d.success||!d.roles?.length)throw new Error('no data');
     grid.innerHTML=d.roles.map(role=>{
