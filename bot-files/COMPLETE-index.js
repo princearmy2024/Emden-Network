@@ -901,6 +901,11 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Message Delete
+    socket.on("msg_delete", ({ msgId }) => {
+        socket.broadcast.emit("msg_deleted", { msgId });
+    });
+
     // 🎙️ WALKIE-TALKIE VOICE SYSTEM
     socket.on("voice_channel_join", ({ channelId, username, discordId }) => {
         if (!channelId || !username) return;

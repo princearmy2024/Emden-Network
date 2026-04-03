@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.6.1'; // Stand: 03.04.2026 (Upload Fix, Overflow Fix)
+let CURRENT_VERSION = '4.7.0'; // Stand: 03.04.2026 (Forward Popup, Delete, Download Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -303,6 +303,20 @@ const WebSocketService = {
                         const msgs = JSON.parse(localStorage.getItem(k) || '[]');
                         const msg = msgs.find(m => m.id === id);
                         if (msg) { msg.status = status; localStorage.setItem(k, JSON.stringify(msgs)); }
+                    });
+                } catch(e) {}
+            });
+
+            // Message Delete (von anderen Clients)
+            this.socket.on('msg_deleted', ({ msgId }) => {
+                const el = document.getElementById(msgId);
+                if (el) el.remove();
+                const numId = parseInt(msgId.replace('msg-', ''));
+                try {
+                    Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
+                        const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                        const filtered = msgs.filter(m => m.id !== numId);
+                        if (filtered.length !== msgs.length) localStorage.setItem(k, JSON.stringify(filtered));
                     });
                 } catch(e) {}
             });
@@ -2372,25 +2386,124 @@ const App = window.App = {
         fileInput.click();
     },
 
-    // ── Rechtsklick Kontextmenü für Bilder ──
+    // ── Rechtsklick Kontextmenü ──
     _ctxTarget: null,
+    _ctxMsgId: null,
+    _ctxIsOwn: false,
+    _forwardSelected: [],
+    _forwardCooldown: false,
+
     ctxDownload() {
         if (!this._ctxTarget) return;
-        const a = document.createElement('a');
-        a.href = this._ctxTarget;
-        a.download = 'image_' + Date.now() + '.gif';
-        a.click();
         document.getElementById('ctxMenu')?.classList.add('hidden');
+        // Dateiformat erkennen
+        let ext = 'png';
+        const src = this._ctxTarget;
+        if (src.includes('.gif') || src.includes('image/gif')) ext = 'gif';
+        else if (src.includes('.jpg') || src.includes('.jpeg') || src.includes('image/jpeg')) ext = 'jpg';
+        else if (src.includes('.webp') || src.includes('image/webp')) ext = 'webp';
+        else if (src.includes('.png') || src.includes('image/png')) ext = 'png';
+        const a = document.createElement('a');
+        a.href = src;
+        a.download = 'image_' + Date.now() + '.' + ext;
+        a.click();
     },
+
     ctxForward() {
         if (!this._ctxTarget) return;
         document.getElementById('ctxMenu')?.classList.add('hidden');
-        // URL ins Input setzen — User wählt dann den Chat
-        const input = document.getElementById('chatInput');
-        if (input) {
-            input.value = this._ctxTarget;
-            input.focus();
-            NotificationService.show('Weiterleiten', 'Bild im Input — wähle einen Chat und sende!', 'info');
+        if (this._forwardCooldown) {
+            NotificationService.show('Cooldown', 'Du kannst nur alle 3 Minuten weiterleiten.', 'warn');
+            return;
+        }
+        // Forward Modal öffnen mit Userliste
+        this._forwardSelected = [];
+        const list = document.getElementById('forwardUserList');
+        const registry = UserRegistry.get();
+        const me = AuthService.getUser();
+        const users = Object.values(registry).filter(u => u.username !== me?.username);
+
+        list.innerHTML = users.map(u => {
+            const initial = (u.username || '?')[0].toUpperCase();
+            const avatarHtml = u.avatar
+                ? `<img src="${u.avatar}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                : '';
+            return `<div class="fwd-user-item" data-user="${escHtml(u.username)}" onclick="App._toggleForwardUser(this)">
+                <div class="fwd-user-avatar">${avatarHtml}<span style="${u.avatar ? 'display:none;' : ''}width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initial}</span></div>
+                <span class="fwd-user-name">${escHtml(u.username)}</span>
+                <div class="fwd-user-check">✓</div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('forwardModal')?.classList.remove('hidden');
+    },
+
+    _toggleForwardUser(el) {
+        const name = el.dataset.user;
+        if (el.classList.contains('selected')) {
+            el.classList.remove('selected');
+            this._forwardSelected = this._forwardSelected.filter(n => n !== name);
+        } else {
+            if (this._forwardSelected.length >= 3) {
+                NotificationService.show('Limit', 'Max. 3 User!', 'warn');
+                return;
+            }
+            el.classList.add('selected');
+            this._forwardSelected.push(name);
+        }
+    },
+
+    confirmForward() {
+        if (this._forwardSelected.length === 0) {
+            NotificationService.show('Fehler', 'Wähle mindestens 1 User!', 'warn');
+            return;
+        }
+        const content = this._ctxTarget;
+        const user = AuthService.getUser();
+        this._forwardSelected.forEach(targetName => {
+            const msgData = {
+                id: Date.now() + Math.random(),
+                username: user?.username || 'User',
+                userId: user?.discordId || '',
+                avatar: user?.avatar || '',
+                text: content,
+                message: content,
+                to: '@' + targetName,
+                timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+                status: 'sent',
+            };
+            if (WebSocketService.socket?.connected) {
+                WebSocketService.socket.emit('send_message', msgData);
+            }
+            this._saveChatMessage(msgData, '@' + targetName);
+        });
+        document.getElementById('forwardModal')?.classList.add('hidden');
+        NotificationService.show('Gesendet', `An ${this._forwardSelected.length} User weitergeleitet!`, 'success');
+        // 3 Minuten Cooldown
+        this._forwardCooldown = true;
+        setTimeout(() => { this._forwardCooldown = false; }, 3 * 60 * 1000);
+    },
+
+    // ── Eigene Nachricht löschen ──
+    ctxDeleteMsg() {
+        if (!this._ctxMsgId) return;
+        document.getElementById('ctxMenu')?.classList.add('hidden');
+        const msgEl = document.getElementById(this._ctxMsgId);
+        if (msgEl) msgEl.remove();
+        // Aus localStorage löschen
+        const numId = parseInt(this._ctxMsgId.replace('msg-', ''));
+        try {
+            Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
+                const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                const filtered = msgs.filter(m => m.id !== numId);
+                if (filtered.length !== msgs.length) {
+                    localStorage.setItem(k, JSON.stringify(filtered));
+                }
+            });
+        } catch(e) {}
+        // Server informieren
+        if (WebSocketService.socket?.connected) {
+            WebSocketService.socket.emit('msg_delete', { msgId: this._ctxMsgId });
         }
     },
 
@@ -2484,13 +2597,47 @@ const App = window.App = {
 // RECHTSKLICK KONTEXTMENÜ FÜR CHAT-BILDER
 // =============================================================
 document.addEventListener('contextmenu', (e) => {
-    const img = e.target.closest('.chat-embed-img, .gif-item');
     const ctx = document.getElementById('ctxMenu');
-    if (!img || !ctx) return;
+    if (!ctx) return;
+
+    const img = e.target.closest('.chat-embed-img, .gif-item');
+    const msgItem = e.target.closest('.msg-item');
+
+    if (!img && !msgItem) return;
     e.preventDefault();
-    App._ctxTarget = img.src;
-    ctx.style.left = e.clientX + 'px';
-    ctx.style.top = e.clientY + 'px';
+
+    // Reset
+    const dlBtn = document.getElementById('ctxDownloadBtn');
+    const fwdBtn = document.getElementById('ctxForwardBtn');
+    const delBtn = document.getElementById('ctxDeleteBtn');
+
+    if (img) {
+        App._ctxTarget = img.src;
+        if (dlBtn) dlBtn.classList.remove('hidden');
+        if (fwdBtn) fwdBtn.classList.remove('hidden');
+    } else {
+        App._ctxTarget = null;
+        if (dlBtn) dlBtn.classList.add('hidden');
+        if (fwdBtn) fwdBtn.classList.add('hidden');
+    }
+
+    // Eigene Nachricht? → Delete zeigen
+    if (msgItem && msgItem.classList.contains('own')) {
+        App._ctxMsgId = msgItem.id;
+        App._ctxIsOwn = true;
+        if (delBtn) delBtn.classList.remove('hidden');
+    } else {
+        App._ctxMsgId = null;
+        App._ctxIsOwn = false;
+        if (delBtn) delBtn.classList.add('hidden');
+    }
+
+    // Nur anzeigen wenn mindestens 1 Button sichtbar
+    const hasVisible = [dlBtn, fwdBtn, delBtn].some(b => b && !b.classList.contains('hidden'));
+    if (!hasVisible) return;
+
+    ctx.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+    ctx.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
     ctx.classList.remove('hidden');
 });
 document.addEventListener('click', () => {

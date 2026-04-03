@@ -1,6 +1,6 @@
 {
-    "version": "4.6.1",
+    "version": "4.7.0",
     "releaseDate": "2026-04-03",
-    "notes": "v4.6.0: GIF-Picker Glass Design, Bild-Upload, Rechtsklick-Menü, Sidebar Suchleiste, Background Fix.",
+    "notes": "v4.7.0: Weiterleiten-Popup, Nachricht löschen, Download-Format Fix.",
     "forceUpdate": true
 }

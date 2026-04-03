@@ -1044,7 +1044,37 @@ body.has-custom-bg .gif-picker-panel {
     transition: background 0.15s;
 }
 .ctx-item:hover { background: var(--bg-card-hover); }
+.ctx-item.ctx-danger { color: var(--status-danger); }
+.ctx-item.ctx-danger:hover { background: rgba(255,107,107,0.1); }
 .ctx-item svg { color: var(--text-muted); flex-shrink: 0; }
+.ctx-item.ctx-danger svg { color: var(--status-danger); }
+
+/* Forward User List */
+.fwd-user-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: background 0.15s;
+    border: 1px solid transparent;
+}
+.fwd-user-item:hover { background: var(--bg-card-hover); }
+.fwd-user-item.selected { background: rgba(0,136,255,0.1); border-color: var(--border-blue); }
+.fwd-user-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, var(--brand-blue), #1e40af); overflow: hidden;
+}
+.fwd-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.fwd-user-name { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+.fwd-user-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--border); display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 10px; color: transparent; transition: all 0.15s;
+}
+.fwd-user-item.selected .fwd-user-check {
+    background: var(--brand-blue); border-color: var(--brand-blue); color: #fff;
+}
 
 .chat-input-area {
     display: flex; gap: 8px; padding: 12px 16px;

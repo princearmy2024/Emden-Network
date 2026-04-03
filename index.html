@@ -1092,14 +1092,33 @@
 
     <!-- Rechtsklick Kontextmenü -->
     <div class="ctx-menu hidden" id="ctxMenu">
-        <button class="ctx-item" onclick="App.ctxDownload()">
+        <button class="ctx-item" id="ctxDownloadBtn" onclick="App.ctxDownload()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Herunterladen
         </button>
-        <button class="ctx-item" onclick="App.ctxForward()">
+        <button class="ctx-item" id="ctxForwardBtn" onclick="App.ctxForward()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 014-4h12"/></svg>
             Weiterleiten
         </button>
+        <button class="ctx-item ctx-danger hidden" id="ctxDeleteBtn" onclick="App.ctxDeleteMsg()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            Nachricht löschen
+        </button>
+    </div>
+
+    <!-- Weiterleiten Popup -->
+    <div class="modal-overlay hidden" id="forwardModal">
+        <div class="modal-box" style="width:360px;">
+            <div class="modal-header">
+                <span class="modal-title">Weiterleiten an...</span>
+                <button class="modal-close" onclick="document.getElementById('forwardModal').classList.add('hidden')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:12px;">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Max. 3 User auswählen</div>
+                <div id="forwardUserList" style="display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto;"></div>
+                <button class="btn btn-primary" onclick="App.confirmForward()" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;">Senden</button>
+            </div>
+        </div>
     </div>
 
     <script src="./socket.io.js"></script>
