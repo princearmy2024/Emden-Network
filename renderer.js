@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.0.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '4.1.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -210,6 +210,9 @@ const WebSocketService = {
             this.socket.on('connect', () => {
                 console.log('[Socket] Verbunden! ID:', this.socket.id);
                 announceOnline();
+                // Chat-User registrieren für PNs
+                const u = AuthService.getUser();
+                if (u) this.socket.emit('chat_register', { discordId: u.discordId, username: u.username });
                 setTimeout(() => this._fetchStatus(), 2000);
                 App.initVoiceSocketEvents(this.socket);
             });
@@ -223,29 +226,61 @@ const WebSocketService = {
                 if (window.App) App.renderFullUserList(users);
             });
 
-            // Eingehende Nachrichten — SIMPEL: Alles anzeigen
+            // Eingehende Nachrichten
             this.socket.on('receive_message', (msg) => {
-                console.log('[Chat] RAW receive_message:', JSON.stringify(msg));
+                console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);
+                const me = AuthService.getUser();
+                const channel = msg.to || 'general';
+                const saveKey = channel === '@' + me?.username ? '@' + msg.username : channel;
 
-                // Warte bis App bereit ist (max 3s)
-                const tryDisplay = (retries) => {
-                    if (window.App && App._displayMessage) {
-                        App._displayMessage(msg);
-                        App._saveChatMessage(msg, 'general');
-                        App.playBlip(900, 0.06);
-                        if (App.currentView !== 'messages') {
-                            NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
-                        }
-                    } else if (retries > 0) {
-                        setTimeout(() => tryDisplay(retries - 1), 500);
-                    } else {
-                        console.warn('[Chat] App nach 3s immer noch nicht bereit');
-                    }
-                };
-                tryDisplay(6);
+                // Anzeigen wenn im richtigen Chat
+                const current = window.App?.currentChat || 'general';
+                const shouldShow = (channel === 'general' && current === 'general') ||
+                    (channel === '@' + me?.username && current === '@' + msg.username) ||
+                    (channel === current);
+
+                if (shouldShow && window.App) {
+                    App._displayMessage(msg);
+                    // Read Receipt senden
+                    this.socket.emit('msg_read', { msgId: msg.id, reader: me?.username });
+                }
+
+                // Immer speichern
+                if (window.App) App._saveChatMessage(msg, saveKey);
+
+                // Sound + Notification
+                if (window.App) App.playBlip(900, 0.06);
+                if (window.App && App.currentView !== 'messages') {
+                    NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                }
+                if (!shouldShow && window.App) {
+                    NotificationService.show('PN', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                }
             });
 
-            console.log('[Socket] receive_message Listener registriert');
+            // Typing Indicator
+            this.socket.on('typing_indicator', ({ username, typing }) => {
+                const el = document.getElementById('typingIndicator');
+                if (!el) return;
+                if (typing) {
+                    el.textContent = `${username} tippt...`;
+                    el.style.display = 'block';
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+
+            // Message Status (Read Receipts)
+            this.socket.on('msg_status', ({ id, status }) => {
+                const msgEl = document.querySelector(`[id="msg-${id}"] .msg-check`);
+                if (msgEl) {
+                    if (status === 'read') { msgEl.textContent = '✓✓'; msgEl.style.color = '#3b82f6'; }
+                    else if (status === 'delivered') { msgEl.textContent = '✓✓'; msgEl.style.color = 'var(--text-muted)'; }
+                    else { msgEl.textContent = '✓'; msgEl.style.color = 'var(--text-muted)'; }
+                }
+            });
+
+            console.log('[Socket] Chat-Listener registriert');
 
             // Alle 20s nochmal melden
             if (this._announceInterval) clearInterval(this._announceInterval);
@@ -965,20 +1000,18 @@ const App = window.App = {
 
     // --- MESSAGES ---
     selectChat(name) {
-        // Immer general nutzen — kein PN-System
-        this.currentChat = 'general';
+        this.currentChat = name;
 
-        // Zur Messages-View navigieren
         if (this.currentView !== 'messages') {
             this.navigate('messages');
         }
 
         // UI Header
         const headTitle = document.getElementById('activeChatName');
-        if (headTitle) headTitle.textContent = '#general';
+        if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
 
         const headSub = document.getElementById('chatHeaderOnlineText');
-        if (headSub) headSub.textContent = '';
+        if (headSub) headSub.textContent = name.startsWith('@') ? 'Privatchat' : 'Gruppenchat';
 
         // Aktiven User in der Liste highlighten
         document.querySelectorAll('.ovn-node').forEach(node => {
@@ -1814,6 +1847,7 @@ const App = window.App = {
         const text = input.value.trim();
         input.value = '';
         const user = AuthService.getUser();
+        const channel = this.currentChat || 'general';
 
         const msgData = {
             id: Date.now(),
@@ -1822,23 +1856,20 @@ const App = window.App = {
             avatar: user?.avatar || '',
             text: text,
             message: text,
-            to: 'general',
+            to: channel,
             timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+            status: 'sent',
         };
 
-        // An Server senden (beide Event-Namen für Kompatibilität)
         if (WebSocketService.socket?.connected) {
             WebSocketService.socket.emit('send_message', msgData);
-            WebSocketService.socket.emit('chat_message', msgData);
-            console.log('[Chat] Gesendet via Socket:', text, '(connected:', WebSocketService.socket.connected, 'id:', WebSocketService.socket.id, ')');
+            WebSocketService.socket.emit('typing_stop', { to: channel, username: user?.username });
         } else {
-            console.warn('[Chat] Socket NICHT verbunden!');
-            NotificationService.show('Fehler', 'Keine Verbindung zum Chat-Server!', 'error');
+            NotificationService.show('Fehler', 'Keine Verbindung!', 'error');
         }
 
-        // Lokal anzeigen + speichern
         this._displayMessage(msgData);
-        this._saveChatMessage(msgData, 'general');
+        this._saveChatMessage(msgData, channel);
         input.focus();
     },
 
@@ -1867,11 +1898,13 @@ const App = window.App = {
 
         const bgColor = isOwn ? 'var(--brand-blue)' : (this.getStringColor?.(data.username) || '#0088FF');
 
+        const checkmark = isOwn ? `<span class="msg-check" style="color:var(--text-muted)">✓</span>` : '';
+
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
                 ${!isOwn ? `<div class="msg-avatar" style="background:${bgColor}">${avatarInner}</div>` : ''}
                 <div class="msg-body">
-                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span></div>
+                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span>${checkmark}</div>
                     <div class="msg-text">${content}</div>
                     <div class="msg-reactions" id="${msgId}-reactions"></div>
                     <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
@@ -2175,6 +2208,19 @@ document.addEventListener('keydown', e => {
     // Chat senden mit Enter
     if (e.key === 'Enter' && document.activeElement?.id === 'chatInput') {
         App.sendMessage();
+    }
+    // Typing indicator
+    if (document.activeElement?.id === 'chatInput' && e.key !== 'Enter') {
+        if (!App._typingTimeout) {
+            const user = AuthService.getUser();
+            WebSocketService.socket?.emit('typing_start', { to: App.currentChat || 'general', username: user?.username });
+        }
+        clearTimeout(App._typingTimeout);
+        App._typingTimeout = setTimeout(() => {
+            const user = AuthService.getUser();
+            WebSocketService.socket?.emit('typing_stop', { to: App.currentChat || 'general', username: user?.username });
+            App._typingTimeout = null;
+        }, 2000);
     }
 });
 

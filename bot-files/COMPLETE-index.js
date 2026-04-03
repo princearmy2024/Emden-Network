@@ -833,19 +833,75 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Chat: User registriert sich mit discordId für PNs
+    socket.on("chat_register", ({ discordId, username }) => {
+        socket.chatUserId = discordId;
+        socket.chatUsername = username;
+        console.log(`[Chat] ${username} registriert (${discordId})`);
+    });
+
     socket.on("send_message", (msgData) => {
-        console.log(`[Chat] ${msgData.username}: "${msgData.text || msgData.message}" → broadcast an ${io.sockets.sockets.size - 1} andere`);
+        const to = msgData.to || 'general';
+        console.log(`[Chat] ${msgData.username} → ${to}: "${msgData.text || msgData.message}"`);
+
+        if (to === 'general') {
+            // Broadcast an alle
+            chatHistory.push(msgData);
+            if (chatHistory.length > 50) chatHistory.shift();
+            socket.broadcast.emit("receive_message", msgData);
+        } else if (to.startsWith('@')) {
+            // PN: Nur an den Empfänger senden
+            const targetUsername = to.substring(1);
+            let sent = false;
+            for (const [sid, s] of io.sockets.sockets) {
+                if (s.chatUsername === targetUsername && sid !== socket.id) {
+                    s.emit("receive_message", msgData);
+                    sent = true;
+                    break;
+                }
+            }
+            // Delivery-Status zurück an Sender
+            socket.emit("msg_status", { id: msgData.id, status: sent ? 'delivered' : 'sent' });
+        }
+    });
+
+    // AUCH chat_message Event (Kompatibilität)
+    socket.on("chat_message", (msgData) => {
         chatHistory.push(msgData);
         if (chatHistory.length > 50) chatHistory.shift();
         socket.broadcast.emit("receive_message", msgData);
     });
 
-    // AUCH chat_message Event (falls alte Clients das senden)
-    socket.on("chat_message", (msgData) => {
-        console.log(`[Chat] (legacy) ${msgData.username}: "${msgData.text || msgData.message}"`);
-        chatHistory.push(msgData);
-        if (chatHistory.length > 50) chatHistory.shift();
-        socket.broadcast.emit("receive_message", msgData);
+    // Typing Indicator
+    socket.on("typing_start", ({ to, username }) => {
+        if (to === 'general') {
+            socket.broadcast.emit("typing_indicator", { username, typing: true });
+        } else if (to.startsWith('@')) {
+            const target = to.substring(1);
+            for (const [sid, s] of io.sockets.sockets) {
+                if (s.chatUsername === target) { s.emit("typing_indicator", { username, typing: true }); break; }
+            }
+        }
+    });
+    socket.on("typing_stop", ({ to, username }) => {
+        if (to === 'general') {
+            socket.broadcast.emit("typing_indicator", { username, typing: false });
+        } else if (to.startsWith('@')) {
+            const target = to.substring(1);
+            for (const [sid, s] of io.sockets.sockets) {
+                if (s.chatUsername === target) { s.emit("typing_indicator", { username, typing: false }); break; }
+            }
+        }
+    });
+
+    // Read Receipt
+    socket.on("msg_read", ({ msgId, reader }) => {
+        // Finde den Sender und schicke ihm den Read-Status
+        for (const [sid, s] of io.sockets.sockets) {
+            if (sid !== socket.id) {
+                s.emit("msg_status", { id: msgId, status: 'read', reader });
+            }
+        }
     });
 
     // 🎙️ WALKIE-TALKIE VOICE SYSTEM
