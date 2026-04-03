@@ -80,8 +80,8 @@ svg { display: block; flex-shrink: 0; }
 .sidebar-logo .en-logo-img { height: 28px; width: auto; }
 
 /* ── Screen System ────────────────────────────────────────── */
-.screen { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 10000; }
-.screen.active { opacity: 1; pointer-events: all; }
+.screen { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 10; }
+.screen.active { opacity: 1; pointer-events: all; z-index: 10; }
 .hidden { display: none !important; }
 
 /* ============================================================
@@ -549,7 +549,7 @@ svg { display: block; flex-shrink: 0; }
 
 /* Custom Background Layer */
 #customBgLayer {
-    position: fixed; inset: 0; z-index: 9999;
+    position: fixed; inset: 0; z-index: 1;
     background-size: cover; background-position: center;
     pointer-events: none;
 }
