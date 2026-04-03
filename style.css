@@ -82,8 +82,10 @@ svg { display: block; flex-shrink: 0; }
 /* ── Screen System ────────────────────────────────────────── */
 .screen { position: absolute; inset: 0; display: none; background: var(--bg-base); z-index: 10; }
 .screen.active { display: flex; flex-direction: column; opacity: 1; pointer-events: all; z-index: 10; }
-#loginScreen.active { z-index: 50; background: var(--bg-base); }
-#splashScreen.active { z-index: 60; background: var(--bg-base); }
+#loginScreen { background: var(--bg-base) !important; }
+#loginScreen.active { z-index: 50; }
+#splashScreen { background: var(--bg-base) !important; }
+#splashScreen.active { z-index: 60; }
 .hidden { display: none !important; }
 
 /* ============================================================

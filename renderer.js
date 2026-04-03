@@ -590,13 +590,15 @@ const App = {
             // Splash → Login oder Dashboard
             await this.runSplash();
 
+            // Login-Handler IMMER initialisieren
+            this.initLoginHandlers();
+
             if (AuthService.loadSession() && AuthService.isLoggedIn()) {
                 this.showDashboard(AuthService.getUser());
-                this.renderActiveVoiceCard(); // Active Voice Card beim Start laden
-                this.syncSoundUI(); // Key & Audio in UI laden
+                this.renderActiveVoiceCard();
+                this.syncSoundUI();
             } else {
                 this.showScreen('loginScreen');
-                this.initLoginHandlers();
             }
         } catch (err) {
             console.error('[App] Kritischer Fehler bei der Initialisierung:', err);
