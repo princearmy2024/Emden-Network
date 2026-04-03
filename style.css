@@ -1616,10 +1616,10 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 .ovn-avatar::after {
     content: ''; position: absolute; bottom: -1px; right: -1px;
     width: 10px; height: 10px; border-radius: 50%;
-    background: var(--status-online); border: 2px solid var(--bg-surface);
+    background: #22c55e; border: 2px solid var(--bg-surface);
     z-index: 5;
 }
-.ovn-avatar.offline::after { background: var(--text-muted); }
+.ovn-avatar.offline::after { background: #6b7280; }
 
 /* Legacy dot (fallback) */
 .ovn-dot {

@@ -527,7 +527,7 @@ function escHtml(str) { return String(str).replace(/[&<>"']/g, c => ({ '&': '&am
 // =============================================================
 const App = {
     currentView: 'overview',
-    currentChat: 'general',
+    currentChat: 'general', // IMMER general — kein PN
     messages: [], // Zentraler Speicher für Filterung
     _clockInterval: null,
 
@@ -539,11 +539,13 @@ const App = {
         this.initBackgroundParallax();
         
         try {
-            // Version-Migration: Session clearen wenn Version sich geändert hat
+            // Version-Migration
             const lastVer = localStorage.getItem('last_app_version');
             if (lastVer !== CURRENT_VERSION) {
                 console.log(`[App] Version geändert: ${lastVer} → ${CURRENT_VERSION}`);
                 localStorage.setItem('last_app_version', CURRENT_VERSION);
+                // Alte Chat-History clearen (neues Chat-System)
+                Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => localStorage.removeItem(k));
             }
 
             // Version auf Splash Screen setzen
@@ -959,21 +961,20 @@ const App = {
 
     // --- MESSAGES ---
     selectChat(name) {
-        this.currentChat = name;
+        // Immer general nutzen — kein PN-System
+        this.currentChat = 'general';
 
-        // Zur Messages-View navigieren falls nicht dort
+        // Zur Messages-View navigieren
         if (this.currentView !== 'messages') {
             this.navigate('messages');
         }
 
-        // UI im Header aktualisieren
+        // UI Header
         const headTitle = document.getElementById('activeChatName');
-        if (headTitle) headTitle.textContent = name.startsWith('@') ? name : '#' + name;
+        if (headTitle) headTitle.textContent = '#general';
 
         const headSub = document.getElementById('chatHeaderOnlineText');
-        if (headSub) {
-            headSub.textContent = name.startsWith('@') ? 'Privatchat mit ' + name.substring(1) : '';
-        }
+        if (headSub) headSub.textContent = '';
 
         // Aktiven User in der Liste highlighten
         document.querySelectorAll('.ovn-node').forEach(node => {
