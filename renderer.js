@@ -815,8 +815,9 @@ const App = window.App = {
         const setAvatar = (id) => {
             const el = document.getElementById(id);
             if (!el) return;
-            const imgUrl = user.avatar || user.PFB || user.pfb;
-            if (imgUrl) {
+            const imgUrl = user.avatar || user.PFB || user.pfb || '';
+            console.log(`[Avatar] ${id}: URL = "${imgUrl ? imgUrl.substring(0, 80) + '...' : 'KEINE'}"`);
+            if (imgUrl && imgUrl.length > 5) {
                 el.innerHTML = `<img src="${escHtml(imgUrl)}" alt="Avatar"
                     style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"
                     onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'avatar-fallback-inner\' style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;\'>${initialEscaped}</div>';">`;

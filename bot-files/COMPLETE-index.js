@@ -240,7 +240,7 @@ client.on("interactionCreate", async interaction => {
                 discordId: interaction.user.id,
                 username:  interaction.user.displayName || interaction.user.username,
                 tag:       interaction.user.tag,
-                avatar:    interaction.user.displayAvatarURL({ size: 128 }),
+                avatar:    interaction.user.displayAvatarURL({ size: 128, extension: 'png' }) || interaction.user.defaultAvatarURL,
                 expiresAt,
             });
 
