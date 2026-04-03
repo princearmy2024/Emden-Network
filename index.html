@@ -920,7 +920,10 @@
                                             <div class="rblx-connect-title">Roblox verbinden</div>
                                             <div class="rblx-connect-sub">Verknüpfe deinen Roblox-Account mit dem Dashboard</div>
                                         </div>
-                                        <button class="btn btn-primary" style="width:auto;padding:9px 20px;white-space:nowrap;" onclick="App.startRobloxVerify()">Verknüpfen</button>
+                                        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                                            <button class="btn btn-primary" style="width:auto;padding:9px 20px;white-space:nowrap;" onclick="App.startRobloxVerify()">Verknüpfen</button>
+                                            <button class="btn" style="width:auto;padding:6px 16px;white-space:nowrap;font-size:11px;color:var(--text-muted);border:1px solid var(--border);" onclick="App.startBioVerify()">Manuell (Bio-Code)</button>
+                                        </div>
                                     </div>
                                 </div>
 

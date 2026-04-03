@@ -3001,6 +3001,16 @@ Object.assign(App, {
 
     // "Verknüpfen" geklickt → OAuth2 Flow starten
     _robloxOAuthCooldown: false,
+    startBioVerify() {
+        const step1 = document.getElementById('rblxStep1');
+        const step2 = document.getElementById('rblxStep2');
+        if (step1) step1.style.display = 'block';
+        if (step2) step2.style.display = 'none';
+        const input = document.getElementById('rblxUsernameInput');
+        if (input) input.value = '';
+        this.showRobloxState('verifying');
+    },
+
     async startRobloxVerify() {
         if (this._robloxOAuthCooldown) {
             NotificationService.show('Bitte warten', 'Warte 30 Sekunden bevor du es erneut versuchst.', 'warn');
