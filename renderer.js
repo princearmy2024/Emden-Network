@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.1.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '4.2.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -272,11 +272,12 @@ const WebSocketService = {
 
             // Message Status (Read Receipts)
             this.socket.on('msg_status', ({ id, status }) => {
-                const msgEl = document.querySelector(`[id="msg-${id}"] .msg-check`);
-                if (msgEl) {
-                    if (status === 'read') { msgEl.textContent = '✓✓'; msgEl.style.color = '#3b82f6'; }
-                    else if (status === 'delivered') { msgEl.textContent = '✓✓'; msgEl.style.color = 'var(--text-muted)'; }
-                    else { msgEl.textContent = '✓'; msgEl.style.color = 'var(--text-muted)'; }
+                const msgEl = document.getElementById('msg-' + id);
+                const check = msgEl?.querySelector('.msg-check');
+                if (check) {
+                    if (status === 'read') { check.innerHTML = '✓✓'; check.style.color = '#3b82f6'; }
+                    else if (status === 'delivered') { check.innerHTML = '✓✓'; check.style.color = 'var(--text-muted)'; }
+                    else { check.innerHTML = '✓'; check.style.color = 'var(--text-muted)'; }
                 }
             });
 
@@ -1785,6 +1786,28 @@ const App = window.App = {
     // =============================================================
     _chatSpamTimestamps: [],
     _chatSpamBlocked: false,
+    _replyTo: null,
+
+    setReply(id, username, text) {
+        this._replyTo = { id, username, text };
+        let bar = document.getElementById('replyBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'replyBar';
+            bar.className = 'reply-bar';
+            const inputArea = document.querySelector('.chat-input-area');
+            if (inputArea) inputArea.parentElement.insertBefore(bar, inputArea);
+        }
+        bar.innerHTML = `<div class="reply-bar-content"><span class="reply-bar-user">${escHtml(username)}</span><span class="reply-bar-text">${escHtml(text)}</span></div><button class="reply-bar-close" onclick="App.clearReply()">✕</button>`;
+        bar.style.display = 'flex';
+        document.getElementById('chatInput')?.focus();
+    },
+
+    clearReply() {
+        this._replyTo = null;
+        const bar = document.getElementById('replyBar');
+        if (bar) bar.style.display = 'none';
+    },
 
     // Chat-Verlauf aus localStorage laden
     _loadChatHistory(channel) {
@@ -1859,7 +1882,9 @@ const App = window.App = {
             to: channel,
             timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
             status: 'sent',
+            replyTo: this._replyTo || null,
         };
+        this.clearReply();
 
         if (WebSocketService.socket?.connected) {
             WebSocketService.socket.emit('send_message', msgData);
@@ -1899,15 +1924,19 @@ const App = window.App = {
         const bgColor = isOwn ? 'var(--brand-blue)' : (this.getStringColor?.(data.username) || '#0088FF');
 
         const checkmark = isOwn ? `<span class="msg-check" style="color:var(--text-muted)">✓</span>` : '';
+        const replyRef = data.replyTo ? `<div class="msg-reply-ref" onclick="document.getElementById('msg-${data.replyTo.id}')?.scrollIntoView({behavior:'smooth'})"><span class="reply-user">${escHtml(data.replyTo.username)}</span><span class="reply-text">${escHtml((data.replyTo.text || '').substring(0, 60))}</span></div>` : '';
+        const replyBtn = `<button class="msg-reply-btn" onclick="App.setReply('${data.id}','${escHtml(data.username || '')}','${escHtml((text || '').substring(0, 80).replace(/'/g, ''))}')" title="Antworten">↩</button>`;
 
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
                 ${!isOwn ? `<div class="msg-avatar" style="background:${bgColor}">${avatarInner}</div>` : ''}
                 <div class="msg-body">
+                    ${replyRef}
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span>${checkmark}</div>
                     <div class="msg-text">${content}</div>
                     <div class="msg-reactions" id="${msgId}-reactions"></div>
                     <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
+                    ${replyBtn}
                 </div>
                 ${isOwn ? `<div class="msg-avatar you" style="background:${bgColor}">${avatarInner}</div>` : ''}
             </div>
