@@ -1940,6 +1940,32 @@ const App = window.App = {
         document.getElementById('chatInput')?.focus();
     },
 
+    replyToMsg(msgId) {
+        // Nachricht aus localStorage finden
+        const numId = parseInt(msgId);
+        let found = null;
+        try {
+            for (const k of Object.keys(localStorage).filter(k => k.startsWith('chat_history_'))) {
+                const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                const msg = msgs.find(m => m.id === numId);
+                if (msg) { found = msg; break; }
+            }
+        } catch(e) {}
+        if (found) {
+            this.setReply(found.id, found.username || 'User', found.text || found.message || '');
+        }
+    },
+
+    scrollToReply(msgId) {
+        const el = document.getElementById(msgId);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.remove('pulse-highlight');
+        void el.offsetWidth;
+        el.classList.add('pulse-highlight');
+        setTimeout(() => el.classList.remove('pulse-highlight'), 1300);
+    },
+
     clearReply() {
         this._replyTo = null;
         const bar = document.getElementById('replyBar');
@@ -2071,9 +2097,9 @@ const App = window.App = {
             const rt = data.replyTo.text || '';
             const isImg = rt.startsWith('data:image/') || /^https?:\/\/\S+\.(?:gif|png|jpe?g|webp)$/i.test(rt) || /^https?:\/\/(?:media\.tenor\.com|media\d*\.giphy\.com)\/\S+$/i.test(rt);
             const replyPreview = isImg ? `<img src="${rt}" style="height:36px;border-radius:4px;object-fit:cover;margin-top:2px;">` : `<span class="reply-text">${escHtml(rt.substring(0, 60))}</span>`;
-            return `<div class="msg-reply-ref" onclick="document.getElementById('msg-${data.replyTo.id}')?.scrollIntoView({behavior:'smooth'})"><span class="reply-user">${escHtml(data.replyTo.username)}</span>${replyPreview}</div>`;
+            return `<div class="msg-reply-ref" onclick="App.scrollToReply('msg-${data.replyTo.id}')"><span class="reply-user">${escHtml(data.replyTo.username)}</span>${replyPreview}</div>`;
         })() : '';
-        const replyBtn = `<button class="msg-reply-btn" onclick="App.setReply('${data.id}','${escHtml(data.username || '')}','${escHtml((text || '').substring(0, 80).replace(/'/g, ''))}')" title="Antworten">↩</button>`;
+        const replyBtn = `<button class="msg-reply-btn" onclick="App.replyToMsg('${data.id}')" title="Antworten">↩</button>`;
 
         const html = `
             <div class="msg-item ${isOwn ? 'own' : ''}" id="${msgId}">
@@ -2520,6 +2546,14 @@ const App = window.App = {
         }).join('');
 
         document.getElementById('forwardModal')?.classList.remove('hidden');
+    },
+
+    filterForwardList(query) {
+        const q = (query || '').toLowerCase();
+        document.querySelectorAll('#forwardUserList .fwd-user-item').forEach(el => {
+            const name = el.querySelector('.fwd-user-name')?.textContent.toLowerCase() || '';
+            el.style.display = name.includes(q) ? '' : 'none';
+        });
     },
 
     _toggleForwardUser(el) {

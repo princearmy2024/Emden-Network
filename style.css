@@ -849,6 +849,14 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 .msg-user { font-size: 11.5px; font-weight: 700; color: var(--text); }
 .msg-time { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); }
 .msg-check { font-size: 10px; margin-left: 4px; letter-spacing: -2px; }
+.msg-item.pulse-highlight {
+    animation: msgPulse 1.2s ease-out;
+}
+@keyframes msgPulse {
+    0% { box-shadow: 0 0 0 0 rgba(0,136,255,0.4); }
+    30% { box-shadow: 0 0 0 6px rgba(0,136,255,0.2); background: rgba(0,136,255,0.08); }
+    100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
 .msg-roblox-badge {
     display: inline-flex; align-items: center; justify-content: center;
     width: 16px; height: 16px; border-radius: 3px;
@@ -1059,13 +1067,17 @@ body.has-custom-bg .gif-picker-panel {
 
 /* Forward Modal */
 #forwardModal .modal-box {
-    background: rgba(26,29,46,0.92); backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    background: rgba(19,21,30,0.82); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 24px 64px rgba(0,0,0,0.7);
 }
 #forwardModal .modal-header {
-    background: rgba(17,19,32,0.6); border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(17,19,32,0.5); border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 #forwardModal .modal-body { padding: 14px 16px; }
+#forwardUserList {
+    scrollbar-width: none; -ms-overflow-style: none;
+}
+#forwardUserList::-webkit-scrollbar { display: none; }
 #forwardModal .btn-primary {
     background: var(--brand-blue); border: none; color: #fff;
     border-radius: var(--radius-sm); transition: all 0.2s;

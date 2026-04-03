@@ -1114,8 +1114,9 @@
                 <button class="modal-close" onclick="document.getElementById('forwardModal').classList.add('hidden')">&times;</button>
             </div>
             <div class="modal-body" style="padding:12px;">
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Max. 3 User auswählen</div>
-                <div id="forwardUserList" style="display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto;"></div>
+                <input type="text" class="chat-sidebar-search-input" id="forwardSearchInput" placeholder="User suchen..." oninput="App.filterForwardList(this.value)" style="margin-bottom:8px;">
+                <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;font-family:var(--font-mono);">MAX. 3 USER</div>
+                <div id="forwardUserList" style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;"></div>
                 <button class="btn btn-primary" onclick="App.confirmForward()" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;">Senden</button>
             </div>
         </div>
