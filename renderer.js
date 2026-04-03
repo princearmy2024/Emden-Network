@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.7.0'; // Stand: 03.04.2026 (Forward Popup, Delete, Download Fix)
+let CURRENT_VERSION = '4.8.0'; // Stand: 04.04.2026 (Glass, Sounds, Roblox Badge, Reply Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1132,30 +1132,59 @@ const App = window.App = {
     // Legacy — redirects zum neuen System
     appendChatMessage(msg) { this._displayMessage(msg); },
 
-    // --- SOUND ENGINE (Walkie-Talkie Effects) ---
+    // --- SOUND ENGINE ---
+    _getAudioCtx() {
+        if (!this._blipCtx || this._blipCtx.state === 'closed') {
+            this._blipCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this._blipCtx.state === 'suspended') this._blipCtx.resume().catch(() => {});
+        return this._blipCtx;
+    },
+
+    playHoverSound() {
+        try {
+            const ctx = this._getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.06);
+            gain.gain.setValueAtTime(0.015, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + 0.06);
+        } catch(e) {}
+    },
+
+    playClickSound() {
+        try {
+            const ctx = this._getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.04);
+            osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.03, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + 0.1);
+        } catch(e) {}
+    },
+
     playBlip(freq = 800, duration = 0.1) {
         try {
-            // Shared AudioContext wiederverwenden — nie mehr als 1 gleichzeitig
-            if (!this._blipCtx || this._blipCtx.state === 'closed') {
-                this._blipCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (this._blipCtx.state === 'suspended') this._blipCtx.resume().catch(() => {});
-            const context = this._blipCtx;
-
-            const osc = context.createOscillator();
-            const gain = context.createGain();
+            const ctx = this._getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, context.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(freq / 2, context.currentTime + duration);
-            gain.gain.setValueAtTime(0.05, context.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(context.destination);
-            osc.start();
-            osc.stop(context.currentTime + duration);
-        } catch (e) {
-            // AudioContext nicht verfügbar — kein Crash
-        }
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(freq / 2, ctx.currentTime + duration);
+            gain.gain.setValueAtTime(0.05, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + duration);
+        } catch(e) {}
     },
 
     // --- CHANNELS ---
@@ -1892,7 +1921,11 @@ const App = window.App = {
             const inputArea = document.querySelector('.chat-input-area');
             if (inputArea) inputArea.parentElement.insertBefore(bar, inputArea);
         }
-        bar.innerHTML = `<div class="reply-bar-content"><span class="reply-bar-user">${escHtml(username)}</span><span class="reply-bar-text">${escHtml(text)}</span></div><button class="reply-bar-close" onclick="App.clearReply()">✕</button>`;
+        const isImage = text && (text.startsWith('data:image/') || /^https?:\/\/\S+\.(?:gif|png|jpe?g|webp)$/i.test(text) || /^https?:\/\/(?:media\.tenor\.com|media\d*\.giphy\.com)\/\S+$/i.test(text));
+        const previewContent = isImage
+            ? `<img src="${text}" style="height:32px;border-radius:4px;object-fit:cover;">`
+            : escHtml((text || '').substring(0, 60));
+        bar.innerHTML = `<div class="reply-bar-content"><span class="reply-bar-user">${escHtml(username)}</span><span class="reply-bar-text">${previewContent}</span></div><button class="reply-bar-close" onclick="App.clearReply()">✕</button>`;
         bar.style.display = 'flex';
         document.getElementById('chatInput')?.focus();
     },
@@ -2024,7 +2057,12 @@ const App = window.App = {
         const checkColor = st === 'read' ? '#3b82f6' : 'var(--text-muted)';
         const checkText = (st === 'read' || st === 'delivered') ? '✓✓' : '✓';
         const checkmark = isOwn ? `<span class="msg-check" style="color:${checkColor}">${checkText}</span>` : '';
-        const replyRef = data.replyTo ? `<div class="msg-reply-ref" onclick="document.getElementById('msg-${data.replyTo.id}')?.scrollIntoView({behavior:'smooth'})"><span class="reply-user">${escHtml(data.replyTo.username)}</span><span class="reply-text">${escHtml((data.replyTo.text || '').substring(0, 60))}</span></div>` : '';
+        const replyRef = data.replyTo ? (() => {
+            const rt = data.replyTo.text || '';
+            const isImg = rt.startsWith('data:image/') || /^https?:\/\/\S+\.(?:gif|png|jpe?g|webp)$/i.test(rt) || /^https?:\/\/(?:media\.tenor\.com|media\d*\.giphy\.com)\/\S+$/i.test(rt);
+            const replyPreview = isImg ? `<img src="${rt}" style="height:36px;border-radius:4px;object-fit:cover;margin-top:2px;">` : `<span class="reply-text">${escHtml(rt.substring(0, 60))}</span>`;
+            return `<div class="msg-reply-ref" onclick="document.getElementById('msg-${data.replyTo.id}')?.scrollIntoView({behavior:'smooth'})"><span class="reply-user">${escHtml(data.replyTo.username)}</span>${replyPreview}</div>`;
+        })() : '';
         const replyBtn = `<button class="msg-reply-btn" onclick="App.setReply('${data.id}','${escHtml(data.username || '')}','${escHtml((text || '').substring(0, 80).replace(/'/g, ''))}')" title="Antworten">↩</button>`;
 
         const html = `
@@ -2032,7 +2070,7 @@ const App = window.App = {
                 ${!isOwn ? `<div class="msg-avatar" style="background:${bgColor}">${avatarInner}</div>` : ''}
                 <div class="msg-body">
                     ${replyRef}
-                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span>${checkmark}</div>
+                    <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span>${this._getRobloxBadge(data.userId, isOwn)}<span class="msg-time">${time}</span>${checkmark}</div>
                     <div class="msg-text">${content}</div>
                     <div class="msg-reactions" id="${msgId}-reactions">${data.reactions ? Object.entries(data.reactions).map(([e,c]) => `<span class="reaction-badge" data-emoji="${e}" onclick="App.addReaction('${msgId}','${e}')">${e}<span class="rc-count">${c}</span></span>`).join('') : ''}</div>
                     <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
@@ -2190,6 +2228,42 @@ const App = window.App = {
             hash = str.charCodeAt(i) + ((hash << 5) - hash);
         }
         return `hsl(${Math.abs(hash) % 360}, 70%, 50%)`;
+    },
+
+    // ── Roblox Badge im Chat ──
+    _robloxCache: {},
+    _getRobloxBadge(userId, isOwn) {
+        if (!userId) return '';
+        // Eigener User → direkt aus localStorage
+        if (isOwn) {
+            const profile = RobloxService.getProfile();
+            if (profile?.profileUrl) {
+                return `<a href="#" onclick="event.preventDefault();window.electronAPI?.openExternal('${profile.profileUrl}')" class="msg-roblox-badge" title="Roblox Profil öffnen">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5.25 0L0 18.75L18.75 24L24 5.25L5.25 0ZM14.7 14.7L9.3 13.2L10.8 7.8L14.7 14.7Z"/></svg>
+                </a>`;
+            }
+            return '';
+        }
+        // Andere User → aus Cache oder async laden
+        if (this._robloxCache[userId] === false) return '';
+        if (this._robloxCache[userId]) {
+            const url = this._robloxCache[userId];
+            return `<a href="#" onclick="event.preventDefault();window.electronAPI?.openExternal('${url}')" class="msg-roblox-badge" title="Roblox Profil öffnen">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5.25 0L0 18.75L18.75 24L24 5.25L5.25 0ZM14.7 14.7L9.3 13.2L10.8 7.8L14.7 14.7Z"/></svg>
+            </a>`;
+        }
+        // Async laden (einmalig)
+        if (this._robloxCache[userId] === undefined) {
+            this._robloxCache[userId] = null; // loading
+            ApiService.get(`/api/roblox/profile?discordId=${encodeURIComponent(userId)}`).then(data => {
+                if (data?.success && data.profile?.profileUrl) {
+                    this._robloxCache[userId] = data.profile.profileUrl;
+                } else {
+                    this._robloxCache[userId] = false;
+                }
+            }).catch(() => { this._robloxCache[userId] = false; });
+        }
+        return '';
     },
 
     // ── GIF Picker (Tenor API) ────────────────────────────────
@@ -2594,7 +2668,19 @@ const App = window.App = {
 };
 
 // =============================================================
-// RECHTSKLICK KONTEXTMENÜ FÜR CHAT-BILDER
+// UI SOUNDS — Hover + Click auf interaktive Elemente
+// =============================================================
+document.addEventListener('mouseenter', (e) => {
+    const target = e.target.closest('button, .ovn-node, .fwd-user-item, .ctx-item, .gif-tab, .chat-item');
+    if (target && window.App) App.playHoverSound();
+}, true);
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('button, .ovn-node, .fwd-user-item, .ctx-item, .gif-tab');
+    if (target && window.App) App.playClickSound();
+}, true);
+
+// =============================================================
+// RECHTSKLICK KONTEXTMENÜ
 // =============================================================
 document.addEventListener('contextmenu', (e) => {
     const ctx = document.getElementById('ctxMenu');

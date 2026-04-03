@@ -849,6 +849,12 @@ body.has-custom-bg .chat-item:hover { background: rgba(255,255,255,0.04) !import
 .msg-user { font-size: 11.5px; font-weight: 700; color: var(--text); }
 .msg-time { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); }
 .msg-check { font-size: 10px; margin-left: 4px; letter-spacing: -2px; }
+.msg-roblox-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 3px;
+    color: #00b2ff; transition: color 0.15s; margin-left: 2px;
+}
+.msg-roblox-badge:hover { color: #fff; }
 
 /* Reply Button */
 .msg-reply-btn {
@@ -1030,11 +1036,13 @@ body.has-custom-bg .gif-picker-panel {
 /* Rechtsklick Kontextmenü */
 .ctx-menu {
     position: fixed; z-index: 9999;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    padding: 4px; min-width: 160px;
-    animation: rpFadeIn 0.12s ease-out;
+    background: rgba(26,29,46,0.88); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    padding: 6px; min-width: 180px;
+    animation: ctxIn 0.15s ease-out;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
 }
+@keyframes ctxIn { from { opacity: 0; transform: scale(0.95) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .ctx-menu.hidden { display: none; }
 .ctx-item {
     display: flex; align-items: center; gap: 8px;
@@ -1049,28 +1057,43 @@ body.has-custom-bg .gif-picker-panel {
 .ctx-item svg { color: var(--text-muted); flex-shrink: 0; }
 .ctx-item.ctx-danger svg { color: var(--status-danger); }
 
+/* Forward Modal */
+#forwardModal .modal-box {
+    background: rgba(26,29,46,0.92); backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+#forwardModal .modal-header {
+    background: rgba(17,19,32,0.6); border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#forwardModal .modal-body { padding: 14px 16px; }
+#forwardModal .btn-primary {
+    background: var(--brand-blue); border: none; color: #fff;
+    border-radius: var(--radius-sm); transition: all 0.2s;
+}
+#forwardModal .btn-primary:hover { background: var(--brand-blue-2); transform: translateY(-1px); }
+
 /* Forward User List */
 .fwd-user-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: var(--radius-sm);
-    cursor: pointer; transition: background 0.15s;
+    padding: 10px 12px; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.2s;
     border: 1px solid transparent;
 }
-.fwd-user-item:hover { background: var(--bg-card-hover); }
-.fwd-user-item.selected { background: rgba(0,136,255,0.1); border-color: var(--border-blue); }
+.fwd-user-item:hover { background: rgba(255,255,255,0.04); }
+.fwd-user-item.selected { background: rgba(0,136,255,0.08); border-color: var(--border-blue); }
 .fwd-user-avatar {
-    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; color: #fff;
+    font-size: 13px; font-weight: 700; color: #fff;
     background: linear-gradient(135deg, var(--brand-blue), #1e40af); overflow: hidden;
 }
 .fwd-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .fwd-user-name { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
 .fwd-user-check {
-    width: 18px; height: 18px; border-radius: 50%;
-    border: 2px solid var(--border); display: flex;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.1); display: flex;
     align-items: center; justify-content: center; flex-shrink: 0;
-    font-size: 10px; color: transparent; transition: all 0.15s;
+    font-size: 11px; color: transparent; transition: all 0.2s;
 }
 .fwd-user-item.selected .fwd-user-check {
     background: var(--brand-blue); border-color: var(--brand-blue); color: #fff;
