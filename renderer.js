@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.3.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
+let CURRENT_VERSION = '4.4.0'; // Stand: 30.03.2026 (Versions-Synchronisierung, Konsistenz-Fix)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1948,7 +1948,7 @@ const App = window.App = {
                     ${replyRef}
                     <div class="msg-meta"><span class="msg-user">${isOwn ? 'Du' : escHtml(data.username || 'User')}</span><span class="msg-time">${time}</span>${checkmark}</div>
                     <div class="msg-text">${content}</div>
-                    <div class="msg-reactions" id="${msgId}-reactions"></div>
+                    <div class="msg-reactions" id="${msgId}-reactions">${data.reactions ? Object.entries(data.reactions).map(([e,c]) => `<span class="reaction-badge" data-emoji="${e}" onclick="App.addReaction('${msgId}','${e}')">${e}<span class="rc-count">${c}</span></span>`).join('') : ''}</div>
                     <button class="msg-react-btn" onclick="App.showReactionPicker('${msgId}')" title="Reagieren">+</button>
                     ${replyBtn}
                 </div>
@@ -2075,6 +2075,20 @@ const App = window.App = {
 
         // Picker schließen
         document.querySelectorAll('.reaction-picker').forEach(el => el.remove());
+
+        // In localStorage speichern
+        try {
+            const id = parseInt(msgId.replace('msg-', ''));
+            Object.keys(localStorage).filter(k => k.startsWith('chat_history_')).forEach(k => {
+                const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                const msg = msgs.find(m => m.id === id);
+                if (msg) {
+                    if (!msg.reactions) msg.reactions = {};
+                    msg.reactions[emoji] = (msg.reactions[emoji] || 0) + 1;
+                    localStorage.setItem(k, JSON.stringify(msgs));
+                }
+            });
+        } catch(e) {}
 
         // Socket sync
         if (WebSocketService.socket?.connected) {
