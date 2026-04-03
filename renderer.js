@@ -550,6 +550,13 @@ const App = {
         this.initBackgroundParallax();
         
         try {
+            // Version-Migration: Session clearen wenn Version sich geändert hat
+            const lastVer = localStorage.getItem('last_app_version');
+            if (lastVer !== CURRENT_VERSION) {
+                console.log(`[App] Version geändert: ${lastVer} → ${CURRENT_VERSION}`);
+                localStorage.setItem('last_app_version', CURRENT_VERSION);
+            }
+
             // Version auf Splash Screen setzen
             const splashVer = document.getElementById('splashVersion');
             if (splashVer) splashVer.textContent = `v${CURRENT_VERSION}`;

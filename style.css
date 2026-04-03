@@ -82,6 +82,9 @@ svg { display: block; flex-shrink: 0; }
 /* ── Screen System ────────────────────────────────────────── */
 .screen { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 10; background: var(--bg-base); }
 .screen.active { opacity: 1; pointer-events: all; z-index: 10; }
+#splashScreen { z-index: 30; }
+#loginScreen { z-index: 20; }
+#dashboardScreen { z-index: 10; }
 .hidden { display: none !important; }
 
 /* ============================================================
