@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.8.0'; // Stand: 04.04.2026 (Glass, Sounds, Roblox Badge, Reply Fix)
+let CURRENT_VERSION = '4.9.0'; // Stand: 04.04.2026 (Forward Glass, Reply Puls, Bild-Reply Fix)
 
 // =============================================================
 // CONFIG — Bot-API
