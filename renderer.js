@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.10.0'; // Stand: 04.04.2026 (Chat-Backup, Paste, Badge Fix)
+let CURRENT_VERSION = '4.10.1'; // Stand: 04.04.2026 (Bio-Code Button, Layout Fix)
 
 // =============================================================
 // CONFIG — Bot-API
