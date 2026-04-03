@@ -974,7 +974,6 @@ const App = window.App = {
                     <div style="display:flex;flex-direction:column;min-width:0;">
                         <div style="display:flex;align-items:center;gap:3px;">
                             <span class="ovn-name">${escHtml(u.username)}</span>
-                            ${App._getRobloxBadge(u.discordId, false)}
                         </div>
                     </div>
                 </div>
@@ -2342,10 +2341,12 @@ const App = window.App = {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5.25 0L0 18.75L18.75 24L24 5.25L5.25 0ZM14.7 14.7L9.3 13.2L10.8 7.8L14.7 14.7Z"/></svg>
             </a>`;
         }
-        // Async laden (einmalig)
+        // Async laden (einmalig, nur bei Bedarf — nicht in Sidebar)
         if (this._robloxCache[userId] === undefined) {
             this._robloxCache[userId] = null; // loading
-            ApiService.get(`/api/roblox/profile?discordId=${encodeURIComponent(userId)}`).then(data => {
+            fetch(`${CONFIG.API_URL}/api/roblox/profile?discordId=${encodeURIComponent(userId)}`, {
+                headers: { 'x-api-key': CONFIG.API_KEY }
+            }).then(r => r.ok ? r.json() : null).then(data => {
                 if (data?.success && data.profile?.profileUrl) {
                     this._robloxCache[userId] = data.profile.profileUrl;
                 } else {
