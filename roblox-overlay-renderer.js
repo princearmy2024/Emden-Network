@@ -70,10 +70,42 @@ const Overlay = (() => {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        // Mod-Panel Toggle nur für Admins
+        // Mod-Panel Toggle nur für Admins — draggable + Position speichern
         if (isAdmin) {
             const toggle = document.getElementById('mod-toggle');
-            if (toggle) toggle.classList.add('visible');
+            if (toggle) {
+                toggle.classList.add('visible');
+                // Gespeicherte Position laden
+                try {
+                    const saved = JSON.parse(localStorage.getItem('mod_toggle_pos'));
+                    if (saved) { toggle.style.left = saved.x + 'px'; toggle.style.top = saved.y + 'px'; }
+                } catch(e) {}
+                // Draggable
+                let isDragging = false, dragStartX, dragStartY, startLeft, startTop, moved = false;
+                toggle.addEventListener('mousedown', (e) => {
+                    isDragging = true; moved = false;
+                    dragStartX = e.clientX; dragStartY = e.clientY;
+                    startLeft = toggle.offsetLeft; startTop = toggle.offsetTop;
+                    toggle.style.transition = 'none'; toggle.style.zIndex = '999';
+                    e.preventDefault();
+                });
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+                    toggle.style.left = (startLeft + dx) + 'px';
+                    toggle.style.top = (startTop + dy) + 'px';
+                });
+                document.addEventListener('mouseup', () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    toggle.style.transition = ''; toggle.style.zIndex = '';
+                    // Position speichern
+                    localStorage.setItem('mod_toggle_pos', JSON.stringify({ x: toggle.offsetLeft, y: toggle.offsetTop }));
+                    // Nur öffnen wenn nicht gedraggt
+                    if (!moved) Overlay.toggleModPanel();
+                });
+            }
         }
 
         if (window.electronAPI?.onToggleRobloxCmd) {

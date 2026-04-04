@@ -291,17 +291,18 @@ body {
 /* Mod Toggle Button */
 #mod-toggle {
   position: fixed; top: 22px; left: 22px;
-  width: 42px; height: 42px; border-radius: 12px;
-  background: rgba(10,10,22,0.85); backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.08);
+  width: 46px; height: 46px; border-radius: 14px;
+  background: rgba(10,10,22,0.88); backdrop-filter: blur(28px);
+  border: 1px solid rgba(255,255,255,0.1);
   display: none; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--accent-blue); z-index: 260;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  transition: all 0.3s;
+  cursor: grab; color: var(--accent-blue); z-index: 260;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 12px rgba(59,130,246,0.08);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
-#mod-toggle:hover { background: rgba(15,15,32,0.9); border-color: rgba(59,130,246,0.3); transform: scale(1.05); }
+#mod-toggle:hover { background: rgba(15,15,32,0.95); border-color: rgba(59,130,246,0.35); box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 20px rgba(59,130,246,0.15); }
+#mod-toggle:active { cursor: grabbing; }
 #mod-toggle.visible { display: flex; }
-#mod-toggle svg { width: 20px; height: 20px; }
+#mod-toggle svg { width: 20px; height: 20px; pointer-events: none; }
 
 .mod-status {
   padding: 8px 16px; text-align: center; font-size: 11px;
@@ -398,7 +399,7 @@ body {
 </div>
 
 <!-- MOD TOGGLE BUTTON (nur für Admins) -->
-<div id="mod-toggle" onclick="Overlay.toggleModPanel()">
+<div id="mod-toggle">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
 </div>
 
