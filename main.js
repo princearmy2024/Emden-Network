@@ -433,13 +433,19 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
 }
 
-// Overlay nur bei Roblox anzeigen — prüft ob Roblox läuft
+// Overlay nur sichtbar wenn Roblox das AKTIVE Fenster ist
 let overlayVisible = true;
 let robloxCheckInterval = null;
+let hideTimeout = null;
 
 function startRobloxWindowCheck() {
     if (robloxCheckInterval) return;
-    const { exec } = require('child_process');
+    const { execFile } = require('child_process');
+    const wscriptPath = 'cscript.exe';
+
+    // VBScript ist VIEL schneller als PowerShell (~20ms statt ~500ms)
+    const vbsScript = path.join(app.getPath('temp'), 'en_fgwin.vbs');
+    fs.writeFileSync(vbsScript, 'Set WshShell = CreateObject("WScript.Shell")\nWScript.Echo WshShell.AppActivate("Roblox")');
 
     robloxCheckInterval = setInterval(() => {
         if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) {
@@ -448,20 +454,33 @@ function startRobloxWindowCheck() {
             return;
         }
 
-        // Schneller Check: Prüft ob Roblox-Prozess existiert (tasklist ist viel schneller als PowerShell)
-        exec('tasklist /FI "IMAGENAME eq RobloxPlayerBeta.exe" /NH', { timeout: 1500 }, (err, stdout) => {
+        // Prüft ob "Roblox" im Titel des aktiven Fensters ist
+        execFile('cscript.exe', ['//Nologo', vbsScript], { timeout: 1000, windowsHide: true }, (err, stdout) => {
             if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
-            const isRobloxRunning = (stdout || '').toLowerCase().includes('robloxplayer');
+            const isRobloxActive = (stdout || '').trim() === 'True' || (stdout || '').trim() === '-1';
 
-            if (isRobloxRunning && !overlayVisible) {
-                overlayVisible = true;
-                robloxOverlayWin.showInactive();
-            } else if (!isRobloxRunning && overlayVisible) {
-                overlayVisible = false;
-                robloxOverlayWin.hide();
+            if (isRobloxActive) {
+                // Roblox ist aktiv → Overlay anzeigen (sofort)
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+                if (!overlayVisible) {
+                    overlayVisible = true;
+                    robloxOverlayWin.showInactive();
+                }
+            } else {
+                // Nicht Roblox → nach 1s verstecken (verhindert Flicker bei kurzen Focus-Wechseln)
+                if (overlayVisible && !hideTimeout) {
+                    hideTimeout = setTimeout(() => {
+                        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                            overlayVisible = false;
+                            robloxOverlayWin.hide();
+                        }
+                        hideTimeout = null;
+                    }, 1000);
+                }
             }
         });
-    }, 3000);
+    }, 800);
 }
 
 // Show/hide Roblox overlay via IPC (called from renderer.js)

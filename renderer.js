@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.16.1'; // Stand: 05.04.2026 (Overlay Flicker Fix)
+let CURRENT_VERSION = '4.16.2'; // Stand: 05.04.2026 (Overlay nur aktives Roblox)
 
 // =============================================================
 // CONFIG — Bot-API
