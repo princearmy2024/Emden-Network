@@ -1,0 +1,16 @@
+{
+    "name": "emden-network-mobile",
+    "version": "1.0.0",
+    "description": "Emden Network - Mobile App",
+    "main": "index.js",
+    "scripts": {
+        "build": "npx cap sync android",
+        "open": "npx cap open android",
+        "run": "npx cap run android"
+    },
+    "dependencies": {
+        "@capacitor/android": "^7.0.0",
+        "@capacitor/core": "^7.0.0",
+        "@capacitor/cli": "^7.0.0"
+    }
+}

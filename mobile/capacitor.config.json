@@ -1,0 +1,12 @@
+{
+    "appId": "com.emdennetwork.app",
+    "appName": "Emden Network",
+    "webDir": "www",
+    "server": {
+        "androidScheme": "https",
+        "allowNavigation": ["91.98.124.212:5009", "*.roblox.com", "*.discord.com", "*.tenor.com"]
+    },
+    "android": {
+        "allowMixedContent": true
+    }
+}
