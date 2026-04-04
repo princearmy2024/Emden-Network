@@ -70,6 +70,12 @@ const Overlay = (() => {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
+        // Mod-Panel Toggle nur für Admins
+        if (isAdmin) {
+            const toggle = document.getElementById('mod-toggle');
+            if (toggle) toggle.classList.add('visible');
+        }
+
         if (window.electronAPI?.onToggleRobloxCmd) {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
@@ -571,7 +577,141 @@ const Overlay = (() => {
             .replace(/>/g,'&gt;');
     }
 
-    return { init, toggleCmd };
+    // ─── MOD PANEL ──────────────────────────────────────────
+    const MOD_WEBHOOK = 'https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
+    let modPanelVisible = false;
+    let modSelectedUser = null;
+    let modSearchTimer = null;
+
+    function toggleModPanel() {
+        modPanelVisible = !modPanelVisible;
+        const panel = document.getElementById('mod-panel');
+        if (panel) panel.classList.toggle('visible', modPanelVisible);
+        if (modPanelVisible) {
+            document.getElementById('modSearchInput')?.focus();
+        }
+    }
+
+    async function searchModUser(query) {
+        clearTimeout(modSearchTimer);
+        const results = document.getElementById('modResults');
+        if (!query || query.length < 2) {
+            results.innerHTML = '<div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,0.2);font-size:12px;">Username eingeben zum Suchen</div>';
+            return;
+        }
+        results.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:12px;">Suche...</div>';
+
+        modSearchTimer = setTimeout(async () => {
+            try {
+                const res = await fetch('https://users.roblox.com/v1/usernames/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
+                });
+                const data = await res.json();
+                if (!data.data || data.data.length === 0) {
+                    results.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:12px;">Kein User gefunden</div>';
+                    return;
+                }
+
+                // Für jeden gefundenen User: Avatar laden
+                const users = data.data;
+                const userIds = users.map(u => u.id);
+                let avatars = {};
+                try {
+                    const avRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userIds.join(',')}&size=48x48&format=Png&isCircular=false`);
+                    const avData = await avRes.json();
+                    avData.data?.forEach(a => { avatars[a.targetId] = a.imageUrl; });
+                } catch(e) {}
+
+                results.innerHTML = users.map(u => {
+                    const avatar = avatars[u.id] || '';
+                    const avatarHtml = avatar
+                        ? `<img src="${avatar}" onerror="this.style.display='none'">`
+                        : u.name[0].toUpperCase();
+                    return `<div class="mod-user-item ${modSelectedUser?.id === u.id ? 'selected' : ''}" onclick="Overlay.selectModUser(${u.id}, '${esc(u.name)}', '${esc(u.displayName || u.name)}', '${esc(avatar)}')">
+                        <div class="mod-user-avatar">${avatarHtml}</div>
+                        <div>
+                            <div class="mod-user-name">${esc(u.displayName || u.name)}</div>
+                            <div class="mod-user-id">@${esc(u.name)} · ${u.id}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                results.innerHTML = '<div style="text-align:center;padding:30px;color:#ff6b6b;font-size:12px;">API Fehler</div>';
+            }
+        }, 400);
+    }
+
+    function selectModUser(id, username, displayName, avatar) {
+        modSelectedUser = { id, username, displayName, avatar };
+        // Highlight
+        document.querySelectorAll('.mod-user-item').forEach(el => el.classList.remove('selected'));
+        event?.target?.closest('.mod-user-item')?.classList.add('selected');
+        // Show selected
+        const sel = document.getElementById('modSelectedUser');
+        if (sel) { sel.textContent = `${displayName} (@${username}) · ${id}`; sel.classList.remove('hidden'); }
+        // Enable buttons
+        ['modBtnWarn','modBtnKick','modBtnBan'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.disabled = false;
+        });
+    }
+
+    async function modAction(type) {
+        if (!modSelectedUser) return;
+        const reason = document.getElementById('modReasonInput')?.value?.trim() || 'Kein Grund angegeben';
+        const user = modSelectedUser;
+        const moderator = voiceUsername || 'Unbekannt';
+        const now = new Date();
+
+        // Webhook senden
+        const color = type === 'Ban' ? 0xFF4444 : type === 'Kick' ? 0xF59E0B : 0x3B82F6;
+        const emoji = type === 'Ban' ? '🔨' : type === 'Kick' ? '👢' : '⚠️';
+
+        const payload = {
+            username: 'Emden Network Moderation',
+            avatar_url: 'https://github.com/princearmy2024.png',
+            embeds: [{
+                color,
+                author: { name: `${emoji} ${type}`, icon_url: user.avatar || 'https://github.com/princearmy2024.png' },
+                title: `Moderation | ${user.id}`,
+                fields: [
+                    { name: 'User ID', value: `\`${user.id}\``, inline: true },
+                    { name: 'Display Name', value: user.displayName, inline: true },
+                    { name: 'Account Created', value: '—', inline: true },
+                    { name: 'Reason', value: reason, inline: true },
+                    { name: 'Punishment', value: type, inline: true },
+                ],
+                footer: { text: `Moderator: @${moderator}`, icon_url: 'https://github.com/princearmy2024.png' },
+                timestamp: now.toISOString(),
+            }]
+        };
+
+        try {
+            await fetch(MOD_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            // Status anzeigen
+            const status = document.getElementById('modStatus');
+            if (status) {
+                status.textContent = `✓ ${type} für ${user.displayName} gesendet`;
+                status.classList.remove('show');
+                void status.offsetWidth;
+                status.classList.add('show');
+            }
+            // Reason leeren
+            const reasonInput = document.getElementById('modReasonInput');
+            if (reasonInput) reasonInput.value = '';
+        } catch(e) {
+            const status = document.getElementById('modStatus');
+            if (status) { status.textContent = '✗ Fehler beim Senden'; status.style.color = '#ff6b6b'; status.classList.add('show'); }
+        }
+    }
+
+    return { init, toggleCmd, toggleModPanel, searchModUser, selectModUser, modAction };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());
