@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.12.0'; // Stand: 04.04.2026 (Overlay weg, PFP Fix, 404 Fix)
+let CURRENT_VERSION = '4.13.0'; // Stand: 05.04.2026 (Mod-Panel, Roblox Badge Profil)
 
 // =============================================================
 // CONFIG — Bot-API
