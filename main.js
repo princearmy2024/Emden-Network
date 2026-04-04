@@ -433,13 +433,13 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
 }
 
-// Overlay nur bei Roblox anzeigen — prüft aktives Fenster
+// Overlay nur bei Roblox anzeigen — prüft ob Roblox läuft
 let overlayVisible = true;
 let robloxCheckInterval = null;
 
 function startRobloxWindowCheck() {
     if (robloxCheckInterval) return;
-    const { execFile } = require('child_process');
+    const { exec } = require('child_process');
 
     robloxCheckInterval = setInterval(() => {
         if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) {
@@ -448,23 +448,20 @@ function startRobloxWindowCheck() {
             return;
         }
 
-        // PowerShell: Prüft ob das aktive Fenster Roblox ist
-        execFile('powershell.exe', ['-NoProfile', '-Command',
-            '(Get-Process | Where-Object {$_.MainWindowHandle -eq (Add-Type -MemberDefinition \'[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();\' -Name W -Namespace U -PassThru)::GetForegroundWindow()}).ProcessName'
-        ], { timeout: 2000 }, (err, stdout) => {
+        // Schneller Check: Prüft ob Roblox-Prozess existiert (tasklist ist viel schneller als PowerShell)
+        exec('tasklist /FI "IMAGENAME eq RobloxPlayerBeta.exe" /NH', { timeout: 1500 }, (err, stdout) => {
             if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
-            const proc = (stdout || '').trim().toLowerCase();
-            const isRoblox = proc.includes('robloxplayer') || proc.includes('roblox');
+            const isRobloxRunning = (stdout || '').toLowerCase().includes('robloxplayer');
 
-            if (isRoblox && !overlayVisible) {
+            if (isRobloxRunning && !overlayVisible) {
                 overlayVisible = true;
                 robloxOverlayWin.showInactive();
-            } else if (!isRoblox && overlayVisible) {
+            } else if (!isRobloxRunning && overlayVisible) {
                 overlayVisible = false;
                 robloxOverlayWin.hide();
             }
         });
-    }, 1500);
+    }, 3000);
 }
 
 // Show/hide Roblox overlay via IPC (called from renderer.js)
