@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.13.0'; // Stand: 05.04.2026 (Mod-Panel, Roblox Badge Profil)
+let CURRENT_VERSION = '4.14.0'; // Stand: 05.04.2026 (Draggable Mod-Panel)
 
 // =============================================================
 // CONFIG — Bot-API
