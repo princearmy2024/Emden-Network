@@ -433,9 +433,44 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
 }
 
+// Overlay nur bei Roblox anzeigen — prüft aktives Fenster
+let overlayVisible = true;
+let robloxCheckInterval = null;
+
+function startRobloxWindowCheck() {
+    if (robloxCheckInterval) return;
+    const { execFile } = require('child_process');
+
+    robloxCheckInterval = setInterval(() => {
+        if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) {
+            clearInterval(robloxCheckInterval);
+            robloxCheckInterval = null;
+            return;
+        }
+
+        // PowerShell: Prüft ob das aktive Fenster Roblox ist
+        execFile('powershell.exe', ['-NoProfile', '-Command',
+            '(Get-Process | Where-Object {$_.MainWindowHandle -eq (Add-Type -MemberDefinition \'[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();\' -Name W -Namespace U -PassThru)::GetForegroundWindow()}).ProcessName'
+        ], { timeout: 2000 }, (err, stdout) => {
+            if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
+            const proc = (stdout || '').trim().toLowerCase();
+            const isRoblox = proc.includes('robloxplayer') || proc.includes('roblox');
+
+            if (isRoblox && !overlayVisible) {
+                overlayVisible = true;
+                robloxOverlayWin.showInactive();
+            } else if (!isRoblox && overlayVisible) {
+                overlayVisible = false;
+                robloxOverlayWin.hide();
+            }
+        });
+    }, 1500);
+}
+
 // Show/hide Roblox overlay via IPC (called from renderer.js)
 ipcMain.on('show-roblox-overlay', (event, { discordId, robloxId, isAdmin }) => {
     createRobloxOverlay(discordId, robloxId, isAdmin);
+    startRobloxWindowCheck();
 });
 ipcMain.on('hide-roblox-overlay', () => {
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {

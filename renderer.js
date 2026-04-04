@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.15.0'; // Stand: 05.04.2026 (F4 Mod-Panel Hotkey)
+let CURRENT_VERSION = '4.16.0'; // Stand: 05.04.2026 (Overlay nur bei Roblox)
 
 // =============================================================
 // CONFIG — Bot-API
