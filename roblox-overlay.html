@@ -189,24 +189,24 @@ body {
 
 /* ── MOD PANEL (left side) ── */
 #mod-panel {
-  position: fixed; top: 80px; left: -360px;
-  width: 340px; height: calc(100vh - 120px);
+  position: fixed; top: 80px; left: 40px;
+  width: 340px; height: 500px; max-height: calc(100vh - 120px);
   background: rgba(10, 10, 22, 0.92);
   backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 0 18px 18px 0;
-  box-shadow: 12px 0 48px rgba(0,0,0,0.5);
-  z-index: 250; display: flex; flex-direction: column;
-  transition: left 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+  z-index: 250; display: none; flex-direction: column;
+  overflow: hidden; resize: both;
 }
-#mod-panel.visible { left: 0; }
+#mod-panel.visible { display: flex; }
 
 .mod-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
-  flex-shrink: 0;
+  flex-shrink: 0; cursor: grab;
 }
+.mod-header:active { cursor: grabbing; }
 .mod-title { font-size: 14px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
 .mod-title svg { color: var(--accent-blue); }
 .mod-close {

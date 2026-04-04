@@ -618,10 +618,46 @@ const Overlay = (() => {
     function toggleModPanel() {
         modPanelVisible = !modPanelVisible;
         const panel = document.getElementById('mod-panel');
-        if (panel) panel.classList.toggle('visible', modPanelVisible);
+        if (!panel) return;
+        panel.classList.toggle('visible', modPanelVisible);
         if (modPanelVisible) {
+            // Gespeicherte Position laden
+            try {
+                const saved = JSON.parse(localStorage.getItem('mod_panel_pos'));
+                if (saved) { panel.style.left = saved.x + 'px'; panel.style.top = saved.y + 'px'; }
+            } catch(e) {}
             document.getElementById('modSearchInput')?.focus();
+            initModPanelDrag();
         }
+    }
+
+    let modPanelDragInit = false;
+    function initModPanelDrag() {
+        if (modPanelDragInit) return;
+        modPanelDragInit = true;
+        const panel = document.getElementById('mod-panel');
+        const header = panel?.querySelector('.mod-header');
+        if (!panel || !header) return;
+
+        let dragging = false, sx, sy, sl, st;
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.mod-close')) return;
+            dragging = true; sx = e.clientX; sy = e.clientY;
+            sl = panel.offsetLeft; st = panel.offsetTop;
+            panel.style.transition = 'none';
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            panel.style.left = (sl + e.clientX - sx) + 'px';
+            panel.style.top = (st + e.clientY - sy) + 'px';
+        });
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return;
+            dragging = false;
+            panel.style.transition = '';
+            localStorage.setItem('mod_panel_pos', JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop }));
+        });
     }
 
     async function searchModUser(query) {
