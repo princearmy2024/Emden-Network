@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.14.0'; // Stand: 05.04.2026 (Draggable Mod-Panel)
+let CURRENT_VERSION = '4.14.1'; // Stand: 05.04.2026 (Overlay Auto-Start, Focus Fix)
 
 // =============================================================
 // CONFIG — Bot-API
