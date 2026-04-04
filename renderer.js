@@ -800,6 +800,12 @@ const App = window.App = {
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
+        // Overlay für Admins immer starten
+        if (user.role === 'admin' && window.electronAPI?.showRobloxOverlay) {
+            const rblxProfile = RobloxService.getProfile();
+            window.electronAPI.showRobloxOverlay(user.discordId, rblxProfile?.userId || '', true);
+        }
+
         // Demo: Notifications nach kurzer Zeit
         setTimeout(() => {
             NotificationService.show('Willkommen!', 'Schön, dass du wieder da bist.', 'success');

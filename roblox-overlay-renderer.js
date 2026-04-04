@@ -626,8 +626,19 @@ const Overlay = (() => {
                 const saved = JSON.parse(localStorage.getItem('mod_panel_pos'));
                 if (saved) { panel.style.left = saved.x + 'px'; panel.style.top = saved.y + 'px'; }
             } catch(e) {}
+            // Focus anfordern damit Klicks im Panel funktionieren
+            if (window.electronAPI) {
+                window.electronAPI.requestOverlayFocus?.(true) ||
+                (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', true));
+            }
             document.getElementById('modSearchInput')?.focus();
             initModPanelDrag();
+        } else {
+            // Focus zurückgeben
+            if (window.electronAPI) {
+                window.electronAPI.requestOverlayFocus?.(false) ||
+                (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', false));
+            }
         }
     }
 

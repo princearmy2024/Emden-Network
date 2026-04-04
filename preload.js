@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveChatBackup: (data) => ipcRenderer.invoke('save-chat-backup', data),
     loadChatBackup: () => ipcRenderer.invoke('load-chat-backup'),
 
+    // Overlay Focus (für Mod-Panel Klicks)
+    requestOverlayFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
+
     // Autostart
     setAutostart: (enabled) => ipcRenderer.send('set-autostart', enabled),
 
