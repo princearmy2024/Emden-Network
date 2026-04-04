@@ -437,6 +437,7 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
 let overlayVisible = true;
 let robloxCheckInterval = null;
 let hideTimeout = null;
+let overlayHasFocus = false;
 
 function startRobloxWindowCheck() {
     if (robloxCheckInterval) return;
@@ -467,8 +468,8 @@ function startRobloxWindowCheck() {
                     overlayVisible = true;
                     robloxOverlayWin.showInactive();
                 }
-            } else {
-                // Nicht Roblox → nach 1s verstecken (verhindert Flicker bei kurzen Focus-Wechseln)
+            } else if (!overlayHasFocus) {
+                // Nicht Roblox UND Overlay hat keinen Focus → nach 1s verstecken
                 if (overlayVisible && !hideTimeout) {
                     hideTimeout = setTimeout(() => {
                         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
@@ -495,12 +496,13 @@ ipcMain.on('hide-roblox-overlay', () => {
     }
 });
 
-// Focus toggle for F3 command bar
+// Focus toggle for F3/F4 command bar / mod panel
 ipcMain.on('overlay-request-focus', (event, focus) => {
+    overlayHasFocus = focus;
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         if (focus) {
             robloxOverlayWin.setIgnoreMouseEvents(false);
-            robloxOverlayWin.focus(); 
+            robloxOverlayWin.focus();
         } else {
             robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
         }

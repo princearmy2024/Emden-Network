@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.16.2'; // Stand: 05.04.2026 (Overlay nur aktives Roblox)
+let CURRENT_VERSION = '4.16.3'; // Stand: 05.04.2026 (Overlay bleibt bei Mod-Panel)
 
 // =============================================================
 // CONFIG — Bot-API
