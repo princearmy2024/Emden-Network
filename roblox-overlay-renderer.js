@@ -70,7 +70,7 @@ const Overlay = (() => {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        // Mod-Panel Toggle nur für Admins — draggable + Position speichern
+        // Mod-Panel Toggle nur für Admins — dynamische Klick-Erkennung
         if (isAdmin) {
             const toggle = document.getElementById('mod-toggle');
             if (toggle) {
@@ -80,8 +80,22 @@ const Overlay = (() => {
                     const saved = JSON.parse(localStorage.getItem('mod_toggle_pos'));
                     if (saved) { toggle.style.left = saved.x + 'px'; toggle.style.top = saved.y + 'px'; }
                 } catch(e) {}
-                // Draggable
+
+                // Hover über interaktive Elemente → Maus-Events aktivieren
                 let isDragging = false, dragStartX, dragStartY, startLeft, startTop, moved = false;
+
+                toggle.addEventListener('mouseenter', () => {
+                    if (!modPanelVisible && window.electronAPI?.requestOverlayFocus) {
+                        window.electronAPI.requestOverlayFocus(true);
+                    }
+                });
+                toggle.addEventListener('mouseleave', () => {
+                    if (!modPanelVisible && !isDragging && window.electronAPI?.requestOverlayFocus) {
+                        window.electronAPI.requestOverlayFocus(false);
+                    }
+                });
+
+                // Draggable
                 toggle.addEventListener('mousedown', (e) => {
                     isDragging = true; moved = false;
                     dragStartX = e.clientX; dragStartY = e.clientY;
@@ -100,12 +114,20 @@ const Overlay = (() => {
                     if (!isDragging) return;
                     isDragging = false;
                     toggle.style.transition = ''; toggle.style.zIndex = '';
-                    // Position speichern
                     localStorage.setItem('mod_toggle_pos', JSON.stringify({ x: toggle.offsetLeft, y: toggle.offsetTop }));
-                    // Nur öffnen wenn nicht gedraggt
                     if (!moved) Overlay.toggleModPanel();
                 });
             }
+
+            // Info-Bar Hover → auch klickbar machen
+            document.querySelectorAll('.info-card').forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    if (window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(true);
+                });
+                card.addEventListener('mouseleave', () => {
+                    if (!modPanelVisible && window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(false);
+                });
+            });
         }
 
         if (window.electronAPI?.onToggleRobloxCmd) {

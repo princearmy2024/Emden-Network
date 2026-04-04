@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.14.1'; // Stand: 05.04.2026 (Overlay Auto-Start, Focus Fix)
+let CURRENT_VERSION = '4.14.2'; // Stand: 05.04.2026 (Overlay Klick Fix)
 
 // =============================================================
 // CONFIG — Bot-API
