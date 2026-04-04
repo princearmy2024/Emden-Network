@@ -3173,6 +3173,10 @@ Object.assign(App, {
 
         this.showRobloxState('connected');
 
+        // Roblox Badge im Account-Bereich anzeigen
+        const rblxBadge = document.getElementById('robloxLinkBadge');
+        if (rblxBadge) rblxBadge.classList.remove('hidden');
+
         // Overlay starten
         const user = AuthService.getUser();
         if (user && window.electronAPI?.showRobloxOverlay) {
@@ -3201,6 +3205,8 @@ Object.assign(App, {
     disconnectRoblox() {
         RobloxService.clearProfile();
         this.showRobloxState('disconnected');
+        const rblxBadge = document.getElementById('robloxLinkBadge');
+        if (rblxBadge) rblxBadge.classList.add('hidden');
         if (window.electronAPI?.hideRobloxOverlay) {
             window.electronAPI.hideRobloxOverlay();
         }
