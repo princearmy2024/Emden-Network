@@ -134,6 +134,13 @@ const Overlay = (() => {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
 
+        // F4: Mod-Panel Toggle via IPC
+        if (window.electronAPI?.onToggleModPanel) {
+            window.electronAPI.onToggleModPanel(() => {
+                if (isAdmin) toggleModPanel();
+            });
+        }
+
         // Voice PTT State vom Dashboard (Sync wenn beide Fenster offen)
         if (window.electronAPI?.onUpdateOverlayState) {
             window.electronAPI.onUpdateOverlayState((state) => {

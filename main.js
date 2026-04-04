@@ -608,18 +608,10 @@ app.whenReady().then(() => {
         }
     });
 
-    // DEV-DEBUG: F4 to simulate game start
+    // F4: Mod-Panel Toggle (Focus + Panel öffnen/schließen)
     globalShortcut.register('F4', () => {
         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-            robloxOverlayWin.webContents.executeJavaScript(`
-                if (typeof setGameRunning !== "undefined") {
-                    setGameRunning(!isGameRunning);
-                } else if (typeof Overlay !== "undefined") {
-                     // trigger F4 simulate
-                     const event = new KeyboardEvent('keydown', { key: 'F4' });
-                     document.dispatchEvent(event);
-                }
-            `);
+            robloxOverlayWin.webContents.send('toggle-mod-panel');
         }
     });
 

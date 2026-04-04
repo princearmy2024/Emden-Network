@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     onToggleRobloxCmd: (callback) => ipcRenderer.on('toggle-roblox-cmd', callback),
+    onToggleModPanel: (callback) => ipcRenderer.on('toggle-mod-panel', callback),
     overlayRequestFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
     updateOverlayState: (state) => ipcRenderer.send('update-overlay-state', state),
     onUpdateOverlayState: (callback) => ipcRenderer.on('update-overlay-state', (event, state) => callback(state)),
