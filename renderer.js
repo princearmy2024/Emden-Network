@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.23.1'; // Stand: 05.04.2026 (Logo, Blur Fix, Clear User)
+let CURRENT_VERSION = '4.23.2'; // Stand: 05.04.2026 (Panel Size Save, Logo Fix)
 
 // =============================================================
 // CONFIG — Bot-API

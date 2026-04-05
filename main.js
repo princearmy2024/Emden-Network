@@ -734,14 +734,14 @@ app.whenReady().then(() => {
 
         // Wenn Panel offen → Panel schließen
         if (modPanelWin && !modPanelWin.isDestroyed()) {
-            saveWinPos(modPanelWin, modPanelPosFile);
+            saveWinState(modPanelWin, modPanelPosFile);
             modPanelWin.close();
             modPanelWin = null;
             return;
         }
         // Wenn Button offen → Button schließen
         if (modBtnWin && !modBtnWin.isDestroyed()) {
-            saveWinPos(modBtnWin, modBtnPosFile);
+            saveWinState(modBtnWin, modBtnPosFile);
             modBtnWin.close();
             modBtnWin = null;
             return;
@@ -762,16 +762,16 @@ app.whenReady().then(() => {
         });
         modBtnWin.setAlwaysOnTop(true, 'screen-saver', 2);
         modBtnWin.loadFile('mod-btn.html');
-        modBtnWin.on('moved', () => saveWinPos(modBtnWin, modBtnPosFile));
+        modBtnWin.on('moved', () => saveWinState(modBtnWin, modBtnPosFile));
         modBtnWin.on('closed', () => { modBtnWin = null; });
     }
 
     function openModPanel() {
         if (modPanelWin && !modPanelWin.isDestroyed()) return;
 
-        const pos = loadPos(modPanelPosFile, 200, 100);
+        const saved = loadPos(modPanelPosFile, 200, 100);
         modPanelWin = new BrowserWindow({
-            width: 400, height: 560, x: pos.x, y: pos.y,
+            width: saved.w || 400, height: saved.h || 560, x: saved.x, y: saved.y,
             frame: false, transparent: true, backgroundColor: '#00000000',
             alwaysOnTop: true, skipTaskbar: false,
             resizable: true, minimizable: false, focusable: true,
@@ -779,18 +779,20 @@ app.whenReady().then(() => {
         });
         modPanelWin.setAlwaysOnTop(true, 'pop-up-menu', 1);
         modPanelWin.loadFile('mod-panel.html');
-        modPanelWin.on('moved', () => saveWinPos(modPanelWin, modPanelPosFile));
+        modPanelWin.on('moved', () => saveWinState(modPanelWin, modPanelPosFile));
+        modPanelWin.on('resize', () => saveWinState(modPanelWin, modPanelPosFile));
         modPanelWin.on('closed', () => { modPanelWin = null; });
     }
 
     function loadPos(file, defX, defY) {
-        try { const s = JSON.parse(fs.readFileSync(file, 'utf-8')); return { x: s.x, y: s.y }; }
+        try { const s = JSON.parse(fs.readFileSync(file, 'utf-8')); return s; }
         catch(e) { return { x: defX, y: defY }; }
     }
-    function saveWinPos(win, file) {
+    function saveWinState(win, file) {
         if (!win || win.isDestroyed()) return;
         const [x, y] = win.getPosition();
-        try { fs.writeFileSync(file, JSON.stringify({ x, y })); } catch(e) {}
+        const [w, h] = win.getSize();
+        try { fs.writeFileSync(file, JSON.stringify({ x, y, w, h })); } catch(e) {}
     }
 
     globalShortcut.register('F4', () => toggleModButton());
