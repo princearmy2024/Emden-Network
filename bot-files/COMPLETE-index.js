@@ -776,16 +776,28 @@ const apiServer = http.createServer(async (req, res) => {
                     return res.end(JSON.stringify({ success: false, error: "Kanal nicht gefunden" }));
                 }
 
+                const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
+
                 // Header Section mit Avatar
                 const headerSection = new SectionBuilder()
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`${emoji} **${action}**\n### ${displayName || username}`)
+                        new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName || username}`)
                     );
                 if (avatar) {
                     headerSection.setThumbnailAccessory(
                         new ThumbnailBuilder().setURL(avatar)
                     );
                 }
+
+                // Roblox Profil Button
+                const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+                const buttonRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setLabel('Roblox Profil')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(profileUrl)
+                        .setEmoji('🎮')
+                );
 
                 // Container bauen
                 const container = new ContainerBuilder()
@@ -795,23 +807,33 @@ const apiServer = http.createServer(async (req, res) => {
                     )
                     .addTextDisplayComponents(
                         new TextDisplayBuilder().setContent(
-                            `**User ID** · \`${userId}\`\n**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}`
+                            `**User ID** · \`${userId}\`\n` +
+                            `**Display Name** · ${displayName || '—'}\n` +
+                            `**Username** · @${username}\n` +
+                            `**Account Created** · ${created || 'Unbekannt'}`
                         )
                     )
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`**Reason**\n${reason || 'Kein Grund angegeben'}`)
+                        new TextDisplayBuilder().setContent(`**Reason**\n> ${reason || 'Kein Grund angegeben'}`)
+                    )
+                    .addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`**Punishment**\n${emoji} ${action}`)
+                        new TextDisplayBuilder().setContent(`**Punishment** · ${emoji} ${action}`)
                     )
+                    .addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                    )
+                    .addActionRowComponents(buttonRow)
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`-# 👮 Moderator: @${moderator || 'Unbekannt'}`)
+                        new TextDisplayBuilder().setContent(`-# 👮 Moderator: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
                 await channel.send({
