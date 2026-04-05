@@ -790,6 +790,7 @@ const apiServer = http.createServer(async (req, res) => {
 
                 // Moderator-Rolle aus Discord holen
                 let modRankEmoji = '<:Trialmoderation:1489312502088073308>';
+                let modRankName = 'Moderator';
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID);
                     if (guild) {
@@ -805,7 +806,7 @@ const apiServer = http.createServer(async (req, res) => {
                                 const roles = member.roles.cache.sort((a, b) => b.position - a.position);
                                 for (const [, role] of roles) {
                                     const key = role.name.toLowerCase();
-                                    if (rankEmojis[key]) { modRankEmoji = rankEmojis[key]; break; }
+                                    if (rankEmojis[key]) { modRankEmoji = rankEmojis[key]; modRankName = role.name; break; }
                                 }
                             }
                         }
@@ -876,7 +877,7 @@ const apiServer = http.createServer(async (req, res) => {
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`-# ${modRankEmoji} Moderator: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
+                        new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
                 await channel.send({
