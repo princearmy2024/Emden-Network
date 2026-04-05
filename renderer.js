@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.20.0'; // Stand: 05.04.2026 (Glass Mod-Panel Redesign)
+let CURRENT_VERSION = '4.21.0'; // Stand: 05.04.2026 (Mod-Panel Cleanup, nur F4)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -800,11 +800,10 @@ const App = window.App = {
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
-        // Overlay + Mod-Button für Admins starten
+        // Overlay für Admins starten (F4 für Mod-Panel)
         if (user.role === 'admin' && window.electronAPI?.showRobloxOverlay) {
             const rblxProfile = RobloxService.getProfile();
             window.electronAPI.showRobloxOverlay(user.discordId, rblxProfile?.userId || '', true);
-            window.electronAPI.createModButton?.();
         }
 
         // Demo: Notifications nach kurzer Zeit

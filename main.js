@@ -718,41 +718,10 @@ app.whenReady().then(() => {
         }
     });
 
-    // === MOD-BUTTON: Kleines Always-on-top Mini-Fenster ===
-    let modBtnWin = null;
-    ipcMain.on('create-mod-button', () => createModButton());
-    ipcMain.on('toggle-mod-panel', () => toggleModPanel());
-    function createModButton() {
-        if (modBtnWin && !modBtnWin.isDestroyed()) return;
-        // Gespeicherte Position laden
-        let posX = 20, posY = 20;
-        try {
-            const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'mod-btn-pos.json'), 'utf-8'));
-            if (saved) { posX = saved.x; posY = saved.y; }
-        } catch(e) {}
-
-        modBtnWin = new BrowserWindow({
-            width: 48, height: 48, x: posX, y: posY,
-            frame: false, transparent: true,
-            backgroundColor: '#00000000',
-            alwaysOnTop: true, skipTaskbar: true,
-            resizable: false, minimizable: false, movable: false,
-            focusable: true,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                preload: path.join(__dirname, 'preload.js')
-            }
-        });
-        modBtnWin.setAlwaysOnTop(true, 'screen-saver', 2);
-        modBtnWin.loadFile('mod-btn.html');
-
-        // Klick wird in mod-btn.html via IPC 'toggle-mod-panel' gehandelt
-    }
-
-    // F4: Mod-Panel öffnen/schließen (mit Debounce)
+    // === F4: MOD-PANEL (nur F4, kein Button-Fenster) ===
     let modPanelWin = null;
     let f4Cooldown = false;
+    ipcMain.on('toggle-mod-panel', () => toggleModPanel());
 
     function toggleModPanel() {
         if (f4Cooldown) return;
@@ -764,10 +733,6 @@ app.whenReady().then(() => {
             modPanelWin = null;
             return;
         }
-        openModPanel();
-    }
-
-    function openModPanel() {
         modPanelWin = new BrowserWindow({
             width: 380, height: 540,
             frame: false, transparent: true,
