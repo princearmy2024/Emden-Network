@@ -66,9 +66,21 @@ const Overlay = (() => {
         setTimeout(() => {
             if (isAdmin) {
                 document.body.classList.add('overlay-active');
+                document.body.classList.add('is-admin');
             }
             setGameRunning(true);
         }, 300);
+
+        // Mod Bar: User-Info setzen
+        try {
+            const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+            if (session?.user) {
+                const barName = document.getElementById('modBarName');
+                const barAv = document.getElementById('modBarAv');
+                if (barName) barName.textContent = session.user.username || 'Moderator';
+                if (barAv && session.user.avatar) barAv.innerHTML = '<img src="' + session.user.avatar + '">';
+            }
+        } catch(_) {}
 
         startClock();
         connectSocket();
@@ -657,188 +669,149 @@ const Overlay = (() => {
             .replace(/>/g,'&gt;');
     }
 
-    // ─── MOD PANEL ──────────────────────────────────────────
-    const MOD_WEBHOOK = 'https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
-    let modPanelVisible = false;
+    // ─── MOD SLIDE PANEL ────────────────────────────────────
+    const API_URL = 'http://91.98.124.212:5009';
+    const API_KEY = 'emden-super-secret-key-2026';
+    let modSlideOpen = false;
     let modSelectedUser = null;
+    let modSelectedAction = null;
     let modSearchTimer = null;
 
-    function toggleModPanel() {
-        modPanelVisible = !modPanelVisible;
-        const panel = document.getElementById('mod-panel');
+    function toggleModSlide() {
+        modSlideOpen = !modSlideOpen;
+        const panel = document.getElementById('mod-slide');
         if (!panel) return;
-        panel.classList.toggle('visible', modPanelVisible);
-        if (modPanelVisible) {
-            // Gespeicherte Position laden
-            try {
-                const saved = JSON.parse(localStorage.getItem('mod_panel_pos'));
-                if (saved) { panel.style.left = saved.x + 'px'; panel.style.top = saved.y + 'px'; }
-            } catch(e) {}
-            // Focus anfordern damit Klicks im Panel funktionieren
-            if (window.electronAPI) {
-                window.electronAPI.requestOverlayFocus?.(true) ||
-                (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', true));
-            }
-            document.getElementById('modSearchInput')?.focus();
-            initModPanelDrag();
-        } else {
-            // Focus zurückgeben
-            if (window.electronAPI) {
-                window.electronAPI.requestOverlayFocus?.(false) ||
-                (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', false));
-            }
+        panel.classList.toggle('open', modSlideOpen);
+        document.body.classList.toggle('mod-open', modSlideOpen);
+
+        if (window.electronAPI) {
+            window.electronAPI.requestOverlayFocus?.(modSlideOpen) ||
+            (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', modSlideOpen));
+        }
+        if (modSlideOpen) {
+            setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
         }
     }
 
-    let modPanelDragInit = false;
-    function initModPanelDrag() {
-        if (modPanelDragInit) return;
-        modPanelDragInit = true;
-        const panel = document.getElementById('mod-panel');
-        const header = panel?.querySelector('.mod-header');
-        if (!panel || !header) return;
-
-        let dragging = false, sx, sy, sl, st;
-        header.addEventListener('mousedown', (e) => {
-            if (e.target.closest('.mod-close')) return;
-            dragging = true; sx = e.clientX; sy = e.clientY;
-            sl = panel.offsetLeft; st = panel.offsetTop;
-            panel.style.transition = 'none';
-            e.preventDefault();
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            panel.style.left = (sl + e.clientX - sx) + 'px';
-            panel.style.top = (st + e.clientY - sy) + 'px';
-        });
-        document.addEventListener('mouseup', () => {
-            if (!dragging) return;
-            dragging = false;
-            panel.style.transition = '';
-            localStorage.setItem('mod_panel_pos', JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop }));
-        });
-    }
+    // Legacy compat
+    function toggleModPanel() { toggleModSlide(); }
 
     async function searchModUser(query) {
         clearTimeout(modSearchTimer);
         const results = document.getElementById('modResults');
         if (!query || query.length < 2) {
-            results.innerHTML = '<div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,0.2);font-size:12px;">Username eingeben zum Suchen</div>';
+            results.innerHTML = '<div class="mod-res-empty">Username eingeben</div>';
             return;
         }
-        results.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:12px;">Suche...</div>';
+        results.innerHTML = '<div class="mod-res-empty">Suche...</div>';
 
         modSearchTimer = setTimeout(async () => {
             try {
-                const res = await fetch('https://users.roblox.com/v1/usernames/users', {
+                const r = await fetch('https://users.roblox.com/v1/usernames/users', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
                 });
-                const data = await res.json();
-                if (!data.data || data.data.length === 0) {
-                    results.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:12px;">Kein User gefunden</div>';
+                const data = await r.json();
+                if (!data.data?.length) {
+                    results.innerHTML = '<div class="mod-res-empty">Nicht gefunden</div>';
                     return;
                 }
 
-                // Für jeden gefundenen User: Avatar laden
-                const users = data.data;
-                const userIds = users.map(u => u.id);
-                let avatars = {};
+                const u = data.data[0];
+                let avatar = '', created = '', displayName = u.displayName || u.name;
                 try {
-                    const avRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userIds.join(',')}&size=48x48&format=Png&isCircular=false`);
-                    const avData = await avRes.json();
-                    avData.data?.forEach(a => { avatars[a.targetId] = a.imageUrl; });
+                    const [pRes, aRes] = await Promise.all([
+                        fetch('https://users.roblox.com/v1/users/' + u.id),
+                        fetch('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' + u.id + '&size=150x150&format=Png&isCircular=false')
+                    ]);
+                    const pData = await pRes.json();
+                    const aData = await aRes.json();
+                    avatar = aData.data?.[0]?.imageUrl || '';
+                    displayName = pData.displayName || displayName;
+                    created = pData.created ? new Date(pData.created).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 } catch(e) {}
 
-                results.innerHTML = users.map(u => {
-                    const avatar = avatars[u.id] || '';
-                    const avatarHtml = avatar
-                        ? `<img src="${avatar}" onerror="this.style.display='none'">`
-                        : u.name[0].toUpperCase();
-                    return `<div class="mod-user-item ${modSelectedUser?.id === u.id ? 'selected' : ''}" onclick="Overlay.selectModUser(${u.id}, '${esc(u.name)}', '${esc(u.displayName || u.name)}', '${esc(avatar)}')">
-                        <div class="mod-user-avatar">${avatarHtml}</div>
-                        <div>
-                            <div class="mod-user-name">${esc(u.displayName || u.name)}</div>
-                            <div class="mod-user-id">@${esc(u.name)} · ${u.id}</div>
-                        </div>
-                    </div>`;
-                }).join('');
+                results.innerHTML = `<div class="mod-usr${modSelectedUser?.id === u.id ? ' on' : ''}" onclick="Overlay.selectModUser(${u.id}, '${esc(u.name)}', '${esc(displayName)}', '${esc(avatar)}', '${esc(created)}')">
+                    <div class="mod-usr-av">${avatar ? '<img src="'+avatar+'">' : esc((u.name[0]||'?').toUpperCase())}</div>
+                    <div><div class="mod-usr-name">${esc(displayName)}</div><div class="mod-usr-id">@${esc(u.name)} · ${u.id}${created ? ' · '+created : ''}</div></div></div>`;
             } catch(e) {
-                results.innerHTML = '<div style="text-align:center;padding:30px;color:#ff6b6b;font-size:12px;">API Fehler</div>';
+                results.innerHTML = '<div class="mod-res-empty" style="color:#ff6b6b">Fehler</div>';
             }
         }, 400);
     }
 
-    function selectModUser(id, username, displayName, avatar) {
-        modSelectedUser = { id, username, displayName, avatar };
-        // Highlight
-        document.querySelectorAll('.mod-user-item').forEach(el => el.classList.remove('selected'));
-        event?.target?.closest('.mod-user-item')?.classList.add('selected');
-        // Show selected
+    function selectModUser(id, username, displayName, avatar, created) {
+        modSelectedUser = { id, username, displayName, avatar, created };
+        document.querySelectorAll('.mod-usr').forEach(el => el.classList.remove('on'));
+        event?.target?.closest('.mod-usr')?.classList.add('on');
         const sel = document.getElementById('modSelectedUser');
-        if (sel) { sel.textContent = `${displayName} (@${username}) · ${id}`; sel.classList.remove('hidden'); }
-        // Enable buttons
-        ['modBtnWarn','modBtnKick','modBtnBan'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) btn.disabled = false;
-        });
+        if (sel) {
+            sel.innerHTML = `<span>${esc(displayName)} (@${esc(username)}) · ${id}</span><button class="mod-sel-x" onclick="Overlay.clearModUser(event)">&times;</button>`;
+            sel.classList.add('show');
+        }
+        updateModSendBtn();
     }
 
-    async function modAction(type) {
-        if (!modSelectedUser) return;
-        const reason = document.getElementById('modReasonInput')?.value?.trim() || 'Kein Grund angegeben';
+    function clearModUser(e) {
+        e?.stopPropagation();
+        modSelectedUser = null;
+        document.querySelectorAll('.mod-usr').forEach(el => el.classList.remove('on'));
+        const sel = document.getElementById('modSelectedUser');
+        if (sel) { sel.classList.remove('show'); sel.innerHTML = ''; }
+        updateModSendBtn();
+    }
+
+    function pickModAction(type, el) {
+        modSelectedAction = type;
+        document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
+        el.classList.add('on');
+        updateModSendBtn();
+    }
+
+    function updateModSendBtn() {
+        const btn = document.getElementById('modSendBtn');
+        if (btn) btn.disabled = !(modSelectedUser && modSelectedAction);
+    }
+
+    async function sendModAction() {
+        if (!modSelectedUser || !modSelectedAction) return;
+        const reason = document.getElementById('modReasonInput')?.value?.trim() || 'Kein Grund';
         const user = modSelectedUser;
         const moderator = voiceUsername || 'Unbekannt';
-        const now = new Date();
 
-        // Webhook senden
-        const color = type === 'Ban' ? 0xFF4444 : type === 'Kick' ? 0xF59E0B : 0x3B82F6;
-        const emoji = type === 'Ban' ? '🔨' : type === 'Kick' ? '👢' : '⚠️';
-
-        const payload = {
-            username: 'Emden Network Moderation',
-            avatar_url: 'https://github.com/princearmy2024.png',
-            embeds: [{
-                color,
-                author: { name: `${emoji} ${type}`, icon_url: user.avatar || 'https://github.com/princearmy2024.png' },
-                title: `Moderation | ${user.id}`,
-                fields: [
-                    { name: 'User ID', value: `\`${user.id}\``, inline: true },
-                    { name: 'Display Name', value: user.displayName, inline: true },
-                    { name: 'Account Created', value: '—', inline: true },
-                    { name: 'Reason', value: reason, inline: true },
-                    { name: 'Punishment', value: type, inline: true },
-                ],
-                footer: { text: `Moderator: @${moderator}`, icon_url: 'https://github.com/princearmy2024.png' },
-                timestamp: now.toISOString(),
-            }]
-        };
+        document.getElementById('modSendBtn').disabled = true;
 
         try {
-            await fetch(MOD_WEBHOOK, {
+            const res = await fetch(API_URL + '/api/mod-action', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                body: JSON.stringify({
+                    userId: user.id, username: user.username,
+                    displayName: user.displayName, avatar: user.avatar,
+                    created: user.created || '', reason,
+                    action: modSelectedAction, moderator,
+                    moderatorAvatar: voiceAvatar || ''
+                })
             });
-            // Status anzeigen
-            const status = document.getElementById('modStatus');
-            if (status) {
-                status.textContent = `✓ ${type} für ${user.displayName} gesendet`;
-                status.classList.remove('show');
-                void status.offsetWidth;
-                status.classList.add('show');
-            }
-            // Reason leeren
-            const reasonInput = document.getElementById('modReasonInput');
-            if (reasonInput) reasonInput.value = '';
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Fehler');
+            showModMsg('✓ ' + modSelectedAction + ' gesendet', 'ok');
+            document.getElementById('modReasonInput').value = '';
+            modSelectedAction = null;
+            document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         } catch(e) {
-            const status = document.getElementById('modStatus');
-            if (status) { status.textContent = '✗ Fehler beim Senden'; status.style.color = '#ff6b6b'; status.classList.add('show'); }
+            showModMsg('✗ Fehler beim Senden', 'err');
         }
+        updateModSendBtn();
     }
 
-    return { init, toggleCmd, toggleModPanel, searchModUser, selectModUser, modAction };
+    function showModMsg(text, type) {
+        const m = document.getElementById('modMsg');
+        if (m) { m.textContent = text; m.className = 'mod-msg ' + type; setTimeout(() => { m.textContent = ''; m.className = 'mod-msg'; }, 3000); }
+    }
+
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());

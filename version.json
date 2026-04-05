@@ -1,6 +1,6 @@
 {
-    "version": "4.25.3",
+    "version": "4.26.0",
     "releaseDate": "2026-04-06",
-    "notes": "v4.25.3: Panel Redesign — Schwarz-Blau Gradient, Grid-Muster, Logo Reflection fix, saubere Ecken.",
+    "notes": "v4.26.0: Mod Panel Slide-In von rechts, integriert ins Overlay mit Gradient-Design.",
     "forceUpdate": true
 }
