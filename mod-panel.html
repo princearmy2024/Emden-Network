@@ -146,7 +146,8 @@ html,body{background:transparent;color:var(--text);font-family:'Inter',sans-seri
 </div>
 
 <script>
-const WH='https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
+const API_URL='http://91.98.124.212:5009';
+const API_KEY='emden-super-secret-key-2026';
 let user=null,action=null,timer=null;
 let mod={name:'Moderator',avatar:''};
 try{const s=JSON.parse(localStorage.getItem('en_session')||'null');if(s?.user){mod.name=s.user.username||'Moderator';mod.avatar=s.user.avatar||''}}catch(e){}
@@ -239,24 +240,19 @@ async function go(){
     const e=action==='Ban'?'🔨':action==='Kick'?'👢':'⚠️';
     document.getElementById('send').disabled=true;
     try{
-        await fetch(WH,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-            username:'Emden Network Moderation',avatar_url:user.av||'https://github.com/princearmy2024.png',
-            embeds:[{color:c,
-                author:{name:user.display,icon_url:user.av||'https://github.com/princearmy2024.png'},
-                title:`Moderation | ${user.id}`,
-                thumbnail:{url:user.av||''},
-                fields:[
-                    {name:'User ID',value:'`'+user.id+'`',inline:true},
-                    {name:'Display Name',value:user.display,inline:true},
-                    {name:'Account Created',value:user.created||'Unbekannt',inline:true},
-                    {name:'Username',value:'@'+user.name,inline:true},
-                    {name:'Reason',value:reason,inline:false},
-                    {name:'Punishment',value:action,inline:true},
-                ],
-                footer:{text:'Moderator: @'+mod.name,icon_url:mod.avatar||'https://github.com/princearmy2024.png'},
-                timestamp:new Date().toISOString(),
-            }]
+        const res=await fetch(API_URL+'/api/mod-action',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':API_KEY},body:JSON.stringify({
+            userId:user.id,
+            username:user.name,
+            displayName:user.display,
+            avatar:user.av,
+            created:user.created,
+            reason:reason,
+            action:action,
+            moderator:mod.name,
+            moderatorAvatar:mod.avatar
         })});
+        const data=await res.json();
+        if(!data.success)throw new Error(data.error||'Fehler');
         show('✓ '+action+' gesendet','ok');
         document.getElementById('reason').value='';action=null;
         document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));

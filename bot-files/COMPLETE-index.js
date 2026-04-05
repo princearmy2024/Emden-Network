@@ -752,6 +752,60 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
+    // POST /api/mod-action — Moderation via Bot (Components v2 Style)
+    if (req.method === "POST" && url.pathname === "/api/mod-action") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", async () => {
+            try {
+                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar } = JSON.parse(body || "{}");
+                if (!userId || !action) {
+                    res.writeHead(400);
+                    return res.end(JSON.stringify({ success: false, error: "userId und action erforderlich" }));
+                }
+
+                const MOD_CHANNEL_ID = "1367243128284905573";
+                const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
+                if (!channel) {
+                    res.writeHead(500);
+                    return res.end(JSON.stringify({ success: false, error: "Mod-Kanal nicht gefunden" }));
+                }
+
+                const color = action === 'Ban' ? 0xFF4444 : action === 'Kick' ? 0xF59E0B : 0x0088FF;
+                const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
+                const actionColor = action === 'Ban' ? '🔴' : action === 'Kick' ? '🟡' : '🔵';
+
+                const embed = new EmbedBuilder()
+                    .setColor(color)
+                    .setAuthor({ name: `${emoji} ${action}`, iconURL: avatar || undefined })
+                    .setTitle(`${displayName || username}`)
+                    .setThumbnail(avatar || null)
+                    .addFields(
+                        { name: 'User ID', value: `\`${userId}\``, inline: true },
+                        { name: 'Display Name', value: displayName || '—', inline: true },
+                        { name: 'Account Created', value: created || 'Unbekannt', inline: true },
+                        { name: 'Username', value: `@${username}`, inline: true },
+                        { name: 'Punishment', value: `${actionColor} ${action}`, inline: true },
+                        { name: '\u200b', value: '\u200b', inline: true },
+                        { name: 'Reason', value: reason || 'Kein Grund angegeben' },
+                    )
+                    .setFooter({ text: `Moderator: @${moderator || 'Unbekannt'}`, iconURL: moderatorAvatar || undefined })
+                    .setTimestamp();
+
+                await channel.send({ embeds: [embed] });
+
+                console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true }));
+            } catch (e) {
+                console.error("[Mod] Fehler:", e.message);
+                res.writeHead(500);
+                return res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
     res.writeHead(404);
     res.end(JSON.stringify({ error: "Not found" }));
 });

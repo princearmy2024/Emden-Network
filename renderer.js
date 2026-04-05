@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.23.2'; // Stand: 05.04.2026 (Panel Size Save, Logo Fix)
+let CURRENT_VERSION = '4.24.0'; // Stand: 05.04.2026 (Mod via Bot, kein Webhook)
 
 // =============================================================
 // CONFIG — Bot-API
