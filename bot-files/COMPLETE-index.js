@@ -771,19 +771,17 @@ const apiServer = http.createServer(async (req, res) => {
                 const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
                 const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-                // Components v2 Message (Container-based)
+                // Components v2 Message (Container-based) — korrektes Format via Discohook
                 const components = [
                     {
                         type: 17, // Container
+                        accent_color: accentColor,
                         components: [
-                            // Header: Avatar + Action
+                            // Header Section: Text + Avatar Thumbnail
                             {
                                 type: 10, // Section
                                 components: [
-                                    {
-                                        type: 10, // TextDisplay in section
-                                        content: `${emoji} **${action}**\n### ${displayName || username}`
-                                    }
+                                    { type: 12, content: `${emoji} **${action}**\n### ${displayName || username}` }
                                 ],
                                 accessory: avatar ? {
                                     type: 11, // Thumbnail
@@ -791,39 +789,23 @@ const apiServer = http.createServer(async (req, res) => {
                                 } : undefined
                             },
                             // Separator
-                            { type: 14, spacing: 1 },
-                            // Info Fields
-                            {
-                                type: 10,
-                                content: `**User ID**\n\`${userId}\``
-                            },
-                            {
-                                type: 10,
-                                content: `**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}`
-                            },
+                            { type: 14, divider: true, spacing: 0 },
+                            // Info
+                            { type: 12, content: `**User ID** · \`${userId}\`\n**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}` },
                             // Separator
-                            { type: 14, spacing: 1 },
-                            // Reason
-                            {
-                                type: 10,
-                                content: `**Reason**\n${reason || 'Kein Grund angegeben'}`
-                            },
-                            {
-                                type: 10,
-                                content: `**Punishment**\n${emoji} ${action}`
-                            },
+                            { type: 14, divider: true, spacing: 0 },
+                            // Reason + Punishment
+                            { type: 12, content: `**Reason**\n${reason || 'Kein Grund angegeben'}` },
+                            { type: 12, content: `**Punishment**\n${emoji} ${action}` },
                             // Separator
-                            { type: 14, spacing: 2 },
+                            { type: 14, divider: true, spacing: 1 },
                             // Footer
-                            {
-                                type: 10,
-                                content: `-# ${moderatorAvatar ? '' : '👮 '}Moderator: @${moderator || 'Unbekannt'} • ${dateStr} um ${timeStr} Uhr`
-                            }
+                            { type: 12, content: `-# 👮 Moderator: @${moderator || 'Unbekannt'} • ${dateStr} um ${timeStr} Uhr` }
                         ]
                     }
                 ];
 
-                // Discord API direkt aufrufen (Components v2 braucht flags: 32768)
+                // Discord API direkt aufrufen (Components v2 braucht flags: 131072)
                 const apiRes = await fetch(`https://discord.com/api/v10/channels/${MOD_CHANNEL_ID}/messages`, {
                     method: 'POST',
                     headers: {
@@ -832,7 +814,7 @@ const apiServer = http.createServer(async (req, res) => {
                     },
                     body: JSON.stringify({
                         components,
-                        flags: 32768 // IS_COMPONENTS_V2
+                        flags: 131072 // IS_COMPONENTS_V2
                     })
                 });
 
