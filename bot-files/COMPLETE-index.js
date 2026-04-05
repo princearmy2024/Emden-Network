@@ -947,6 +947,49 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
+    if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
+        const robloxId = url.searchParams.get("robloxId");
+        if (!robloxId) { res.writeHead(400); return res.end(JSON.stringify({ error: "robloxId required" })); }
+
+        // Reverse-Lookup: robloxLinks ist discordId -> robloxId
+        let discordId = null;
+        for (const [dId, rId] of robloxLinks.entries()) {
+            if (String(rId) === String(robloxId)) { discordId = dId; break; }
+        }
+
+        if (!discordId) {
+            res.writeHead(200);
+            return res.end(JSON.stringify({ linked: false }));
+        }
+
+        // Discord-User Info holen
+        try {
+            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            const knownUser = allKnownUsers.get(discordId);
+
+            res.writeHead(200);
+            return res.end(JSON.stringify({
+                linked: true,
+                discordId,
+                discordUsername: member?.displayName || member?.user?.username || knownUser?.username || 'Unbekannt',
+                discordAvatar: member?.user?.displayAvatarURL({ size: 128 }) || knownUser?.avatar || null,
+                discordTag: member?.user?.tag || null,
+                inServer: !!member,
+                status: member?.presence?.status || 'offline',
+                roles: member?.roles?.cache
+                    ?.filter(r => r.name !== '@everyone')
+                    ?.sort((a, b) => b.position - a.position)
+                    ?.first(3)
+                    ?.map(r => ({ name: r.name, color: r.hexColor })) || [],
+            }));
+        } catch (e) {
+            res.writeHead(200);
+            return res.end(JSON.stringify({ linked: true, discordId, error: e.message }));
+        }
+    }
+
     res.writeHead(404);
     res.end(JSON.stringify({ error: "Not found" }));
 });

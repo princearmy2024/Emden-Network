@@ -430,6 +430,8 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     
     robloxOverlayWin.once('ready-to-show', () => {
         robloxOverlayWin.show();
+        // Maximize damit es wirklich den ganzen Bildschirm abdeckt (Vollbild-Gap fix)
+        robloxOverlayWin.maximize();
     });
 }
 

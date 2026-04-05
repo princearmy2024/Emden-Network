@@ -716,9 +716,11 @@ const Overlay = (() => {
         const results = document.getElementById('modResults');
         if (!query || query.length < 2) {
             results.innerHTML = '<div class="mod-res-empty">Username eingeben</div>';
+            results.classList.remove('show');
             return;
         }
         results.innerHTML = '<div class="mod-res-empty">Suche...</div>';
+        results.classList.add('show');
 
         modSearchTimer = setTimeout(async () => {
             try {
@@ -747,7 +749,7 @@ const Overlay = (() => {
                     created = pData.created ? new Date(pData.created).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 } catch(e) {}
 
-                results.innerHTML = `<div class="mod-usr${modSelectedUser?.id === u.id ? ' on' : ''}" onclick="Overlay.selectModUser(${u.id}, '${esc(u.name)}', '${esc(displayName)}', '${esc(avatar)}', '${esc(created)}')">
+                results.innerHTML = `<div class="mod-usr" onclick="Overlay.selectModUser(${u.id}, '${esc(u.name)}', '${esc(displayName)}', '${esc(avatar)}', '${esc(created)}')">
                     <div class="mod-usr-av">${avatar ? '<img src="'+avatar+'">' : esc((u.name[0]||'?').toUpperCase())}</div>
                     <div><div class="mod-usr-name">${esc(displayName)}</div><div class="mod-usr-id">@${esc(u.name)} · ${u.id}${created ? ' · '+created : ''}</div></div></div>`;
             } catch(e) {
@@ -756,24 +758,86 @@ const Overlay = (() => {
         }, 400);
     }
 
-    function selectModUser(id, username, displayName, avatar, created) {
+    async function selectModUser(id, username, displayName, avatar, created) {
         modSelectedUser = { id, username, displayName, avatar, created };
-        document.querySelectorAll('.mod-usr').forEach(el => el.classList.remove('on'));
-        event?.target?.closest('.mod-usr')?.classList.add('on');
+        // Dropdown schliessen
+        const results = document.getElementById('modResults');
+        results.classList.remove('show');
+        document.getElementById('modSearchInput').value = '';
+
+        // Selected-Leiste
         const sel = document.getElementById('modSelectedUser');
         if (sel) {
             sel.innerHTML = `<span>${esc(displayName)} (@${esc(username)}) · ${id}</span><button class="mod-sel-x" onclick="Overlay.clearModUser(event)">&times;</button>`;
             sel.classList.add('show');
         }
+
+        // Profile anzeigen
+        document.getElementById('modProfileEmpty').style.display = 'none';
+        const content = document.getElementById('modProfileContent');
+        content.style.display = 'flex';
+
+        // Name + ID
+        document.getElementById('modProfileName').textContent = displayName;
+        document.getElementById('modProfileId').textContent = '@' + username + ' · ' + id;
+        document.getElementById('modProfileCreated').textContent = created ? 'Erstellt: ' + created : '';
+
+        // Full-Body Avatar laden
+        const avatarEl = document.getElementById('modAvatarFull');
+        avatarEl.innerHTML = '<div class="mod-res-empty">Lade...</div>';
+        try {
+            const avRes = await fetch('https://thumbnails.roblox.com/v1/users/avatar?userIds=' + id + '&size=352x352&format=Png&isCircular=false');
+            const avData = await avRes.json();
+            const fullBody = avData.data?.[0]?.imageUrl;
+            if (fullBody) {
+                avatarEl.innerHTML = '<img src="' + fullBody + '" />';
+            } else {
+                avatarEl.innerHTML = avatar ? '<img src="' + avatar + '" />' : '';
+            }
+        } catch(e) {
+            avatarEl.innerHTML = avatar ? '<img src="' + avatar + '" />' : '';
+        }
+
+        // Discord-Lookup
+        const discordInfo = document.getElementById('modDiscordInfo');
+        discordInfo.style.display = 'none';
+        try {
+            const lookupRes = await fetch(API_URL + '/api/roblox/lookup?robloxId=' + id, {
+                headers: { 'x-api-key': API_KEY }
+            });
+            const lookupData = await lookupRes.json();
+            if (lookupData.linked && lookupData.discordUsername) {
+                document.getElementById('modDiscordName').textContent = lookupData.discordUsername;
+
+                // Rollen
+                const rolesEl = document.getElementById('modDiscordRoles');
+                rolesEl.innerHTML = (lookupData.roles || []).map(r =>
+                    `<span class="mod-discord-role" style="color:${r.color};border-color:${r.color}33">${esc(r.name)}</span>`
+                ).join('');
+
+                // Status
+                const statusMap = { online: '🟢 Online', idle: '🌙 Abwesend', dnd: '⛔ Nicht stören', offline: '⚫ Offline' };
+                document.getElementById('modDiscordStatus').textContent =
+                    lookupData.inServer ? (statusMap[lookupData.status] || 'Offline') : 'Nicht im Server';
+
+                discordInfo.style.display = 'flex';
+            }
+        } catch(e) {}
+
         updateModSendBtn();
     }
 
     function clearModUser(e) {
         e?.stopPropagation();
         modSelectedUser = null;
-        document.querySelectorAll('.mod-usr').forEach(el => el.classList.remove('on'));
+        modSelectedAction = null;
+        document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         const sel = document.getElementById('modSelectedUser');
         if (sel) { sel.classList.remove('show'); sel.innerHTML = ''; }
+        // Profile zurücksetzen
+        document.getElementById('modProfileEmpty').style.display = 'flex';
+        document.getElementById('modProfileContent').style.display = 'none';
+        document.getElementById('modDiscordInfo').style.display = 'none';
         updateModSendBtn();
     }
 
