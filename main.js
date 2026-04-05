@@ -736,7 +736,7 @@ app.whenReady().then(() => {
             frame: false, transparent: true,
             backgroundColor: '#00000000',
             alwaysOnTop: true, skipTaskbar: true,
-            resizable: false, minimizable: false,
+            resizable: false, minimizable: false, movable: false,
             focusable: true,
             webPreferences: {
                 nodeIntegration: false,
@@ -746,14 +746,6 @@ app.whenReady().then(() => {
         });
         modBtnWin.setAlwaysOnTop(true, 'screen-saver', 2);
         modBtnWin.loadFile('mod-btn.html');
-
-        // Position speichern beim Verschieben
-        modBtnWin.on('moved', () => {
-            if (modBtnWin && !modBtnWin.isDestroyed()) {
-                const [x, y] = modBtnWin.getPosition();
-                try { fs.writeFileSync(path.join(app.getPath('userData'), 'mod-btn-pos.json'), JSON.stringify({x, y})); } catch(e) {}
-            }
-        });
 
         // Klick wird in mod-btn.html via IPC 'toggle-mod-panel' gehandelt
     }
