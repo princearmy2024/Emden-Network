@@ -70,8 +70,14 @@ const Overlay = (() => {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        // Mod-Panel Toggle nur für Admins — dynamische Klick-Erkennung
+        // Mod-Hint für Admins anzeigen
         if (isAdmin) {
+            const hint = document.getElementById('mod-hint');
+            if (hint) hint.style.display = 'flex';
+        }
+
+        // Mod-Panel interaktive Elemente (legacy, nicht mehr genutzt)
+        if (isAdmin && false) {
             const toggle = document.getElementById('mod-toggle');
             if (toggle) {
                 toggle.classList.add('visible');
