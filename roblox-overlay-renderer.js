@@ -71,6 +71,15 @@ const Overlay = (() => {
             setGameRunning(true);
         }, 300);
 
+        // Click outside Mod Panel → Focus zurück ans Spiel
+        document.addEventListener('mousedown', (e) => {
+            if (!modSlideOpen) return;
+            const panel = document.getElementById('mod-slide');
+            if (panel && !panel.contains(e.target) && !e.target.closest('#mod-trigger')) {
+                toggleModSlide();
+            }
+        });
+
         // Mod Trigger Button — Focus anfordern bei Hover (sonst click-through!)
         const modTrigger = document.getElementById('mod-trigger');
         if (modTrigger) {
@@ -175,10 +184,10 @@ const Overlay = (() => {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
 
-        // F4: Mod Slide-Panel Toggle via IPC
+        // F4: Overlay komplett an/aus (Panels + alles)
         if (window.electronAPI?.onToggleModPanel) {
             window.electronAPI.onToggleModPanel(() => {
-                if (isAdmin) toggleModSlide();
+                toggleOverlayVisibility();
             });
         }
 
@@ -466,12 +475,27 @@ const Overlay = (() => {
 
     // ─── OVERLAY VISIBILITY ─────────────────────────────────────
     let isGameRunning = false;
+    let overlayHidden = false;
+
+    function toggleOverlayVisibility() {
+        overlayHidden = !overlayHidden;
+        if (overlayHidden) {
+            // Alles verstecken
+            document.body.classList.remove('overlay-active');
+            if (modSlideOpen) toggleModSlide();
+        } else {
+            // Alles wieder zeigen
+            if (isAdmin) document.body.classList.add('overlay-active');
+        }
+    }
+
     function setGameRunning(running, startTime = null) {
         isGameRunning = running;
         if (running) {
-            // Activate gradient panels
             setTimeout(() => {
-                document.body.classList.add('overlay-active');
+                if (!overlayHidden) {
+                    document.body.classList.add('overlay-active');
+                }
                 document.getElementById('info-bar').classList.add('visible');
             }, 100);
             startPlaytime(startTime);
@@ -692,6 +716,11 @@ const Overlay = (() => {
     let modSelectedAction = null;
     let modSearchTimer = null;
 
+    function requestFocus(on) {
+        if (window.electronAPI?.overlayRequestFocus) window.electronAPI.overlayRequestFocus(on);
+        else if (window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(on);
+    }
+
     function toggleModSlide() {
         modSlideOpen = !modSlideOpen;
         const panel = document.getElementById('mod-slide');
@@ -699,10 +728,7 @@ const Overlay = (() => {
         panel.classList.toggle('open', modSlideOpen);
         document.body.classList.toggle('mod-open', modSlideOpen);
 
-        if (window.electronAPI) {
-            window.electronAPI.requestOverlayFocus?.(modSlideOpen) ||
-            (window.require && window.require('electron').ipcRenderer.send('overlay-request-focus', modSlideOpen));
-        }
+        requestFocus(modSlideOpen);
         if (modSlideOpen) {
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
         }
