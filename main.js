@@ -673,16 +673,28 @@ app.whenReady().then(() => {
             width: 380, height: 520,
             frame: false, transparent: false,
             backgroundColor: '#0a0a16',
-            alwaysOnTop: true, skipTaskbar: true,
+            alwaysOnTop: true, skipTaskbar: false,
             resizable: true, minimizable: false,
+            focusable: true,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js')
             }
         });
-        modPanelWin.setAlwaysOnTop(true, 'screen-saver', 2);
+        modPanelWin.setAlwaysOnTop(true, 'pop-up-menu', 1);
         modPanelWin.loadFile('mod-panel.html');
+        modPanelWin.once('ready-to-show', () => {
+            modPanelWin.focus();
+        });
+        // Wenn Roblox den Focus klaut, sofort zurückholen
+        modPanelWin.on('blur', () => {
+            if (modPanelWin && !modPanelWin.isDestroyed()) {
+                setTimeout(() => {
+                    if (modPanelWin && !modPanelWin.isDestroyed()) modPanelWin.focus();
+                }, 100);
+            }
+        });
         modPanelWin.on('closed', () => { modPanelWin = null; });
     });
 

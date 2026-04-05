@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.17.0'; // Stand: 05.04.2026 (Mod-Panel eigenes Fenster)
+let CURRENT_VERSION = '4.17.1'; // Stand: 05.04.2026 (Mod-Panel Focus Fix)
 
 // =============================================================
 // CONFIG — Bot-API
