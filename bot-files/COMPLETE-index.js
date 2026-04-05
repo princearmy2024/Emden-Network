@@ -1310,8 +1310,8 @@ client.once("ready", async () => {
             if (modChannel) {
                 let imported = 0;
                 let lastId = null;
-                // Letzte 2000 Nachrichten durchgehen
-                for (let i = 0; i < 20; i++) {
+                // Letzte 4000 Nachrichten durchgehen
+                for (let i = 0; i < 40; i++) {
                     const opts = { limit: 100 };
                     if (lastId) opts.before = lastId;
                     const messages = await modChannel.messages.fetch(opts);
