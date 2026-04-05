@@ -718,40 +718,88 @@ app.whenReady().then(() => {
         }
     });
 
-    // === F4: MOD-PANEL (nur F4, kein Button-Fenster) ===
+    // === F4: MOD-BUTTON → PANEL SYSTEM ===
+    let modBtnWin = null;
     let modPanelWin = null;
     let f4Cooldown = false;
-    ipcMain.on('toggle-mod-panel', () => toggleModPanel());
+    const modBtnPosFile = path.join(app.getPath('userData'), 'mod-btn-pos.json');
+    const modPanelPosFile = path.join(app.getPath('userData'), 'mod-panel-pos.json');
 
-    function toggleModPanel() {
+    ipcMain.on('toggle-mod-panel', () => openModPanel());
+
+    function toggleModButton() {
         if (f4Cooldown) return;
         f4Cooldown = true;
-        setTimeout(() => { f4Cooldown = false; }, 1000);
+        setTimeout(() => { f4Cooldown = false; }, 800);
 
+        // Wenn Panel offen → Panel schließen
         if (modPanelWin && !modPanelWin.isDestroyed()) {
+            saveWinPos(modPanelWin, modPanelPosFile);
             modPanelWin.close();
             modPanelWin = null;
             return;
         }
+        // Wenn Button offen → Button schließen
+        if (modBtnWin && !modBtnWin.isDestroyed()) {
+            saveWinPos(modBtnWin, modBtnPosFile);
+            modBtnWin.close();
+            modBtnWin = null;
+            return;
+        }
+        // Button anzeigen
+        showModButton();
+    }
+
+    function showModButton() {
+        if (modBtnWin && !modBtnWin.isDestroyed()) return;
+        const pos = loadPos(modBtnPosFile, 60, 60);
+        modBtnWin = new BrowserWindow({
+            width: 48, height: 48, x: pos.x, y: pos.y,
+            frame: false, transparent: true, backgroundColor: '#00000000',
+            alwaysOnTop: true, skipTaskbar: true,
+            resizable: false, minimizable: false, focusable: true,
+            webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
+        });
+        modBtnWin.setAlwaysOnTop(true, 'screen-saver', 2);
+        modBtnWin.loadFile('mod-btn.html');
+        modBtnWin.on('moved', () => saveWinPos(modBtnWin, modBtnPosFile));
+        modBtnWin.on('closed', () => { modBtnWin = null; });
+    }
+
+    function openModPanel() {
+        // Button schließen
+        if (modBtnWin && !modBtnWin.isDestroyed()) {
+            saveWinPos(modBtnWin, modBtnPosFile);
+            modBtnWin.close();
+            modBtnWin = null;
+        }
+        if (modPanelWin && !modPanelWin.isDestroyed()) return;
+
+        const pos = loadPos(modPanelPosFile, 200, 100);
         modPanelWin = new BrowserWindow({
-            width: 380, height: 540,
-            frame: false, transparent: true,
-            backgroundColor: '#00000000',
+            width: 400, height: 560, x: pos.x, y: pos.y,
+            frame: false, transparent: true, backgroundColor: '#00000000',
             alwaysOnTop: true, skipTaskbar: false,
-            resizable: true, minimizable: false,
-            focusable: true,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                preload: path.join(__dirname, 'preload.js')
-            }
+            resizable: true, minimizable: false, focusable: true,
+            webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
         });
         modPanelWin.setAlwaysOnTop(true, 'pop-up-menu', 1);
         modPanelWin.loadFile('mod-panel.html');
+        modPanelWin.on('moved', () => saveWinPos(modPanelWin, modPanelPosFile));
         modPanelWin.on('closed', () => { modPanelWin = null; });
     }
 
-    globalShortcut.register('F4', () => toggleModPanel());
+    function loadPos(file, defX, defY) {
+        try { const s = JSON.parse(fs.readFileSync(file, 'utf-8')); return { x: s.x, y: s.y }; }
+        catch(e) { return { x: defX, y: defY }; }
+    }
+    function saveWinPos(win, file) {
+        if (!win || win.isDestroyed()) return;
+        const [x, y] = win.getPosition();
+        try { fs.writeFileSync(file, JSON.stringify({ x, y })); } catch(e) {}
+    }
+
+    globalShortcut.register('F4', () => toggleModButton());
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

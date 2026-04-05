@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.21.0'; // Stand: 05.04.2026 (Mod-Panel Cleanup, nur F4)
+let CURRENT_VERSION = '4.22.0'; // Stand: 05.04.2026 (F4 Button→Panel, Webhook+Moderator)
 
 // =============================================================
 // CONFIG — Bot-API

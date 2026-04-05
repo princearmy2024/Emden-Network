@@ -5,160 +5,66 @@
 <title>Moderation</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-    --brand: #0088FF;
-    --brand-2: #006AD5;
-    --glass: rgba(13, 15, 28, 0.55);
-    --glass-border: rgba(255,255,255,0.07);
-    --glass-hover: rgba(255,255,255,0.04);
-    --text: #E4E4F0;
-    --text-sub: #8B8FA8;
-    --text-muted: #50546A;
-    --danger: #FF6B6B;
-    --warn: #F59E0B;
-    --radius: 14px;
-    --font: 'Inter', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-    background: transparent; color: var(--text);
-    font-family: var(--font); height: 100vh;
-    overflow: hidden; -webkit-font-smoothing: antialiased;
-}
-
-.panel {
-    margin: 4px; height: calc(100% - 8px);
-    display: flex; flex-direction: column;
-    background: var(--glass);
-    backdrop-filter: blur(40px) saturate(1.5);
-    -webkit-backdrop-filter: blur(40px) saturate(1.5);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    overflow: hidden;
-}
-
-/* Header — draggable */
-.header {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--glass-border);
-    -webkit-app-region: drag;
-}
-.header-icon {
-    width: 28px; height: 28px; border-radius: 8px;
-    background: rgba(0,136,255,0.1); border: 1px solid rgba(0,136,255,0.15);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--brand); flex-shrink: 0;
-}
-.header-title { font-size: 13px; font-weight: 700; flex: 1; color: #fff; }
-.header-close {
-    -webkit-app-region: no-drag;
-    width: 24px; height: 24px; border-radius: 6px;
-    background: transparent; border: none;
-    color: var(--text-muted); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; transition: all 0.15s;
-}
-.header-close:hover { background: rgba(255,107,107,0.1); color: var(--danger); }
-
-/* Search */
-.search { padding: 10px 12px; }
-.search input {
-    width: 100%; padding: 10px 14px; border-radius: 10px;
-    background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-    color: var(--text); font-size: 13px; font-family: var(--font);
-    outline: none; transition: border-color 0.2s;
-}
-.search input:focus { border-color: rgba(0,136,255,0.4); }
-.search input::placeholder { color: var(--text-muted); }
-
-/* Results */
-.results { flex: 1; overflow-y: auto; padding: 0 8px; scrollbar-width: none; }
-.results::-webkit-scrollbar { display: none; }
-.empty { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 11px; }
-
-.user {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px; border-radius: 10px; cursor: pointer;
-    border: 1px solid transparent; transition: all 0.15s;
-}
-.user:hover { background: var(--glass-hover); }
-.user.active { background: rgba(0,136,255,0.08); border-color: rgba(0,136,255,0.15); }
-.user-av {
-    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--brand), #1e40af);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: #fff; overflow: hidden;
-}
-.user-av img { width: 100%; height: 100%; object-fit: cover; }
-.user-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.user-sub { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
-
-/* Footer Actions */
-.footer {
-    padding: 12px; border-top: 1px solid var(--glass-border);
-}
-.selected {
-    display: none; padding: 8px 10px; margin-bottom: 8px;
-    background: rgba(0,136,255,0.06); border-radius: 8px;
-    font-size: 11px; color: var(--brand); font-weight: 600;
-    border: 1px solid rgba(0,136,255,0.1);
-}
-.selected.show { display: block; }
-
-.reason {
-    width: 100%; padding: 9px 12px; border-radius: 8px;
-    background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);
-    color: var(--text); font-size: 12px; font-family: var(--font);
-    outline: none; margin-bottom: 8px;
-}
-.reason:focus { border-color: rgba(0,136,255,0.3); }
-.reason::placeholder { color: var(--text-muted); }
-
-.actions { display: flex; gap: 4px; margin-bottom: 8px; }
-.act {
-    flex: 1; padding: 8px 0; border-radius: 8px; text-align: center;
-    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-    text-transform: uppercase; cursor: pointer; transition: all 0.15s;
-    background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);
-    color: var(--text-muted);
-}
-.act:hover { background: rgba(255,255,255,0.06); }
-.act.warn.on { background: rgba(0,136,255,0.1); color: var(--brand); border-color: rgba(0,136,255,0.2); }
-.act.kick.on { background: rgba(245,158,11,0.1); color: var(--warn); border-color: rgba(245,158,11,0.2); }
-.act.ban.on { background: rgba(255,107,107,0.1); color: var(--danger); border-color: rgba(255,107,107,0.2); }
-
-.send {
-    width: 100%; padding: 10px; border: none; border-radius: 10px;
-    background: var(--brand); color: #fff;
-    font-size: 12px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: all 0.15s; letter-spacing: 0.03em;
-}
-.send:hover:not(:disabled) { background: var(--brand-2); }
-.send:disabled { opacity: 0.3; cursor: not-allowed; }
-.send:active:not(:disabled) { transform: scale(0.98); }
-
-.msg { text-align: center; font-size: 11px; font-weight: 600; min-height: 18px; margin-top: 6px; }
-.msg.ok { color: #10b981; }
-.msg.err { color: var(--danger); }
+:root { --brand:#0088FF; --brand2:#006AD5; --glass:rgba(13,15,28,0.55); --border:rgba(255,255,255,0.07); --text:#E4E4F0; --sub:#8B8FA8; --muted:#50546A; --danger:#FF6B6B; --warn:#F59E0B; --r:14px; }
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;color:var(--text);font-family:'Inter',sans-serif;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none}
+.panel{margin:4px;height:calc(100% - 8px);display:flex;flex-direction:column;background:var(--glass);backdrop-filter:blur(40px) saturate(1.5);-webkit-backdrop-filter:blur(40px) saturate(1.5);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,0.4);overflow:hidden}
+.hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);-webkit-app-region:drag}
+.hdr-ico{width:28px;height:28px;border-radius:8px;background:rgba(0,136,255,0.1);border:1px solid rgba(0,136,255,0.15);display:flex;align-items:center;justify-content:center;color:var(--brand);flex-shrink:0}
+.hdr-t{font-size:13px;font-weight:700;flex:1;color:#fff}
+.hdr-x{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.hdr-x:hover{background:rgba(255,107,107,0.1);color:var(--danger)}
+.search{padding:10px 12px}
+.search input{width:100%;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
+.search input:focus{border-color:rgba(0,136,255,0.4)}
+.search input::placeholder{color:var(--muted)}
+.res{flex:1;overflow-y:auto;padding:0 8px;scrollbar-width:none}
+.res::-webkit-scrollbar{display:none}
+.empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:11px}
+.usr{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.usr:hover{background:rgba(255,255,255,0.04)}
+.usr.on{background:rgba(0,136,255,0.08);border-color:rgba(0,136,255,0.15)}
+.av{width:36px;height:36px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--brand),#1e40af);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.nm{font-size:13px;font-weight:600}
+.id{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.ft{padding:12px;border-top:1px solid var(--border)}
+.sel{display:none;padding:8px 10px;margin-bottom:8px;background:rgba(0,136,255,0.06);border-radius:8px;font-size:11px;color:var(--brand);font-weight:600;border:1px solid rgba(0,136,255,0.1)}
+.sel.show{display:block}
+.inp{width:100%;padding:9px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:inherit;outline:none;margin-bottom:8px}
+.inp:focus{border-color:rgba(0,136,255,0.3)}
+.inp::placeholder{color:var(--muted)}
+.acts{display:flex;gap:4px;margin-bottom:8px}
+.act{flex:1;padding:8px 0;border-radius:8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .15s;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--muted)}
+.act:hover{background:rgba(255,255,255,0.06)}
+.act.warn.on{background:rgba(0,136,255,0.1);color:var(--brand);border-color:rgba(0,136,255,0.2)}
+.act.kick.on{background:rgba(245,158,11,0.1);color:var(--warn);border-color:rgba(245,158,11,0.2)}
+.act.ban.on{background:rgba(255,107,107,0.1);color:var(--danger);border-color:rgba(255,107,107,0.2)}
+.send{width:100%;padding:10px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;letter-spacing:.03em}
+.send:hover:not(:disabled){background:var(--brand2)}
+.send:disabled{opacity:.25;cursor:not-allowed}
+.send:active:not(:disabled){transform:scale(.98)}
+.msg{text-align:center;font-size:11px;font-weight:600;min-height:18px;margin-top:6px}
+.msg.ok{color:#10b981}.msg.err{color:var(--danger)}
+.mod-info{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--sub)}
+.mod-info .mod-av{width:20px;height:20px;border-radius:50%;background:var(--brand);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.mod-info .mod-av img{width:100%;height:100%;object-fit:cover}
+.mod-info span{font-weight:600;color:var(--text)}
 </style>
 </head>
 <body>
 <div class="panel">
-    <div class="header">
-        <div class="header-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <span class="header-title">Moderation</span>
-        <button class="header-close" onclick="window.close()">&times;</button>
+    <div class="hdr">
+        <div class="hdr-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="hdr-t">Moderation</span>
+        <button class="hdr-x" onclick="window.close()">&times;</button>
     </div>
     <div class="search"><input id="q" placeholder="Roblox Username suchen..." autofocus></div>
-    <div class="results" id="res"><div class="empty">Username eingeben</div></div>
-    <div class="footer">
-        <div class="selected" id="sel"></div>
-        <input class="reason" id="reason" placeholder="Grund eingeben...">
-        <div class="actions">
+    <div class="res" id="res"><div class="empty">Username eingeben</div></div>
+    <div class="ft">
+        <div class="sel" id="sel"></div>
+        <input class="inp" id="reason" placeholder="Grund eingeben...">
+        <div class="acts">
             <div class="act warn" onclick="pick('Warn',this)">Warn</div>
             <div class="act kick" onclick="pick('Kick',this)">Kick</div>
             <div class="act ban" onclick="pick('Ban',this)">Ban</div>
@@ -169,12 +75,29 @@ html, body {
         </button>
         <div class="msg" id="msg"></div>
     </div>
+    <div class="mod-info" id="modInfo">
+        <div class="mod-av" id="modAv">M</div>
+        Eingeloggt als <span id="modName">Moderator</span>
+    </div>
 </div>
 <script>
 const WH='https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
-let user=null,action=null,timer=null,mod='Mod';
-try{const s=JSON.parse(localStorage.getItem('en_session')||'null');if(s?.user?.username)mod=s.user.username}catch(e){}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;')}
+let user=null,action=null,timer=null;
+let mod={name:'Moderator',avatar:'',discordId:''};
+try{
+    const s=JSON.parse(localStorage.getItem('en_session')||'null');
+    if(s?.user){
+        mod.name=s.user.username||'Moderator';
+        mod.avatar=s.user.avatar||'';
+        mod.discordId=s.user.discordId||'';
+    }
+}catch(e){}
+// Mod-Info unten anzeigen
+document.getElementById('modName').textContent=mod.name;
+if(mod.avatar){document.getElementById('modAv').innerHTML='<img src="'+mod.avatar+'">';}
+else{document.getElementById('modAv').textContent=(mod.name[0]||'M').toUpperCase();}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
 
 document.getElementById('q').oninput=e=>{
     clearTimeout(timer);const v=e.target.value.trim();
@@ -187,15 +110,32 @@ async function search(q){
     try{
         const r=await fetch('https://users.roblox.com/v1/usernames/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usernames:[q],excludeBannedUsers:false})});
         const d=await r.json();if(!d.data?.length){document.getElementById('res').innerHTML='<div class="empty">Nicht gefunden</div>';return}
-        let av={};try{const a=await fetch('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds='+d.data.map(u=>u.id).join(',')+'&size=48x48&format=Png&isCircular=false');const j=await a.json();j.data?.forEach(x=>{av[x.targetId]=x.imageUrl})}catch(e){}
-        document.getElementById('res').innerHTML=d.data.map(u=>`<div class="user${user?.id===u.id?' active':''}" onclick="sel(${u.id},'${esc(u.name)}','${esc(u.displayName||u.name)}','${esc(av[u.id]||'')}')"><div class="user-av">${av[u.id]?'<img src="'+av[u.id]+'">':esc((u.name[0]||'?').toUpperCase())}</div><div><div class="user-name">${esc(u.displayName||u.name)}</div><div class="user-sub">@${esc(u.name)} · ${u.id}</div></div></div>`).join('');
+
+        // User-Details + Avatar laden
+        const u=d.data[0];
+        let avatar='',created='';
+        try{
+            const [pRes,aRes]=await Promise.all([
+                fetch('https://users.roblox.com/v1/users/'+u.id),
+                fetch('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds='+u.id+'&size=150x150&format=Png&isCircular=false')
+            ]);
+            const pData=await pRes.json();
+            const aData=await aRes.json();
+            avatar=aData.data?.[0]?.imageUrl||'';
+            created=pData.created?new Date(pData.created).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+        }catch(e){}
+
+        document.getElementById('res').innerHTML=`<div class="usr${user?.id===u.id?' on':''}" onclick="sel(${u.id},'${esc(u.name)}','${esc(u.displayName||u.name)}','${esc(avatar)}','${esc(created)}')">
+            <div class="av">${avatar?'<img src="'+avatar+'">':esc((u.name[0]||'?').toUpperCase())}</div>
+            <div><div class="nm">${esc(u.displayName||u.name)}</div><div class="id">@${esc(u.name)} · ${u.id}${created?' · '+created:''}</div></div>
+        </div>`;
     }catch(e){document.getElementById('res').innerHTML='<div class="empty" style="color:#ff6b6b">Fehler</div>'}
 }
 
-function sel(id,name,display,av){
-    user={id,name,display,av};
-    document.querySelectorAll('.user').forEach(e=>e.classList.remove('active'));
-    event?.target?.closest('.user')?.classList.add('active');
+function sel(id,name,display,av,created){
+    user={id,name,display,av,created};
+    document.querySelectorAll('.usr').forEach(e=>e.classList.remove('on'));
+    event?.target?.closest('.usr')?.classList.add('on');
     const s=document.getElementById('sel');s.textContent=`${display} (@${name}) · ${id}`;s.classList.add('show');
     upd();
 }
@@ -209,8 +149,28 @@ async function go(){
     const e=action==='Ban'?'🔨':action==='Kick'?'👢':'⚠️';
     document.getElementById('send').disabled=true;
     try{
-        await fetch(WH,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'Emden Network Moderation',avatar_url:'https://github.com/princearmy2024.png',embeds:[{color:c,author:{name:e+' '+action,icon_url:user.av||'https://github.com/princearmy2024.png'},title:'Moderation | '+user.id,fields:[{name:'User ID',value:'`'+user.id+'`',inline:true},{name:'Display Name',value:user.display,inline:true},{name:'Username',value:'@'+user.name,inline:true},{name:'Reason',value:reason,inline:false},{name:'Punishment',value:action,inline:true}],footer:{text:'Moderator: @'+mod},timestamp:new Date().toISOString()}]})});
-        show('✓ '+action+' gesendet','ok');document.getElementById('reason').value='';action=null;document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));
+        await fetch(WH,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+            username:'Emden Network Moderation',
+            avatar_url:user.av||'https://github.com/princearmy2024.png',
+            embeds:[{
+                color:c,
+                author:{name:user.display,icon_url:user.av||'https://github.com/princearmy2024.png'},
+                title:`Moderation | ${user.id}`,
+                thumbnail:{url:user.av||''},
+                fields:[
+                    {name:'User ID',value:'`'+user.id+'`',inline:true},
+                    {name:'Display Name',value:user.display,inline:true},
+                    {name:'Account Created',value:user.created||'Unbekannt',inline:true},
+                    {name:'Reason',value:reason,inline:false},
+                    {name:'Punishment',value:action,inline:true},
+                ],
+                footer:{text:'Moderator: @'+mod.name,icon_url:mod.avatar||'https://github.com/princearmy2024.png'},
+                timestamp:new Date().toISOString(),
+            }]
+        })});
+        show('✓ '+action+' gesendet','ok');
+        document.getElementById('reason').value='';
+        action=null;document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));
     }catch(e){show('✗ Fehler','err')}
     upd();
 }
