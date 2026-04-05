@@ -1438,7 +1438,9 @@ function startOverlayDataLoop() {
         try {
             const guild = client.guilds.cache.get(GUILD_ID);
             if (guild) {
-                const role = await guild.roles.fetch(ON_DUTY_ROLE_ID).catch(() => null);
+                // Members fetchen damit role.members aktuell ist
+                await guild.members.fetch().catch(() => {});
+                const role = guild.roles.cache.get(ON_DUTY_ROLE_ID);
                 if (role) {
                     const count = role.members.size;
                     if (count !== lastSupporterCount) {

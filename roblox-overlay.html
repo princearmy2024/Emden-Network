@@ -24,9 +24,9 @@ html, body {
   --text-main: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.45);
   --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
-  --panel-solid: rgba(6, 8, 18, 0.92);
-  --panel-mid: rgba(10, 18, 40, 0.6);
-  --panel-fade: rgba(14, 24, 55, 0.2);
+  --panel-solid: rgba(6, 8, 18, 0.95);
+  --panel-mid: rgba(10, 18, 40, 0.7);
+  --panel-fade: rgba(14, 24, 55, 0.25);
   --glass-border: rgba(255,255,255,0.07);
 }
 
@@ -232,41 +232,76 @@ html, body {
 /* ================================================================
    MOD PANEL TRIGGER BUTTON — rechts im Panel
    ================================================================ */
+/* Pin/Unpin Button */
+.panel-pin-wrap {
+  padding: 6px clamp(10px, 1vw, 16px) 2px;
+  display: flex; justify-content: flex-end;
+  pointer-events: auto;
+}
+.panel-pin-btn {
+  width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.35); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.panel-pin-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.panel-pin-btn.unpinned { color: rgba(255,255,255,0.15); }
+.panel-pin-btn.unpinned:hover { color: var(--accent); }
+.panel-pin-btn svg, .panel-pin-btn i { width: 12px; height: 12px; }
+
+/* Panel eingeklappt */
+#panel-left.collapsed {
+  width: 8px !important;
+  pointer-events: none;
+}
+#panel-left.collapsed .panel-section,
+#panel-left.collapsed .panel-sep,
+#panel-left.collapsed .panel-spacer,
+#panel-left.collapsed #notif-area,
+#panel-left.collapsed .panel-pin-wrap,
+#panel-left.collapsed .grid-pattern { opacity: 0; pointer-events: none; }
+
+/* Eintragen Button */
 #mod-trigger {
   position: fixed;
-  bottom: clamp(120px, calc(5.5vh + 80px), 160px);
-  right: clamp(10px, 1vw, 20px);
-  width: clamp(36px, 2.8vw, 46px);
-  height: clamp(36px, 2.8vw, 46px);
-  border-radius: 12px;
-  /* Minimal opaque bg damit forward:true mouseenter triggert */
-  background: rgba(0, 136, 255, 0.1);
-  border: 1px solid rgba(0, 136, 255, 0.2);
+  bottom: clamp(56px, calc(5.5vh + 14px), 78px);
+  right: clamp(100px, 9vw, 160px);
+  height: clamp(32px, 2.4vw, 40px);
+  padding: 0 clamp(14px, 1.2vw, 20px);
+  border-radius: 10px;
+  background: rgba(0, 136, 255, 0.12);
+  border: 1px solid rgba(0, 136, 255, 0.22);
   display: none; align-items: center; justify-content: center;
+  gap: 7px;
   cursor: pointer;
   color: var(--accent);
   z-index: 200;
   pointer-events: auto;
   transition: all 0.25s ease;
   backdrop-filter: blur(20px);
+  font-family: 'Inter', sans-serif;
 }
 #mod-trigger:hover {
   background: rgba(0, 136, 255, 0.22);
   border-color: rgba(0, 136, 255, 0.4);
-  transform: scale(1.08);
-  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.15);
 }
-#mod-trigger svg { width: clamp(16px, 1.2vw, 20px); height: clamp(16px, 1.2vw, 20px); pointer-events: none; }
+#mod-trigger i, #mod-trigger svg { width: clamp(13px, 1vw, 16px); height: clamp(13px, 1vw, 16px); pointer-events: none; }
+.mod-trigger-text {
+  font-size: clamp(10px, 0.7vw, 12px); font-weight: 700;
+  letter-spacing: 0.03em; pointer-events: none;
+}
 body.overlay-active.is-admin #mod-trigger { display: flex; }
 
-/* Klick-Area: grosserer unsichtbarer Bereich hinter dem Button
-   damit forward:true den Hover erkennt (braucht nicht-transparente Pixel!) */
+/* Klick-Area */
 #mod-trigger::before {
   content: '';
   position: absolute;
-  top: -12px; left: -12px; right: -12px; bottom: -12px;
-  border-radius: 18px;
-  background: rgba(0, 0, 10, 0.01); /* minimal opaque — forward:true braucht das */
+  top: -10px; left: -10px; right: -10px; bottom: -10px;
+  border-radius: 16px;
+  background: rgba(0, 0, 10, 0.01);
 }
 
 /* ================================================================
@@ -718,7 +753,13 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <!-- ========== GRADIENT FRAME ========== -->
 <div id="panel-left">
   <div class="grid-pattern"></div>
-  <div class="panel-section">
+  <!-- Pin/Unpin Button -->
+  <div class="panel-pin-wrap">
+    <button class="panel-pin-btn" id="panelPinBtn" onclick="Overlay.togglePanelPin()" title="Panel fixieren/einklappen">
+      <i data-lucide="pin" id="pinIconLucide"></i>
+    </button>
+  </div>
+  <div class="panel-section" id="panelContent">
     <div class="panel-section-title">Status</div>
     <div class="panel-info-card">
       <div class="panel-info-icon green"><i data-lucide="shield-check"></i></div>
@@ -735,17 +776,17 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     </div>
   </div>
   <div class="panel-sep"></div>
-  <div class="panel-section">
+  <div class="panel-section panel-shortcuts" id="panelShortcuts">
     <div class="panel-section-title">Shortcuts</div>
-    <div class="panel-info-card" style="opacity:0.4;">
+    <div class="panel-info-card" style="opacity:0.5;">
       <div class="panel-info-icon"><i data-lucide="terminal"></i></div>
       <div><div class="panel-info-label">Commands</div><div class="panel-info-value" style="font-size:11px;">F3</div></div>
     </div>
-    <div class="panel-info-card" style="opacity:0.4;">
-      <div class="panel-info-icon"><i data-lucide="shield"></i></div>
-      <div><div class="panel-info-label">Mod Panel</div><div class="panel-info-value" style="font-size:11px;">F4</div></div>
+    <div class="panel-info-card" style="opacity:0.5;">
+      <div class="panel-info-icon"><i data-lucide="eye-off"></i></div>
+      <div><div class="panel-info-label">Overlay An/Aus</div><div class="panel-info-value" style="font-size:11px;">F4</div></div>
     </div>
-    <div class="panel-info-card" style="opacity:0.4;">
+    <div class="panel-info-card" style="opacity:0.5;">
       <div class="panel-info-icon"><i data-lucide="mic"></i></div>
       <div><div class="panel-info-label">Push to Talk</div><div class="panel-info-value" style="font-size:11px;">V</div></div>
     </div>
@@ -758,7 +799,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <div class="grid-pattern"></div>
   <div class="bottom-bar-content">
     <div class="bottom-hint"><kbd>F2</kbd> Dashboard <kbd>F3</kbd> Commands <kbd>F4</kbd> Mod <kbd>V</kbd> Talk</div>
-    <div class="bottom-version">Emden Network v4.27.0</div>
+    <div class="bottom-version">Emden Network v4.28.0</div>
   </div>
 </div>
 
@@ -769,9 +810,10 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <div class="glow-line-left"></div>
 <div class="glow-line-bottom"></div>
 
-<!-- MOD TRIGGER BUTTON -->
+<!-- MOD TRIGGER BUTTON — "Eintragen" -->
 <div id="mod-trigger" onclick="Overlay.toggleModSlide()">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  <i data-lucide="clipboard-edit"></i>
+  <span class="mod-trigger-text">Eintragen</span>
 </div>
 
 <!-- MOD SLIDE PANEL -->

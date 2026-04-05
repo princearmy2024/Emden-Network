@@ -916,7 +916,18 @@ const Overlay = (() => {
         if (m) { m.textContent = text; m.className = 'mod-msg ' + type; setTimeout(() => { m.textContent = ''; m.className = 'mod-msg'; }, 3000); }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction };
+    // ─── PANEL PIN/UNPIN ─────────────────────────────────────
+    let panelPinned = true;
+
+    function togglePanelPin() {
+        panelPinned = !panelPinned;
+        const panel = document.getElementById('panel-left');
+        const btn = document.getElementById('panelPinBtn');
+        if (panel) panel.classList.toggle('collapsed', !panelPinned);
+        if (btn) btn.classList.toggle('unpinned', !panelPinned);
+    }
+
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());
