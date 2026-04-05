@@ -775,7 +775,6 @@ const apiServer = http.createServer(async (req, res) => {
                 const components = [
                     {
                         type: 17, // Container
-                        accent_color: accentColor,
                         components: [
                             // Header: Avatar + Action
                             {
