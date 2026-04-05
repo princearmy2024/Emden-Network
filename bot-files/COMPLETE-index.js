@@ -768,7 +768,6 @@ const apiServer = http.createServer(async (req, res) => {
 
                 const MOD_CHANNEL_ID = "1367243128284905573";
                 const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
-                const accentColor = action === 'Ban' ? 0xFF4444 : action === 'Kick' ? 0xF59E0B : 0x0088FF;
 
                 // Components V2 via discord.js Builder
                 const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
@@ -790,7 +789,6 @@ const apiServer = http.createServer(async (req, res) => {
 
                 // Container bauen
                 const container = new ContainerBuilder()
-                    .setAccentColor(accentColor)
                     .addSectionComponents(headerSection)
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
