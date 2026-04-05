@@ -407,9 +407,9 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.close();
     }
-    const { width, height } = screen.getPrimaryDisplay().bounds;
+    const { width, height } = screen.getPrimaryDisplay().size;
     robloxOverlayWin = new BrowserWindow({
-        width: width + 2, height: height + 2, x: -1, y: -1, // +2 Hack um Windows Maximize-Snap & Frame-Bug zu umgehen
+        width: width, height: height, x: 0, y: 0,
         transparent: true, frame: false,
         titleBarStyle: 'hidden', type: 'toolbar', // Extra Sicherheitsnetze für Frameless
         backgroundColor: '#00000000',

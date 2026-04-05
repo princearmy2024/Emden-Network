@@ -71,6 +71,21 @@ const Overlay = (() => {
             setGameRunning(true);
         }, 300);
 
+        // Mod Trigger Button — Focus anfordern bei Hover (sonst click-through!)
+        const modTrigger = document.getElementById('mod-trigger');
+        if (modTrigger) {
+            modTrigger.addEventListener('mouseenter', () => {
+                if (window.electronAPI?.overlayRequestFocus) window.electronAPI.overlayRequestFocus(true);
+                else if (window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(true);
+            });
+            modTrigger.addEventListener('mouseleave', () => {
+                if (!modSlideOpen) {
+                    if (window.electronAPI?.overlayRequestFocus) window.electronAPI.overlayRequestFocus(false);
+                    else if (window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(false);
+                }
+            });
+        }
+
         // Mod Bar: User-Info setzen
         try {
             const session = JSON.parse(localStorage.getItem('en_session') || 'null');
@@ -160,10 +175,10 @@ const Overlay = (() => {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
 
-        // F4: Mod-Panel Toggle via IPC
+        // F4: Mod Slide-Panel Toggle via IPC
         if (window.electronAPI?.onToggleModPanel) {
             window.electronAPI.onToggleModPanel(() => {
-                if (isAdmin) toggleModPanel();
+                if (isAdmin) toggleModSlide();
             });
         }
 

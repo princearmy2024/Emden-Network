@@ -239,6 +239,7 @@ html, body {
   width: clamp(36px, 2.8vw, 46px);
   height: clamp(36px, 2.8vw, 46px);
   border-radius: 12px;
+  /* Minimal opaque bg damit forward:true mouseenter triggert */
   background: rgba(0, 136, 255, 0.1);
   border: 1px solid rgba(0, 136, 255, 0.2);
   display: none; align-items: center; justify-content: center;
@@ -250,13 +251,23 @@ html, body {
   backdrop-filter: blur(20px);
 }
 #mod-trigger:hover {
-  background: rgba(0, 136, 255, 0.18);
-  border-color: rgba(0, 136, 255, 0.35);
+  background: rgba(0, 136, 255, 0.22);
+  border-color: rgba(0, 136, 255, 0.4);
   transform: scale(1.08);
-  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.2);
 }
 #mod-trigger svg { width: clamp(16px, 1.2vw, 20px); height: clamp(16px, 1.2vw, 20px); pointer-events: none; }
 body.overlay-active.is-admin #mod-trigger { display: flex; }
+
+/* Klick-Area: grosserer unsichtbarer Bereich hinter dem Button
+   damit forward:true den Hover erkennt (braucht nicht-transparente Pixel!) */
+#mod-trigger::before {
+  content: '';
+  position: absolute;
+  top: -12px; left: -12px; right: -12px; bottom: -12px;
+  border-radius: 18px;
+  background: rgba(0, 0, 10, 0.01); /* minimal opaque — forward:true braucht das */
+}
 
 /* ================================================================
    MOD SLIDE PANEL — slides in from right

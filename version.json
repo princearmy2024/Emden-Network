@@ -1,6 +1,6 @@
 {
-    "version": "4.26.0",
+    "version": "4.26.1",
     "releaseDate": "2026-04-06",
-    "notes": "v4.26.0: Mod Panel Slide-In von rechts, integriert ins Overlay mit Gradient-Design.",
+    "notes": "v4.26.1: Fix — Mod Button klickbar, F4 Toggle, Vollbild Bottom-Gap fix.",
     "forceUpdate": true
 }
