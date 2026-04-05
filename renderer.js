@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.18.0'; // Stand: 05.04.2026 (Overlay Zustandsmaschine)
+let CURRENT_VERSION = '4.18.1'; // Stand: 05.04.2026 (Mod-Hint Badge)
 
 // =============================================================
 // CONFIG — Bot-API
