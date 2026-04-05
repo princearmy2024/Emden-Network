@@ -718,11 +718,52 @@ app.whenReady().then(() => {
         }
     });
 
-    // F4: Mod-Panel als separates Fenster öffnen/schließen (mit Debounce)
+    // === MOD-BUTTON: Kleines Always-on-top Mini-Fenster ===
+    let modBtnWin = null;
+    ipcMain.on('create-mod-button', () => createModButton());
+    ipcMain.on('toggle-mod-panel', () => toggleModPanel());
+    function createModButton() {
+        if (modBtnWin && !modBtnWin.isDestroyed()) return;
+        // Gespeicherte Position laden
+        let posX = 20, posY = 20;
+        try {
+            const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'mod-btn-pos.json'), 'utf-8'));
+            if (saved) { posX = saved.x; posY = saved.y; }
+        } catch(e) {}
+
+        modBtnWin = new BrowserWindow({
+            width: 48, height: 48, x: posX, y: posY,
+            frame: false, transparent: true,
+            backgroundColor: '#00000000',
+            alwaysOnTop: true, skipTaskbar: true,
+            resizable: false, minimizable: false,
+            focusable: true,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+        modBtnWin.setAlwaysOnTop(true, 'screen-saver', 2);
+        modBtnWin.loadFile('mod-btn.html');
+
+        // Position speichern beim Verschieben
+        modBtnWin.on('moved', () => {
+            if (modBtnWin && !modBtnWin.isDestroyed()) {
+                const [x, y] = modBtnWin.getPosition();
+                try { fs.writeFileSync(path.join(app.getPath('userData'), 'mod-btn-pos.json'), JSON.stringify({x, y})); } catch(e) {}
+            }
+        });
+
+        // Klick wird in mod-btn.html via IPC 'toggle-mod-panel' gehandelt
+    }
+
+    // F4: Mod-Panel öffnen/schließen (mit Debounce)
     let modPanelWin = null;
     let f4Cooldown = false;
-    globalShortcut.register('F4', () => {
-        if (f4Cooldown) return; // Debounce: max 1x pro Sekunde
+
+    function toggleModPanel() {
+        if (f4Cooldown) return;
         f4Cooldown = true;
         setTimeout(() => { f4Cooldown = false; }, 1000);
 
@@ -731,10 +772,14 @@ app.whenReady().then(() => {
             modPanelWin = null;
             return;
         }
+        openModPanel();
+    }
+
+    function openModPanel() {
         modPanelWin = new BrowserWindow({
-            width: 380, height: 520,
-            frame: false, transparent: false,
-            backgroundColor: '#0a0a16',
+            width: 380, height: 540,
+            frame: false, transparent: true,
+            backgroundColor: '#00000000',
             alwaysOnTop: true, skipTaskbar: false,
             resizable: true, minimizable: false,
             focusable: true,
@@ -746,9 +791,10 @@ app.whenReady().then(() => {
         });
         modPanelWin.setAlwaysOnTop(true, 'pop-up-menu', 1);
         modPanelWin.loadFile('mod-panel.html');
-        // KEIN on('blur') Focus-Loop! User kann frei wechseln.
         modPanelWin.on('closed', () => { modPanelWin = null; });
-    });
+    }
+
+    globalShortcut.register('F4', () => toggleModPanel());
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

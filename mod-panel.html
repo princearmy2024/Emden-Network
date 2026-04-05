@@ -7,134 +7,175 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-    background: #0c0c1a; color: #fff; font-family: 'Inter', sans-serif;
+    background: transparent; color: #fff; font-family: 'Inter', sans-serif;
     height: 100vh; display: flex; flex-direction: column; overflow: hidden;
     -webkit-font-smoothing: antialiased; user-select: none;
+}
+
+.panel {
+    flex: 1; display: flex; flex-direction: column;
+    background: rgba(12, 14, 28, 0.75);
+    backdrop-filter: blur(32px) saturate(1.4); -webkit-backdrop-filter: blur(32px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px; overflow: hidden;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    margin: 6px;
 }
 
 /* Draggable Title Bar */
 .titlebar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px; background: #0f0f1e; -webkit-app-region: drag;
-    border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+    padding: 12px 18px; -webkit-app-region: drag;
+    border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
 }
-.titlebar-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.titlebar-title svg { color: #3b82f6; width: 16px; height: 16px; }
+.titlebar-title {
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.9);
+}
+.titlebar-title svg { color: #3b82f6; }
 .titlebar-close {
     -webkit-app-region: no-drag;
-    width: 24px; height: 24px; border-radius: 6px; border: none;
-    background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4);
+    width: 26px; height: 26px; border-radius: 8px; border: none;
+    background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.35);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 14px; transition: all 0.2s;
+    cursor: pointer; font-size: 15px; transition: all 0.2s;
 }
-.titlebar-close:hover { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+.titlebar-close:hover { background: rgba(255,107,107,0.12); color: #ff6b6b; }
 
 /* Search */
 .search-area { padding: 10px 14px; flex-shrink: 0; }
 .search-input {
-    width: 100%; padding: 10px 14px; border-radius: 10px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06);
+    width: 100%; padding: 11px 14px; border-radius: 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
     color: #fff; font-size: 13px; font-family: inherit; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
-.search-input:focus { border-color: #3b82f6; }
-.search-input::placeholder { color: rgba(255,255,255,0.25); }
+.search-input:focus { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+.search-input::placeholder { color: rgba(255,255,255,0.2); }
 
 /* Results */
 .results {
-    flex: 1; overflow-y: auto; padding: 0 10px; min-height: 0;
+    flex: 1; overflow-y: auto; padding: 4px 10px; min-height: 0;
     scrollbar-width: none;
 }
 .results::-webkit-scrollbar { display: none; }
-.placeholder { text-align: center; padding: 40px 20px; color: rgba(255,255,255,0.2); font-size: 12px; }
+.placeholder { text-align: center; padding: 40px 20px; color: rgba(255,255,255,0.15); font-size: 12px; }
 
 .user-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 10px; cursor: pointer;
-    transition: background 0.2s; border: 1px solid transparent;
+    padding: 10px 12px; border-radius: 12px; cursor: pointer;
+    transition: all 0.2s; border: 1px solid transparent;
 }
 .user-item:hover { background: rgba(255,255,255,0.04); }
 .user-item.selected { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.2); }
 .user-avatar {
-    width: 34px; height: 34px; border-radius: 50%;
+    width: 36px; height: 36px; border-radius: 50%;
     background: linear-gradient(135deg, #3b82f6, #1e40af);
     display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: #fff;
+    font-size: 14px; font-weight: 700; color: #fff;
     overflow: hidden; flex-shrink: 0;
 }
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .user-name { font-size: 13px; font-weight: 600; }
-.user-id { font-size: 10px; color: rgba(255,255,255,0.3); font-family: 'JetBrains Mono', monospace; }
+.user-id { font-size: 10px; color: rgba(255,255,255,0.25); font-family: 'JetBrains Mono', monospace; }
 
 /* Actions */
 .actions {
-    padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+    padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
 }
-.selected-user {
-    display: none; align-items: center; gap: 8px;
-    padding: 8px 12px; background: rgba(59,130,246,0.08);
-    border-radius: 8px; margin-bottom: 8px; font-size: 12px; color: #3b82f6; font-weight: 600;
+.selected-info {
+    display: none; padding: 8px 12px; margin-bottom: 8px;
+    background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.12);
+    border-radius: 10px; font-size: 11px; color: #3b82f6; font-weight: 600;
 }
-.selected-user.show { display: flex; }
+.selected-info.show { display: block; }
+
 .reason-input {
-    width: 100%; padding: 9px 12px; border-radius: 8px;
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
-    color: #fff; font-size: 12px; font-family: inherit; outline: none; margin-bottom: 8px;
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    color: #fff; font-size: 12px; font-family: inherit; outline: none;
+    margin-bottom: 10px; transition: border-color 0.2s;
 }
-.reason-input:focus { border-color: #3b82f6; }
-.reason-input::placeholder { color: rgba(255,255,255,0.2); }
+.reason-input:focus { border-color: rgba(59,130,246,0.4); }
+.reason-input::placeholder { color: rgba(255,255,255,0.15); }
 
-.btns { display: flex; gap: 6px; }
-.btn {
-    flex: 1; padding: 10px 0; border: none; border-radius: 8px;
-    font-size: 11px; font-weight: 700; cursor: pointer;
+/* Action Type Selector */
+.action-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.action-type {
+    flex: 1; padding: 8px 0; border-radius: 8px;
+    font-size: 10px; font-weight: 700; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    text-align: center; transition: all 0.2s;
+    border: 1px solid transparent; background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.3);
+}
+.action-type:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); }
+.action-type.warn.active { background: rgba(59,130,246,0.12); color: #3b82f6; border-color: rgba(59,130,246,0.25); }
+.action-type.kick.active { background: rgba(245,158,11,0.12); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
+.action-type.ban.active { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
+
+/* Send Button */
+.send-btn {
+    width: 100%; padding: 11px; border: none; border-radius: 10px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    background: rgba(59,130,246,0.15); color: #3b82f6;
+    border: 1px solid rgba(59,130,246,0.2);
     transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.05em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
 }
-.btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn.warn { background: rgba(59,130,246,0.12); color: #3b82f6; border: 1px solid rgba(59,130,246,0.2); }
-.btn.warn:hover:not(:disabled) { background: rgba(59,130,246,0.22); }
-.btn.kick { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
-.btn.kick:hover:not(:disabled) { background: rgba(245,158,11,0.22); }
-.btn.ban { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
-.btn.ban:hover:not(:disabled) { background: rgba(239,68,68,0.22); }
+.send-btn:hover:not(:disabled) { background: rgba(59,130,246,0.25); }
+.send-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.send-btn svg { width: 14px; height: 14px; }
 
-.status { padding: 6px 14px; text-align: center; font-size: 11px; color: #10b981; font-weight: 600; min-height: 24px; }
+.status {
+    padding: 8px; text-align: center; font-size: 11px; font-weight: 600; min-height: 20px;
+    transition: opacity 0.3s;
+}
+.status.success { color: #10b981; }
+.status.error { color: #ef4444; }
 </style>
 </head>
 <body>
 
-<div class="titlebar">
-    <div class="titlebar-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Moderation
+<div class="panel">
+    <div class="titlebar">
+        <div class="titlebar-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Moderation
+        </div>
+        <button class="titlebar-close" onclick="window.close()">&times;</button>
     </div>
-    <button class="titlebar-close" onclick="window.close()">&times;</button>
-</div>
 
-<div class="search-area">
-    <input type="text" class="search-input" id="searchInput" placeholder="Roblox Username suchen..." autofocus>
-</div>
-
-<div class="results" id="results">
-    <div class="placeholder">Username eingeben zum Suchen</div>
-</div>
-
-<div class="actions">
-    <div class="selected-user" id="selectedUser">Kein User</div>
-    <input type="text" class="reason-input" id="reasonInput" placeholder="Grund eingeben...">
-    <div class="btns">
-        <button class="btn warn" id="btnWarn" disabled>Warn</button>
-        <button class="btn kick" id="btnKick" disabled>Kick</button>
-        <button class="btn ban" id="btnBan" disabled>Ban</button>
+    <div class="search-area">
+        <input type="text" class="search-input" id="searchInput" placeholder="Roblox Username suchen..." autofocus>
     </div>
-    <div class="status" id="status"></div>
+
+    <div class="results" id="results">
+        <div class="placeholder">Username eingeben zum Suchen</div>
+    </div>
+
+    <div class="actions">
+        <div class="selected-info" id="selectedInfo"></div>
+        <input type="text" class="reason-input" id="reasonInput" placeholder="Grund eingeben...">
+        <div class="action-row">
+            <div class="action-type warn" onclick="selectAction('Warn', this)">Warn</div>
+            <div class="action-type kick" onclick="selectAction('Kick', this)">Kick</div>
+            <div class="action-type ban" onclick="selectAction('Ban', this)">Ban</div>
+        </div>
+        <button class="send-btn" id="sendBtn" disabled onclick="sendAction()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Senden
+        </button>
+        <div class="status" id="status"></div>
+    </div>
 </div>
 
 <script>
 const WEBHOOK = 'https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
 let selectedUser = null;
+let selectedAction = null;
 let searchTimer = null;
 
-// Get moderator name from session
 let moderatorName = 'Moderator';
 try {
     const session = JSON.parse(localStorage.getItem('en_session') || 'null');
@@ -175,36 +216,48 @@ async function searchUser(query) {
 
         document.getElementById('results').innerHTML = data.data.map(u => {
             const av = avatars[u.id] || '';
-            return '<div class="user-item' + (selectedUser?.id === u.id ? ' selected' : '') + '" onclick="selectUser(' + u.id + ',\'' + esc(u.name) + '\',\'' + esc(u.displayName || u.name) + '\',\'' + esc(av) + '\')">' +
-                '<div class="user-avatar">' + (av ? '<img src="' + av + '">' : (u.name[0] || '?').toUpperCase()) + '</div>' +
-                '<div><div class="user-name">' + esc(u.displayName || u.name) + '</div><div class="user-id">@' + esc(u.name) + ' · ' + u.id + '</div></div></div>';
+            return `<div class="user-item${selectedUser?.id === u.id ? ' selected' : ''}" onclick="pickUser(${u.id},'${esc(u.name)}','${esc(u.displayName || u.name)}','${esc(av)}')">
+                <div class="user-avatar">${av ? '<img src="'+av+'">' : (u.name[0]||'?').toUpperCase()}</div>
+                <div><div class="user-name">${esc(u.displayName || u.name)}</div><div class="user-id">@${esc(u.name)} · ${u.id}</div></div>
+            </div>`;
         }).join('');
     } catch(e) {
-        document.getElementById('results').innerHTML = '<div class="placeholder" style="color:#ff6b6b">API Fehler</div>';
+        document.getElementById('results').innerHTML = '<div class="placeholder" style="color:#ef4444">API Fehler</div>';
     }
 }
 
-function selectUser(id, username, displayName, avatar) {
+function pickUser(id, username, displayName, avatar) {
     selectedUser = { id, username, displayName, avatar };
     document.querySelectorAll('.user-item').forEach(el => el.classList.remove('selected'));
     event?.target?.closest('.user-item')?.classList.add('selected');
-    const sel = document.getElementById('selectedUser');
-    sel.textContent = displayName + ' (@' + username + ') · ' + id;
-    sel.classList.add('show');
-    document.getElementById('btnWarn').disabled = false;
-    document.getElementById('btnKick').disabled = false;
-    document.getElementById('btnBan').disabled = false;
+    const info = document.getElementById('selectedInfo');
+    info.textContent = `${displayName} (@${username}) · ${id}`;
+    info.classList.add('show');
+    updateSendBtn();
 }
 
-document.getElementById('btnWarn').onclick = () => doAction('Warn');
-document.getElementById('btnKick').onclick = () => doAction('Kick');
-document.getElementById('btnBan').onclick = () => doAction('Ban');
+function selectAction(type, el) {
+    selectedAction = type;
+    document.querySelectorAll('.action-type').forEach(a => a.classList.remove('active'));
+    el.classList.add('active');
+    updateSendBtn();
+}
 
-async function doAction(type) {
-    if (!selectedUser) return;
+function updateSendBtn() {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = !(selectedUser && selectedAction);
+}
+
+async function sendAction() {
+    if (!selectedUser || !selectedAction) return;
     const reason = document.getElementById('reasonInput').value.trim() || 'Kein Grund angegeben';
+    const type = selectedAction;
     const color = type === 'Ban' ? 0xFF4444 : type === 'Kick' ? 0xF59E0B : 0x3B82F6;
     const emoji = type === 'Ban' ? '🔨' : type === 'Kick' ? '👢' : '⚠️';
+
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    btn.innerHTML = 'Sende...';
 
     try {
         await fetch(WEBHOOK, {
@@ -215,8 +268,8 @@ async function doAction(type) {
                 avatar_url: 'https://github.com/princearmy2024.png',
                 embeds: [{
                     color,
-                    author: { name: emoji + ' ' + type, icon_url: selectedUser.avatar || 'https://github.com/princearmy2024.png' },
-                    title: 'Moderation | ' + selectedUser.id,
+                    author: { name: `${emoji} ${type}`, icon_url: selectedUser.avatar || 'https://github.com/princearmy2024.png' },
+                    title: `Moderation | ${selectedUser.id}`,
                     fields: [
                         { name: 'User ID', value: '`' + selectedUser.id + '`', inline: true },
                         { name: 'Display Name', value: selectedUser.displayName, inline: true },
@@ -229,13 +282,22 @@ async function doAction(type) {
                 }]
             })
         });
-        document.getElementById('status').textContent = '✓ ' + type + ' für ' + selectedUser.displayName + ' gesendet';
+        showStatus('✓ ' + type + ' für ' + selectedUser.displayName + ' gesendet', 'success');
         document.getElementById('reasonInput').value = '';
-        setTimeout(() => { document.getElementById('status').textContent = ''; }, 3000);
+        selectedAction = null;
+        document.querySelectorAll('.action-type').forEach(a => a.classList.remove('active'));
     } catch(e) {
-        document.getElementById('status').textContent = '✗ Fehler';
-        document.getElementById('status').style.color = '#ff6b6b';
+        showStatus('✗ Fehler beim Senden', 'error');
     }
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Senden';
+    updateSendBtn();
+}
+
+function showStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = 'status ' + type;
+    setTimeout(() => { el.textContent = ''; el.className = 'status'; }, 3000);
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }

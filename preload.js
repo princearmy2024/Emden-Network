@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Overlay Focus (für Mod-Panel Klicks)
     requestOverlayFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
 
+    // Mod-Button erstellen (für Admins)
+    createModButton: () => ipcRenderer.send('create-mod-button'),
+    toggleModPanel: () => ipcRenderer.send('toggle-mod-panel'),
+
     // Autostart
     setAutostart: (enabled) => ipcRenderer.send('set-autostart', enabled),
 

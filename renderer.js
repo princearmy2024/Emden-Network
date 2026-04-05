@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.18.1'; // Stand: 05.04.2026 (Mod-Hint Badge)
+let CURRENT_VERSION = '4.19.0'; // Stand: 05.04.2026 (Mod-Button + Glass Panel + Send)
 
 // =============================================================
 // CONFIG — Bot-API
@@ -800,10 +800,11 @@ const App = window.App = {
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
-        // Overlay für Admins immer starten
+        // Overlay + Mod-Button für Admins starten
         if (user.role === 'admin' && window.electronAPI?.showRobloxOverlay) {
             const rblxProfile = RobloxService.getProfile();
             window.electronAPI.showRobloxOverlay(user.discordId, rblxProfile?.userId || '', true);
+            window.electronAPI.createModButton?.();
         }
 
         // Demo: Notifications nach kurzer Zeit
