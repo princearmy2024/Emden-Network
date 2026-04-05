@@ -798,7 +798,15 @@ app.whenReady().then(() => {
         try { fs.writeFileSync(file, JSON.stringify({ x, y, w, h })); } catch(e) {}
     }
 
-    globalShortcut.register('F4', () => toggleModButton());
+    globalShortcut.register('F4', () => {
+        // F4 → Overlay Toggle (wenn Overlay offen)
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.webContents.send('toggle-mod-panel');
+        } else {
+            // Fallback: altes Mod-Panel System wenn kein Overlay
+            toggleModButton();
+        }
+    });
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

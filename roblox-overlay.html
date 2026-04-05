@@ -225,8 +225,9 @@ html, body {
   font-family: var(--font-mono);
 }
 .bottom-version {
-  font-size: clamp(8px, 0.5vw, 10px); color: rgba(255,255,255,0.08);
+  font-size: clamp(9px, 0.55vw, 11px); color: rgba(255,255,255,0.3);
   font-weight: 600; margin-left: auto;
+  letter-spacing: 0.03em;
 }
 
 /* ================================================================
@@ -262,35 +263,33 @@ html, body {
 #panel-left.collapsed .panel-pin-wrap,
 #panel-left.collapsed .grid-pattern { opacity: 0; pointer-events: none; }
 
-/* Eintragen Button */
+/* Eintragen Button — unten im Fade, clean verbunden */
 #mod-trigger {
   position: fixed;
-  bottom: clamp(56px, calc(5.5vh + 14px), 78px);
-  right: clamp(100px, 9vw, 160px);
-  height: clamp(32px, 2.4vw, 40px);
-  padding: 0 clamp(14px, 1.2vw, 20px);
-  border-radius: 10px;
-  background: rgba(0, 136, 255, 0.12);
-  border: 1px solid rgba(0, 136, 255, 0.22);
+  bottom: clamp(6px, 0.8vh, 14px);
+  right: clamp(140px, 12vw, 220px);
+  height: clamp(28px, 2.2vw, 36px);
+  padding: 0 clamp(12px, 1vw, 18px);
+  border-radius: 8px;
+  background: rgba(0, 136, 255, 0.08);
+  border: 1px solid rgba(0, 136, 255, 0.15);
   display: none; align-items: center; justify-content: center;
-  gap: 7px;
+  gap: 6px;
   cursor: pointer;
   color: var(--accent);
   z-index: 200;
   pointer-events: auto;
   transition: all 0.25s ease;
-  backdrop-filter: blur(20px);
   font-family: 'Inter', sans-serif;
 }
 #mod-trigger:hover {
-  background: rgba(0, 136, 255, 0.22);
-  border-color: rgba(0, 136, 255, 0.4);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.15);
+  background: rgba(0, 136, 255, 0.18);
+  border-color: rgba(0, 136, 255, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 136, 255, 0.12);
 }
-#mod-trigger i, #mod-trigger svg { width: clamp(13px, 1vw, 16px); height: clamp(13px, 1vw, 16px); pointer-events: none; }
+#mod-trigger i, #mod-trigger svg { width: clamp(12px, 0.85vw, 15px); height: clamp(12px, 0.85vw, 15px); pointer-events: none; }
 .mod-trigger-text {
-  font-size: clamp(10px, 0.7vw, 12px); font-weight: 700;
+  font-size: clamp(9px, 0.65vw, 11px); font-weight: 700;
   letter-spacing: 0.03em; pointer-events: none;
 }
 body.overlay-active.is-admin #mod-trigger { display: flex; }
@@ -300,7 +299,7 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
   content: '';
   position: absolute;
   top: -10px; left: -10px; right: -10px; bottom: -10px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(0, 0, 10, 0.01);
 }
 
@@ -799,7 +798,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <div class="grid-pattern"></div>
   <div class="bottom-bar-content">
     <div class="bottom-hint"><kbd>F2</kbd> Dashboard <kbd>F3</kbd> Commands <kbd>F4</kbd> Mod <kbd>V</kbd> Talk</div>
-    <div class="bottom-version">Emden Network v4.28.0</div>
+    <div class="bottom-version">Emden Network v4.28.1</div>
   </div>
 </div>
 

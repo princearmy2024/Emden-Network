@@ -541,7 +541,7 @@ const Overlay = (() => {
 
     // ─── SUPPORTER COUNT ────────────────────────────────────────
     function setSupporter(count) {
-        document.getElementById('supporter-count').textContent = `Supporter: ${count}`;
+        document.getElementById('supporter-count').textContent = `${count} Supporter`;
     }
 
     // ─── SMALL NOTIFICATIONS ────────────────────────────────────
