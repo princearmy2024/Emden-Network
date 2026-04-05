@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body {
+html, body {
   width: 100vw; height: 100vh;
   background: transparent;
   overflow: hidden;
@@ -26,201 +26,213 @@ body {
   --text-muted: rgba(255, 255, 255, 0.45);
   --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
   --panel-base: #0a0a14;
-  --panel-width: 220px;
-  --panel-top: 52px;
-  --panel-bottom: 48px;
 }
 
 /* ================================================================
-   GRADIENT FRAME PANELS — Farbe -> Transparent
+   LEFT PANEL — starts at 40% from top (top-left FREE for chat)
+   Gradient: solid -> transparent nach rechts
    ================================================================ */
-
-/* LEFT PANEL — solid -> transparent nach rechts */
 #panel-left {
-  position: fixed; top: 0; left: 0;
-  width: var(--panel-width); height: 100vh;
+  position: fixed;
+  top: 40vh;
+  left: 0;
+  width: clamp(180px, 14vw, 240px);
+  bottom: clamp(40px, 5vh, 60px);
   background: linear-gradient(to right,
-    rgba(10, 10, 20, 0.92) 0%,
-    rgba(10, 10, 20, 0.75) 40%,
-    rgba(10, 10, 20, 0.35) 70%,
+    rgba(10, 10, 20, 0.88) 0%,
+    rgba(10, 10, 20, 0.65) 35%,
+    rgba(10, 10, 20, 0.25) 65%,
     transparent 100%
   );
   z-index: 50;
   display: flex; flex-direction: column;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* TOP BAR — solid -> transparent nach unten */
-#panel-top {
-  position: fixed; top: 0; left: var(--panel-width);
-  right: 0; height: var(--panel-top);
-  background: linear-gradient(to bottom,
-    rgba(10, 10, 20, 0.88) 0%,
-    rgba(10, 10, 20, 0.5) 50%,
-    transparent 100%
-  );
-  z-index: 50;
-  display: flex; align-items: flex-start;
-  pointer-events: none;
-}
-
-/* BOTTOM BAR — transparent -> solid nach unten */
+/* BOTTOM BAR — flush to bottom, no gap */
 #panel-bottom {
-  position: fixed; bottom: 0; left: var(--panel-width);
-  right: 0; height: var(--panel-bottom);
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: clamp(40px, 5vh, 60px);
   background: linear-gradient(to top,
-    rgba(10, 10, 20, 0.88) 0%,
-    rgba(10, 10, 20, 0.5) 50%,
+    rgba(10, 10, 20, 0.85) 0%,
+    rgba(10, 10, 20, 0.45) 45%,
     transparent 100%
   );
   z-index: 50;
   display: flex; align-items: flex-end;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* RIGHT PANEL — transparent -> solid nach rechts
-   ABER: obere Haelfte ist FREI (wegen Map!) */
+/* RIGHT BOTTOM — only bottom 40% (top-right FREE for map) */
 #panel-right {
-  position: fixed; top: 50%; right: 0;
-  width: var(--panel-width); height: 50vh;
+  position: fixed;
+  top: 60vh;
+  right: 0;
+  width: clamp(160px, 12vw, 220px);
+  bottom: clamp(40px, 5vh, 60px);
   background: linear-gradient(to left,
-    rgba(10, 10, 20, 0.85) 0%,
-    rgba(10, 10, 20, 0.55) 40%,
-    rgba(10, 10, 20, 0.2) 70%,
+    rgba(10, 10, 20, 0.82) 0%,
+    rgba(10, 10, 20, 0.5) 35%,
+    rgba(10, 10, 20, 0.15) 65%,
     transparent 100%
   );
   z-index: 50;
   display: flex; flex-direction: column;
   justify-content: flex-end;
+  align-items: center;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ================================================================
-   CORNER GRADIENTS — Smooth Ecken-Uebergang
+   GLOW ACCENT LINES — subtle blue edges
    ================================================================ */
-#corner-top-left {
-  position: fixed; top: 0; left: 0;
-  width: var(--panel-width); height: var(--panel-top);
-  background: linear-gradient(135deg,
-    rgba(10, 10, 20, 0.95) 0%,
-    rgba(10, 10, 20, 0.7) 60%,
-    transparent 100%
-  );
-  z-index: 51;
-}
-
-/* ================================================================
-   SUBTLE GLOW LINES — Accent-Kanten
-   ================================================================ */
-.glow-line-right {
-  position: fixed; top: 10%; right: 0;
-  width: 1px; height: 80%;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    rgba(59, 130, 246, 0.08) 30%,
-    rgba(59, 130, 246, 0.15) 50%,
-    rgba(59, 130, 246, 0.08) 70%,
-    transparent 100%
-  );
-  z-index: 52; pointer-events: none;
-  display: none; /* nur unten rechts aktiv */
-}
-
 .glow-line-left {
-  position: fixed; top: 5%; left: calc(var(--panel-width) - 1px);
-  width: 1px; height: 90%;
+  position: fixed;
+  top: 42vh;
+  left: clamp(179px, calc(14vw - 1px), 239px);
+  bottom: clamp(42px, calc(5vh + 2px), 62px);
+  width: 1px;
   background: linear-gradient(to bottom,
     transparent 0%,
-    rgba(59, 130, 246, 0.06) 20%,
-    rgba(59, 130, 246, 0.12) 50%,
-    rgba(59, 130, 246, 0.06) 80%,
+    rgba(59, 130, 246, 0.08) 20%,
+    rgba(59, 130, 246, 0.14) 50%,
+    rgba(59, 130, 246, 0.08) 80%,
     transparent 100%
   );
   z-index: 52; pointer-events: none;
-}
-
-.glow-line-top {
-  position: fixed; top: calc(var(--panel-top) - 1px);
-  left: calc(var(--panel-width) + 5%); right: 5%;
-  height: 1px;
-  background: linear-gradient(to right,
-    rgba(59, 130, 246, 0.1) 0%,
-    rgba(59, 130, 246, 0.04) 50%,
-    transparent 100%
-  );
-  z-index: 52; pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
 }
 
 .glow-line-bottom {
-  position: fixed; bottom: calc(var(--panel-bottom) - 1px);
-  left: calc(var(--panel-width) + 5%); right: 5%;
+  position: fixed;
+  bottom: clamp(39px, calc(5vh - 1px), 59px);
+  left: 10%; right: 10%;
   height: 1px;
   background: linear-gradient(to right,
-    rgba(59, 130, 246, 0.1) 0%,
-    rgba(59, 130, 246, 0.04) 50%,
+    transparent 0%,
+    rgba(59, 130, 246, 0.08) 20%,
+    rgba(59, 130, 246, 0.12) 50%,
+    rgba(59, 130, 246, 0.08) 80%,
     transparent 100%
   );
   z-index: 52; pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+/* ================================================================
+   REFLECTION / SHIMMER ANIMATION on panels
+   ================================================================ */
+#panel-left::after,
+#panel-right::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; right: 0; bottom: 0;
+  width: 300%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(59, 130, 246, 0.04) 42%,
+    rgba(255, 255, 255, 0.06) 44%,
+    rgba(59, 130, 246, 0.04) 46%,
+    transparent 48%,
+    transparent 100%
+  );
+  animation: panel-shimmer 12s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#panel-right::after {
+  animation-delay: 6s;
+}
+
+@keyframes panel-shimmer {
+  0% { transform: translateX(-30%); }
+  30% { transform: translateX(130%); }
+  100% { transform: translateX(130%); }
+}
+
+#panel-bottom::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; right: 0; bottom: 0;
+  width: 300%; height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(59, 130, 246, 0.03) 44%,
+    rgba(255, 255, 255, 0.04) 46%,
+    rgba(59, 130, 246, 0.03) 48%,
+    transparent 50%,
+    transparent 100%
+  );
+  animation: bar-shimmer 15s ease-in-out infinite;
+  animation-delay: 3s;
+  pointer-events: none;
+}
+
+@keyframes bar-shimmer {
+  0% { transform: translateX(-20%); }
+  25% { transform: translateX(120%); }
+  100% { transform: translateX(120%); }
 }
 
 /* ================================================================
    LEFT PANEL CONTENT
    ================================================================ */
-.panel-brand {
-  padding: 14px 18px 10px;
-  display: flex; align-items: center; gap: 10px;
-  pointer-events: auto;
-}
-.panel-brand-icon {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-blue), #1e40af);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 900; color: #fff;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-.panel-brand-text {
-  font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.9);
-  letter-spacing: 0.08em; text-transform: uppercase;
-}
-
 .panel-section {
-  padding: 6px 14px;
+  padding: 8px clamp(10px, 1vw, 16px);
 }
 .panel-section-title {
-  font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.25);
-  text-transform: uppercase; letter-spacing: 0.12em;
-  margin-bottom: 8px; padding-left: 4px;
+  font-size: clamp(8px, 0.55vw, 10px);
+  font-weight: 700;
+  color: rgba(255,255,255,0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  padding-left: 4px;
 }
 
-/* Info Cards im linken Panel */
 .panel-info-card {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 10px;
-  margin-bottom: 4px;
+  display: flex; align-items: center; gap: clamp(6px, 0.5vw, 10px);
+  padding: clamp(5px, 0.4vw, 8px) clamp(6px, 0.5vw, 10px);
+  border-radius: 8px;
+  margin-bottom: 2px;
   transition: background 0.2s;
   pointer-events: auto; cursor: default;
 }
-.panel-info-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
+.panel-info-card:hover { background: rgba(255, 255, 255, 0.04); }
 
 .panel-info-icon {
-  width: 30px; height: 30px; border-radius: 8px;
+  width: clamp(24px, 1.6vw, 30px);
+  height: clamp(24px, 1.6vw, 30px);
+  border-radius: 7px;
   background: rgba(59, 130, 246, 0.1);
   display: flex; align-items: center; justify-content: center;
   color: var(--accent-blue); flex-shrink: 0;
 }
-.panel-info-icon svg { width: 14px; height: 14px; }
+.panel-info-icon svg { width: clamp(11px, 0.75vw, 14px); height: clamp(11px, 0.75vw, 14px); }
 .panel-info-icon.green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 .panel-info-icon.orange { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
 
 .panel-info-label {
-  font-size: 9px; color: rgba(255,255,255,0.35);
+  font-size: clamp(7px, 0.5vw, 9px);
+  color: rgba(255,255,255,0.3);
   text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
 }
 .panel-info-value {
-  font-size: 13px; color: #fff; font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: clamp(11px, 0.75vw, 14px);
+  color: #fff; font-weight: 700;
 }
 .panel-info-value.accent { color: var(--accent-blue); }
 
@@ -236,94 +248,114 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Separator */
 .panel-sep {
-  height: 1px; margin: 8px 18px;
+  height: 1px; margin: 6px clamp(12px, 1vw, 18px);
   background: linear-gradient(to right, rgba(255,255,255,0.06), transparent);
 }
 
-/* Panel spacer */
 .panel-spacer { flex: 1; }
-
-/* Panel Footer (bottom of left panel) */
-.panel-footer {
-  padding: 10px 14px 16px;
-  pointer-events: auto;
-}
-.panel-footer-text {
-  font-size: 9px; color: rgba(255,255,255,0.15);
-  font-weight: 600; letter-spacing: 0.05em;
-  text-align: center;
-}
-
-/* ================================================================
-   TOP BAR CONTENT
-   ================================================================ */
-.top-bar-content {
-  display: flex; align-items: center; gap: 16px;
-  padding: 12px 20px;
-  width: 100%;
-}
-
-.top-status-pill {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 12px 4px 8px;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.15);
-  border-radius: 100px;
-  pointer-events: auto;
-}
-.top-status-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
-}
-.top-status-text {
-  font-size: 10px; font-weight: 700; color: #10b981;
-  text-transform: uppercase; letter-spacing: 0.06em;
-}
-
-.top-spacer { flex: 1; }
 
 /* ================================================================
    BOTTOM BAR CONTENT
    ================================================================ */
 .bottom-bar-content {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 20px;
+  display: flex; align-items: center; gap: clamp(8px, 0.8vw, 14px);
+  padding: clamp(6px, 0.6vh, 12px) clamp(14px, 1.2vw, 24px);
   width: 100%;
 }
 
 .bottom-hint {
-  font-size: 10px; color: rgba(255,255,255,0.2);
-  font-weight: 600; display: flex; align-items: center; gap: 8px;
+  font-size: clamp(8px, 0.55vw, 11px);
+  color: rgba(255,255,255,0.18);
+  font-weight: 600;
+  display: flex; align-items: center; gap: clamp(5px, 0.5vw, 10px);
 }
 .bottom-hint kbd {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 2px 6px; border-radius: 4px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.35);
+  padding: 1px 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: clamp(7px, 0.45vw, 9px);
+  font-weight: 700; color: rgba(255,255,255,0.3);
   font-family: var(--font-mono);
 }
 
+.bottom-version {
+  font-size: clamp(8px, 0.5vw, 10px);
+  color: rgba(255,255,255,0.1);
+  font-weight: 600;
+  margin-left: auto;
+  letter-spacing: 0.03em;
+}
+
 /* ================================================================
-   NOTIFICATION AREA (bottom-left, inside panel)
+   LOGO — Bottom Right with Reflection Blitz
+   ================================================================ */
+#logo-container {
+  position: fixed;
+  bottom: clamp(48px, calc(5vh + 10px), 72px);
+  right: clamp(12px, 1.2vw, 24px);
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+#logo-img {
+  width: clamp(48px, 4vw, 72px);
+  height: clamp(48px, 4vw, 72px);
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+/* Reflection overlay on logo */
+#logo-container::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -50%;
+  width: 200%; height: 100%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(59, 130, 246, 0.15) 40%,
+    rgba(255, 255, 255, 0.35) 43%,
+    rgba(59, 130, 246, 0.15) 46%,
+    transparent 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  animation: logo-blitz 30s ease-in-out infinite;
+}
+
+@keyframes logo-blitz {
+  0% { opacity: 0; transform: translateX(-80%) rotate(0deg); }
+  2% { opacity: 1; }
+  5% { opacity: 1; transform: translateX(120%) rotate(0deg); }
+  6% { opacity: 0; transform: translateX(120%); }
+  100% { opacity: 0; transform: translateX(-80%); }
+}
+
+/* ================================================================
+   NOTIFICATIONS — bottom-left inside panel area
    ================================================================ */
 #notif-area {
-  position: fixed; bottom: 60px; left: 14px;
-  display: flex; flex-direction: column-reverse; gap: 8px;
-  z-index: 100; max-width: 200px;
+  padding: 0 clamp(8px, 0.7vw, 14px);
+  display: flex; flex-direction: column-reverse; gap: 6px;
+  max-height: 30vh;
+  overflow: hidden;
   pointer-events: none;
 }
 .notif-card {
   background: rgba(10, 10, 22, 0.9);
-  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
-  border-radius: 12px; padding: 10px 12px;
-  display: flex; gap: 10px; align-items: flex-start;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  transform-origin: left center;
+  border-radius: 10px; padding: 8px 10px;
+  display: flex; gap: 8px; align-items: flex-start;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
   animation: notifIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: auto;
 }
@@ -333,18 +365,18 @@ body {
 .notif-card.admin    { border-left: 2px solid #f59e0b; }
 
 .notif-ico { color: var(--accent-blue); flex-shrink: 0; margin-top: 1px; }
-.notif-ico svg { width: 14px; height: 14px; }
-.notif-title { font-size: 11px; font-weight: 800; color: #fff; margin-bottom: 2px; }
-.notif-text { font-size: 10px; color: rgba(255,255,255,0.5); line-height: 1.4; }
-.notif-time { font-size: 9px; color: rgba(255,255,255,0.2); margin-top: 4px; font-weight: 500; }
+.notif-ico svg { width: 12px; height: 12px; }
+.notif-title { font-size: clamp(9px, 0.6vw, 11px); font-weight: 800; color: #fff; margin-bottom: 1px; }
+.notif-text { font-size: clamp(8px, 0.55vw, 10px); color: rgba(255,255,255,0.45); line-height: 1.35; }
+.notif-time { font-size: clamp(7px, 0.45vw, 9px); color: rgba(255,255,255,0.15); margin-top: 3px; font-weight: 500; }
 
 @keyframes notifIn {
-  from { opacity: 0; transform: translateX(-20px) scale(0.95); }
+  from { opacity: 0; transform: translateX(-16px) scale(0.95); }
   to { opacity: 1; transform: translateX(0) scale(1); }
 }
 @keyframes notifOut {
-  from { opacity: 1; transform: translateX(0) scale(1); max-height: 120px; }
-  to { opacity: 0; transform: translateX(-15px) scale(0.9); max-height: 0; padding: 0; margin: 0; }
+  from { opacity: 1; transform: translateX(0) scale(1); max-height: 100px; }
+  to { opacity: 0; transform: translateX(-12px) scale(0.9); max-height: 0; padding: 0; margin: 0; }
 }
 
 /* ================================================================
@@ -358,52 +390,50 @@ body {
   opacity: 0; transition: opacity 0.6s ease;
 }
 #big-ann.visible { opacity: 1; }
-
 .big-ann-card {
   background: rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
   border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 24px; padding: 40px 56px; text-align: center; max-width: 520px;
+  border-radius: 24px; padding: 40px 56px; text-align: center;
+  max-width: clamp(400px, 30vw, 520px);
   box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 80px rgba(59, 130, 246, 0.08);
   transform: scale(0.85);
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #big-ann.visible .big-ann-card { transform: scale(1); }
-
 .big-ann-badge {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em;
   color: var(--accent-blue); background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 100px; padding: 6px 14px; margin-bottom: 20px;
 }
-.big-ann-title { font-size: 30px; font-weight: 900; color: #fff; margin-bottom: 10px; letter-spacing: -0.02em; }
-.big-ann-text  { font-size: 14px; color: rgba(255,255,255,0.6); line-height: 1.7; font-weight: 500; }
+.big-ann-title { font-size: clamp(22px, 2vw, 32px); font-weight: 900; color: #fff; margin-bottom: 10px; }
+.big-ann-text  { font-size: clamp(12px, 0.9vw, 15px); color: rgba(255,255,255,0.6); line-height: 1.7; font-weight: 500; }
 
 /* ================================================================
    F3 COMMAND BAR
    ================================================================ */
 #cmd-bar {
   position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
-  width: 580px; z-index: 300;
+  width: clamp(420px, 35vw, 600px); z-index: 300;
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #cmd-bar.visible { top: 60px; }
-
 .cmd-inner {
   background: rgba(10, 10, 22, 0.95);
   backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px; padding: 14px 20px;
-  display: flex; align-items: center; gap: 14px;
+  border-radius: 14px; padding: 12px 18px;
+  display: flex; align-items: center; gap: 12px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.8);
 }
 #cmd-input {
   flex: 1; background: none; border: none; outline: none;
-  font-size: 15px; color: #fff; font-family: inherit; font-weight: 600;
+  font-size: clamp(13px, 0.9vw, 16px); color: #fff; font-family: inherit; font-weight: 600;
   caret-color: var(--accent-blue);
 }
 .cmd-ico { color: var(--accent-blue); opacity: 0.9; display: flex; align-items: center; }
-.cmd-ico svg { width: 20px; height: 20px; }
+.cmd-ico svg { width: 18px; height: 18px; }
 .cmd-badge {
   font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--accent-blue); background: rgba(59, 130, 246, 0.1);
@@ -412,12 +442,12 @@ body {
 .cmd-esc {
   font-size: 10px; color: rgba(255,255,255,0.3); font-weight: 700;
   padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
-  transition: all 0.2s; cursor: pointer;
+  cursor: pointer; transition: all 0.2s;
 }
 .cmd-esc:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); }
 
 /* ================================================================
-   MOD PANEL (left side, inside gradient)
+   MOD PANEL
    ================================================================ */
 #mod-panel {
   position: fixed; top: 80px; left: 40px;
@@ -431,7 +461,6 @@ body {
   overflow: hidden; resize: both;
 }
 #mod-panel.visible { display: flex; pointer-events: auto; }
-
 .mod-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -447,7 +476,6 @@ body {
   cursor: pointer; font-size: 14px; transition: all 0.2s;
 }
 .mod-close:hover { background: rgba(255,107,107,0.15); color: #ff6b6b; }
-
 .mod-search { padding: 10px 14px; flex-shrink: 0; }
 .mod-search-input {
   width: 100%; padding: 9px 12px; border-radius: 8px;
@@ -457,13 +485,8 @@ body {
 }
 .mod-search-input:focus { border-color: var(--accent-blue); }
 .mod-search-input::placeholder { color: rgba(255,255,255,0.25); }
-
-.mod-results {
-  flex: 1; overflow-y: auto; padding: 0 10px;
-  scrollbar-width: none;
-}
+.mod-results { flex: 1; overflow-y: auto; padding: 0 10px; scrollbar-width: none; }
 .mod-results::-webkit-scrollbar { display: none; }
-
 .mod-user-item {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px; border-radius: 8px; cursor: pointer;
@@ -481,10 +504,8 @@ body {
 .mod-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .mod-user-name { font-size: 12px; font-weight: 600; color: #fff; }
 .mod-user-id { font-size: 9px; color: rgba(255,255,255,0.3); font-family: var(--font-mono); }
-
 .mod-actions {
-  padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.06);
-  flex-shrink: 0;
+  padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
 }
 .mod-selected-user {
   display: flex; align-items: center; gap: 8px;
@@ -496,11 +517,10 @@ body {
   width: 100%; padding: 8px 10px; border-radius: 6px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
   color: #fff; font-size: 11px; font-family: inherit; outline: none;
-  margin-bottom: 8px; transition: border-color 0.2s;
+  margin-bottom: 8px;
 }
 .mod-reason-input:focus { border-color: var(--accent-blue); }
 .mod-reason-input::placeholder { color: rgba(255,255,255,0.2); }
-
 .mod-btns { display: flex; gap: 5px; }
 .mod-btn {
   flex: 1; padding: 8px 0; border: none; border-radius: 6px;
@@ -514,7 +534,6 @@ body {
 .mod-btn.warn { background: rgba(59,130,246,0.15); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); }
 .mod-btn.warn:hover { background: rgba(59,130,246,0.25); }
 .mod-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
 .mod-status {
   padding: 6px 14px; text-align: center; font-size: 10px;
   color: #10b981; font-weight: 600; display: none;
@@ -522,7 +541,7 @@ body {
 .mod-status.show { display: block; animation: statusFade 2s ease-out forwards; }
 @keyframes statusFade { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 
-/* MOD TOGGLE BUTTON */
+/* MOD TOGGLE + HINT */
 #mod-toggle {
   position: fixed; top: 22px; left: 22px;
   width: 42px; height: 42px; border-radius: 12px;
@@ -534,43 +553,38 @@ body {
   transition: background 0.3s, border-color 0.3s;
 }
 #mod-toggle:hover { background: rgba(15,15,32,0.95); border-color: rgba(59,130,246,0.35); }
-#mod-toggle:active { cursor: grabbing; }
 #mod-toggle.visible { display: flex; pointer-events: auto; }
 #mod-toggle svg { width: 18px; height: 18px; pointer-events: none; }
 
-/* MOD HINT */
 #mod-hint {
   position: fixed; top: 22px; left: 22px;
-  display: none; align-items: center; gap: 6px;
-  padding: 6px 12px;
-  background: rgba(10,10,22,0.85);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px; z-index: 100; pointer-events: none;
+  display: none; align-items: center; gap: 6px; padding: 6px 12px;
+  background: rgba(10,10,22,0.85); backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  z-index: 100; pointer-events: none;
 }
 
 /* ================================================================
-   VOICE STATUS (bottom-right, inside right panel area)
+   VOICE STATUS — bottom-right above logo
    ================================================================ */
 #voice-status-area {
-  position: fixed; bottom: 60px; right: 20px;
+  position: fixed;
+  bottom: clamp(100px, calc(5vh + 70px), 140px);
+  right: clamp(12px, 1.2vw, 24px);
   z-index: 100; opacity: 0; transform: translateX(20px) scale(0.95);
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #voice-status-area.visible { opacity: 1; transform: translateX(0) scale(1); }
-
 .voice-status-card {
   background: rgba(14, 14, 24, 0.9);
-  backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(28px); border: 1px solid rgba(255,255,255,0.08);
   border-left: 3px solid var(--accent-blue);
   border-radius: 10px; padding: 10px 14px 10px 10px;
   display: flex; align-items: center; gap: 12px;
 }
 .voice-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  position: relative;
-  background: rgba(255, 255, 255, 0.05);
+  width: 36px; height: 36px; border-radius: 50%; position: relative;
+  background: rgba(255,255,255,0.05);
   display: flex; align-items: center; justify-content: center;
   border: 2px solid transparent;
 }
@@ -578,8 +592,7 @@ body {
 .voice-avatar .voice-icon {
   position: absolute; bottom: -3px; right: -3px;
   width: 16px; height: 16px; border-radius: 50%;
-  background: #12121b; display: flex; align-items: center; justify-content: center;
-  color: #fff;
+  background: #12121b; display: flex; align-items: center; justify-content: center; color: #fff;
 }
 .voice-avatar .voice-icon svg { width: 9px; height: 9px; }
 .voice-user { font-size: 13px; font-weight: 800; color: #fff; }
@@ -592,43 +605,27 @@ body {
 }
 
 /* ================================================================
-   VISIBILITY ANIMATIONS
+   VISIBILITY — show when overlay active
    ================================================================ */
-#panel-left, #panel-top, #panel-bottom, #panel-right,
-.glow-line-left, .glow-line-top, .glow-line-bottom {
-  opacity: 0;
-  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
-}
 body.overlay-active #panel-left,
-body.overlay-active #panel-top,
 body.overlay-active #panel-bottom,
 body.overlay-active #panel-right,
 body.overlay-active .glow-line-left,
-body.overlay-active .glow-line-top,
-body.overlay-active .glow-line-bottom {
+body.overlay-active .glow-line-bottom,
+body.overlay-active #logo-container {
   opacity: 1;
 }
 
-/* Legacy compat: info-bar visibility class triggers panel visibility */
-#info-bar { display: none; } /* hidden — we use panels now */
-#info-bar.visible ~ #panel-left { opacity: 1; }
+/* Hidden info-bar for backward compat */
+#info-bar { display: none; }
 </style>
 </head>
 <body>
 
-<!-- ============================================================
-     GRADIENT FRAME PANELS
-     ============================================================ -->
+<!-- ========== GRADIENT FRAME PANELS ========== -->
 
-<!-- LEFT PANEL -->
+<!-- LEFT PANEL (starts at 40vh — top-left is FREE) -->
 <div id="panel-left">
-  <div class="panel-brand">
-    <div class="panel-brand-icon">EN</div>
-    <div class="panel-brand-text">Emden Network</div>
-  </div>
-
-  <div class="panel-sep"></div>
-
   <div class="panel-section">
     <div class="panel-section-title">Status</div>
     <div class="panel-info-card">
@@ -657,23 +654,23 @@ body.overlay-active .glow-line-bottom {
 
   <div class="panel-sep"></div>
 
-  <div class="panel-section" id="left-panel-extra">
+  <div class="panel-section">
     <div class="panel-section-title">Shortcuts</div>
-    <div class="panel-info-card" style="opacity:0.5;">
+    <div class="panel-info-card" style="opacity:0.45;">
       <div class="panel-info-icon"><i data-lucide="terminal"></i></div>
       <div>
-        <div class="panel-info-label">Command Bar</div>
+        <div class="panel-info-label">Commands</div>
         <div class="panel-info-value" style="font-size:11px;">F3</div>
       </div>
     </div>
-    <div class="panel-info-card" style="opacity:0.5;">
+    <div class="panel-info-card" style="opacity:0.45;">
       <div class="panel-info-icon"><i data-lucide="shield"></i></div>
       <div>
         <div class="panel-info-label">Mod Panel</div>
         <div class="panel-info-value" style="font-size:11px;">F4</div>
       </div>
     </div>
-    <div class="panel-info-card" style="opacity:0.5;">
+    <div class="panel-info-card" style="opacity:0.45;">
       <div class="panel-info-icon"><i data-lucide="mic"></i></div>
       <div>
         <div class="panel-info-label">Push to Talk</div>
@@ -684,26 +681,11 @@ body.overlay-active .glow-line-bottom {
 
   <div class="panel-spacer"></div>
 
-  <!-- Notifications inside left panel -->
+  <!-- Notifications -->
   <div id="notif-area"></div>
-
-  <div class="panel-footer">
-    <div class="panel-footer-text">Emden Network v4.25</div>
-  </div>
 </div>
 
-<!-- TOP BAR -->
-<div id="panel-top">
-  <div class="top-bar-content">
-    <div class="top-status-pill">
-      <div class="top-status-dot"></div>
-      <div class="top-status-text">Overlay Active</div>
-    </div>
-    <div class="top-spacer"></div>
-  </div>
-</div>
-
-<!-- BOTTOM BAR -->
+<!-- BOTTOM BAR (flush, kein Abstand) -->
 <div id="panel-bottom">
   <div class="bottom-bar-content">
     <div class="bottom-hint">
@@ -712,21 +694,23 @@ body.overlay-active .glow-line-bottom {
       <kbd>F4</kbd> Mod
       <kbd>V</kbd> Talk
     </div>
+    <div class="bottom-version">Emden Network v4.25.2</div>
   </div>
 </div>
 
-<!-- RIGHT PANEL (only bottom half — top is free for map) -->
+<!-- RIGHT PANEL (only bottom 40% — top-right FREE for map) -->
 <div id="panel-right"></div>
 
-<!-- GLOW ACCENT LINES -->
+<!-- GLOW LINES -->
 <div class="glow-line-left"></div>
-<div class="glow-line-top"></div>
 <div class="glow-line-bottom"></div>
 
-<!-- Corner overlay -->
-<div id="corner-top-left"></div>
+<!-- LOGO — bottom right with reflection blitz -->
+<div id="logo-container">
+  <img id="logo-img" src="assets/logoEN.png" alt="EN" />
+</div>
 
-<!-- Hidden info-bar for backward compat with renderer.js -->
+<!-- Hidden info-bar for renderer.js compat -->
 <div id="info-bar"></div>
 
 <!-- BIG ANNOUNCEMENT -->
