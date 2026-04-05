@@ -433,76 +433,133 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
 }
 
-// Overlay nur sichtbar wenn Roblox das AKTIVE Fenster ist
-let overlayVisible = true;
-let robloxCheckInterval = null;
-let hideTimeout = null;
-let overlayHasFocus = false;
+// ================================================================
+// OVERLAY VISIBILITY — Saubere Zustandsmaschine
+// ================================================================
+const OverlayState = {
+    isOverlayVisible: false,
+    isRobloxActive: false,
+    robloxActiveStableSince: 0, // Timestamp wann Roblox stabil aktiv wurde
+    checkInterval: null,
+    showTimeout: null,
+    hideTimeout: null,
+    SHOW_DELAY: 4000,  // 4s stabil aktiv bevor Overlay erscheint
+    HIDE_DELAY: 800,   // 0.8s bevor Overlay verschwindet
 
-function startRobloxWindowCheck() {
-    if (robloxCheckInterval) return;
-    const { execFile } = require('child_process');
-    const wscriptPath = 'cscript.exe';
+    start() {
+        if (this.checkInterval) return;
+        const { exec } = require('child_process');
 
-    // VBScript ist VIEL schneller als PowerShell (~20ms statt ~500ms)
-    const vbsScript = path.join(app.getPath('temp'), 'en_fgwin.vbs');
-    fs.writeFileSync(vbsScript, 'Set WshShell = CreateObject("WScript.Shell")\nWScript.Echo WshShell.AppActivate("Roblox")');
-
-    robloxCheckInterval = setInterval(() => {
-        if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) {
-            clearInterval(robloxCheckInterval);
-            robloxCheckInterval = null;
-            return;
-        }
-
-        // Prüft ob "Roblox" im Titel des aktiven Fensters ist
-        execFile('cscript.exe', ['//Nologo', vbsScript], { timeout: 1000, windowsHide: true }, (err, stdout) => {
-            if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
-            const isRobloxActive = (stdout || '').trim() === 'True' || (stdout || '').trim() === '-1';
-
-            if (isRobloxActive) {
-                // Roblox ist aktiv → Overlay anzeigen (sofort)
-                clearTimeout(hideTimeout);
-                hideTimeout = null;
-                if (!overlayVisible) {
-                    overlayVisible = true;
-                    robloxOverlayWin.showInactive();
-                }
-            } else if (!overlayHasFocus) {
-                // Nicht Roblox UND Overlay hat keinen Focus → nach 1s verstecken
-                if (overlayVisible && !hideTimeout) {
-                    hideTimeout = setTimeout(() => {
-                        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-                            overlayVisible = false;
-                            robloxOverlayWin.hide();
-                        }
-                        hideTimeout = null;
-                    }, 1000);
-                }
+        this.checkInterval = setInterval(() => {
+            if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) {
+                this.stop();
+                return;
             }
-        });
-    }, 800);
-}
+
+            // Prüft ob RobloxPlayerBeta das aktive Fenster ist (OHNE es zu fokussieren!)
+            exec('powershell.exe -NoProfile -NoLogo -Command "(Get-Process | Where-Object {$_.MainWindowHandle -eq [System.Diagnostics.Process]::GetCurrentProcess().MainWindowHandle}).ProcessName"',
+                { timeout: 2000, windowsHide: true }, (err, stdout) => {
+                // Fallback: Einfach prüfen ob Roblox-Prozess existiert UND unser Overlay nicht fokussiert ist
+            });
+
+            // Sicherer Check: tasklist + aktives Fenster Titel via wmic
+            exec('wmic process where "name=\'RobloxPlayerBeta.exe\'" get ProcessId /format:list',
+                { timeout: 1500, windowsHide: true }, (err, stdout) => {
+                if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
+
+                const robloxRunning = (stdout || '').includes('ProcessId=');
+
+                // Prüfe ob unser eigenes Hauptfenster fokussiert ist
+                const ourAppFocused = mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused();
+
+                // Roblox ist "aktiv" wenn es läuft UND unser Hauptfenster NICHT fokussiert ist
+                const robloxShouldShow = robloxRunning && !ourAppFocused;
+
+                this._handleStateChange(robloxShouldShow);
+            });
+        }, 2000);
+    },
+
+    stop() {
+        clearInterval(this.checkInterval);
+        clearTimeout(this.showTimeout);
+        clearTimeout(this.hideTimeout);
+        this.checkInterval = null;
+        this.showTimeout = null;
+        this.hideTimeout = null;
+    },
+
+    _handleStateChange(robloxActive) {
+        const now = Date.now();
+
+        if (robloxActive && !this.isRobloxActive) {
+            // Roblox wurde gerade aktiv → Timer starten (zeige erst nach SHOW_DELAY)
+            this.isRobloxActive = true;
+            this.robloxActiveStableSince = now;
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+
+            // Zeige Overlay erst nach stabiler Wartezeit
+            clearTimeout(this.showTimeout);
+            this.showTimeout = setTimeout(() => {
+                if (this.isRobloxActive && !this.isOverlayVisible) {
+                    this._showOverlay();
+                }
+                this.showTimeout = null;
+            }, this.SHOW_DELAY);
+
+        } else if (!robloxActive && this.isRobloxActive) {
+            // Roblox nicht mehr aktiv → Overlay nach kurzem Delay verstecken
+            this.isRobloxActive = false;
+            clearTimeout(this.showTimeout);
+            this.showTimeout = null;
+
+            if (this.isOverlayVisible && !this.hideTimeout) {
+                this.hideTimeout = setTimeout(() => {
+                    if (!this.isRobloxActive) {
+                        this._hideOverlay();
+                    }
+                    this.hideTimeout = null;
+                }, this.HIDE_DELAY);
+            }
+        }
+    },
+
+    _showOverlay() {
+        if (this.isOverlayVisible) return;
+        if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
+        this.isOverlayVisible = true;
+        robloxOverlayWin.showInactive(); // showInactive = zeigt ohne Focus zu klauen
+        console.log('[Overlay] Sichtbar (Roblox stabil aktiv)');
+    },
+
+    _hideOverlay() {
+        if (!this.isOverlayVisible) return;
+        if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
+        this.isOverlayVisible = false;
+        robloxOverlayWin.hide();
+        console.log('[Overlay] Versteckt (Roblox nicht aktiv)');
+    }
+};
 
 // Show/hide Roblox overlay via IPC (called from renderer.js)
 ipcMain.on('show-roblox-overlay', (event, { discordId, robloxId, isAdmin }) => {
     createRobloxOverlay(discordId, robloxId, isAdmin);
-    startRobloxWindowCheck();
+    OverlayState.start();
 });
 ipcMain.on('hide-roblox-overlay', () => {
+    OverlayState.stop();
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.close();
         robloxOverlayWin = null;
     }
 });
 
-// Focus toggle for F3/F4 command bar / mod panel
+// Focus toggle for F3 command bar
 ipcMain.on('overlay-request-focus', (event, focus) => {
-    overlayHasFocus = focus;
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         if (focus) {
             robloxOverlayWin.setIgnoreMouseEvents(false);
-            robloxOverlayWin.focus();
         } else {
             robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
         }
@@ -661,9 +718,14 @@ app.whenReady().then(() => {
         }
     });
 
-    // F4: Mod-Panel als separates Fenster öffnen/schließen
+    // F4: Mod-Panel als separates Fenster öffnen/schließen (mit Debounce)
     let modPanelWin = null;
+    let f4Cooldown = false;
     globalShortcut.register('F4', () => {
+        if (f4Cooldown) return; // Debounce: max 1x pro Sekunde
+        f4Cooldown = true;
+        setTimeout(() => { f4Cooldown = false; }, 1000);
+
         if (modPanelWin && !modPanelWin.isDestroyed()) {
             modPanelWin.close();
             modPanelWin = null;
@@ -684,17 +746,7 @@ app.whenReady().then(() => {
         });
         modPanelWin.setAlwaysOnTop(true, 'pop-up-menu', 1);
         modPanelWin.loadFile('mod-panel.html');
-        modPanelWin.once('ready-to-show', () => {
-            modPanelWin.focus();
-        });
-        // Wenn Roblox den Focus klaut, sofort zurückholen
-        modPanelWin.on('blur', () => {
-            if (modPanelWin && !modPanelWin.isDestroyed()) {
-                setTimeout(() => {
-                    if (modPanelWin && !modPanelWin.isDestroyed()) modPanelWin.focus();
-                }, 100);
-            }
-        });
+        // KEIN on('blur') Focus-Loop! User kann frei wechseln.
         modPanelWin.on('closed', () => { modPanelWin = null; });
     });
 
