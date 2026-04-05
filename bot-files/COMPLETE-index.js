@@ -1301,6 +1301,76 @@ async function checkGithubRelease() {
 
 client.once("ready", async () => {
     console.log(`🤖 ${client.user.tag} ist online!`);
+
+    // === Trident-Einträge importieren (einmalig beim Start) ===
+    if (Object.keys(modHistory).length === 0) {
+        console.log('[Mod] Importiere alte Einträge aus Kanal...');
+        try {
+            const modChannel = await client.channels.fetch("1367243128284905573").catch(() => null);
+            if (modChannel) {
+                let imported = 0;
+                let lastId = null;
+                // Letzte 500 Nachrichten durchgehen
+                for (let i = 0; i < 5; i++) {
+                    const opts = { limit: 100 };
+                    if (lastId) opts.before = lastId;
+                    const messages = await modChannel.messages.fetch(opts);
+                    if (messages.size === 0) break;
+                    lastId = messages.last().id;
+
+                    for (const [, msg] of messages) {
+                        // Embeds (Trident-Format)
+                        for (const embed of msg.embeds) {
+                            const title = embed.title || '';
+                            const match = title.match(/Moderation\s*\|\s*(\d+)/);
+                            if (!match) continue;
+
+                            const fields = {};
+                            for (const f of (embed.fields || [])) {
+                                fields[f.name?.toLowerCase()?.trim()] = f.value?.trim();
+                            }
+
+                            const robloxUserId = fields['user id'] || '';
+                            const punishment = fields['punishment'] || '';
+                            const reason = fields['reason'] || 'Kein Grund';
+                            const displayName = fields['display name'] || '';
+                            const moderatorText = embed.footer?.text || '';
+                            const mod = moderatorText.replace(/Moderator:\s*@?/i, '').trim();
+
+                            if (robloxUserId && punishment) {
+                                if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
+                                modHistory[robloxUserId].push({
+                                    action: punishment,
+                                    reason,
+                                    moderator: mod,
+                                    date: msg.createdAt.toISOString(),
+                                    displayName,
+                                    source: 'trident'
+                                });
+                                imported++;
+                            }
+                        }
+
+                        // Components V2 (unser Format) — Text aus TextDisplay parsen
+                        if (msg.flags?.has('IsComponentsV2') || msg.components?.length > 0) {
+                            // Unsere eigenen Nachrichten überspringen — die werden schon live gespeichert
+                        }
+                    }
+                }
+                if (imported > 0) {
+                    saveModHistory();
+                    console.log(`[Mod] ✅ ${imported} Einträge aus Trident importiert (${Object.keys(modHistory).length} User)`);
+                } else {
+                    console.log('[Mod] Keine Trident-Einträge gefunden.');
+                }
+            }
+        } catch(e) {
+            console.error('[Mod] Import-Fehler:', e.message);
+        }
+    } else {
+        console.log(`[Mod] ${Object.keys(modHistory).length} User in History geladen.`);
+    }
+
     startReminderScheduler(client);
     await client.guilds.fetch().catch(() => { });
     await updateBotStatus(client);
