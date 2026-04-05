@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.22.0'; // Stand: 05.04.2026 (F4 Button→Panel, Webhook+Moderator)
+let CURRENT_VERSION = '4.23.0'; // Stand: 05.04.2026 (Settings, Animationen, Webhook Fix)
 
 // =============================================================
 // CONFIG — Bot-API

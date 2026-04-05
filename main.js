@@ -767,12 +767,6 @@ app.whenReady().then(() => {
     }
 
     function openModPanel() {
-        // Button schließen
-        if (modBtnWin && !modBtnWin.isDestroyed()) {
-            saveWinPos(modBtnWin, modBtnPosFile);
-            modBtnWin.close();
-            modBtnWin = null;
-        }
         if (modPanelWin && !modPanelWin.isDestroyed()) return;
 
         const pos = loadPos(modPanelPosFile, 200, 100);

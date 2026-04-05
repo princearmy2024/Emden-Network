@@ -5,99 +5,176 @@
 <title>Moderation</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root { --brand:#0088FF; --brand2:#006AD5; --glass:rgba(13,15,28,0.55); --border:rgba(255,255,255,0.07); --text:#E4E4F0; --sub:#8B8FA8; --muted:#50546A; --danger:#FF6B6B; --warn:#F59E0B; --r:14px; }
+:root { --brand:#0088FF; --brand2:#006AD5; --glass:rgba(13,15,28,0.6); --border:rgba(255,255,255,0.07); --text:#E4E4F0; --sub:#8B8FA8; --muted:#50546A; --danger:#FF6B6B; --warn:#F59E0B; --r:16px; --blur:40px; }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:transparent;color:var(--text);font-family:'Inter',sans-serif;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none}
-.panel{margin:4px;height:calc(100% - 8px);display:flex;flex-direction:column;background:var(--glass);backdrop-filter:blur(40px) saturate(1.5);-webkit-backdrop-filter:blur(40px) saturate(1.5);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,0.4);overflow:hidden}
-.hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);-webkit-app-region:drag}
-.hdr-ico{width:28px;height:28px;border-radius:8px;background:rgba(0,136,255,0.1);border:1px solid rgba(0,136,255,0.15);display:flex;align-items:center;justify-content:center;color:var(--brand);flex-shrink:0}
+
+.panel{margin:4px;height:calc(100% - 8px);display:flex;flex-direction:column;background:var(--glass);backdrop-filter:blur(var(--blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--blur)) saturate(1.5);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,0.4);overflow:hidden;position:relative}
+
+/* Header */
+.hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);-webkit-app-region:drag;flex-shrink:0}
+.hdr-ico{width:26px;height:26px;border-radius:8px;background:rgba(0,136,255,0.1);border:1px solid rgba(0,136,255,0.15);display:flex;align-items:center;justify-content:center;color:var(--brand);flex-shrink:0;transition:transform .3s}
+.hdr-ico:hover{transform:rotate(15deg)}
 .hdr-t{font-size:13px;font-weight:700;flex:1;color:#fff}
-.hdr-x{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
-.hdr-x:hover{background:rgba(255,107,107,0.1);color:var(--danger)}
-.search{padding:10px 12px}
-.search input{width:100%;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
-.search input:focus{border-color:rgba(0,136,255,0.4)}
+.hdr-btn{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.hdr-btn:hover{background:rgba(255,255,255,0.06);color:var(--text)}
+.hdr-btn.close:hover{background:rgba(255,107,107,0.1);color:var(--danger)}
+.hdr-btn svg{width:14px;height:14px}
+
+/* Pages */
+.page{display:none;flex:1;flex-direction:column;overflow:hidden;animation:pageIn .25s ease-out}
+.page.active{display:flex}
+@keyframes pageIn{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+
+/* Search */
+.search{padding:10px 12px;flex-shrink:0}
+.search input{width:100%;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:all .2s}
+.search input:focus{border-color:rgba(0,136,255,0.4);box-shadow:0 0 0 2px rgba(0,136,255,0.08)}
 .search input::placeholder{color:var(--muted)}
+
+/* Results */
 .res{flex:1;overflow-y:auto;padding:0 8px;scrollbar-width:none}
 .res::-webkit-scrollbar{display:none}
 .empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:11px}
-.usr{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:all .15s}
-.usr:hover{background:rgba(255,255,255,0.04)}
+.usr{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:all .2s}
+.usr:hover{background:rgba(255,255,255,0.04);transform:translateX(2px)}
 .usr.on{background:rgba(0,136,255,0.08);border-color:rgba(0,136,255,0.15)}
-.av{width:36px;height:36px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--brand),#1e40af);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;overflow:hidden}
+.av{width:38px;height:38px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--brand),#1e40af);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;overflow:hidden;transition:transform .2s}
+.usr:hover .av{transform:scale(1.05)}
 .av img{width:100%;height:100%;object-fit:cover}
 .nm{font-size:13px;font-weight:600}
 .id{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
-.ft{padding:12px;border-top:1px solid var(--border)}
-.sel{display:none;padding:8px 10px;margin-bottom:8px;background:rgba(0,136,255,0.06);border-radius:8px;font-size:11px;color:var(--brand);font-weight:600;border:1px solid rgba(0,136,255,0.1)}
+
+/* Footer Actions */
+.ft{padding:12px;border-top:1px solid var(--border);flex-shrink:0}
+.sel{display:none;padding:8px 10px;margin-bottom:8px;background:rgba(0,136,255,0.06);border-radius:8px;font-size:11px;color:var(--brand);font-weight:600;border:1px solid rgba(0,136,255,0.1);animation:fadeIn .2s}
 .sel.show{display:block}
-.inp{width:100%;padding:9px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:inherit;outline:none;margin-bottom:8px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.inp{width:100%;padding:9px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:inherit;outline:none;margin-bottom:8px;transition:border-color .2s}
 .inp:focus{border-color:rgba(0,136,255,0.3)}
 .inp::placeholder{color:var(--muted)}
 .acts{display:flex;gap:4px;margin-bottom:8px}
-.act{flex:1;padding:8px 0;border-radius:8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .15s;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--muted)}
-.act:hover{background:rgba(255,255,255,0.06)}
+.act{flex:1;padding:8px 0;border-radius:8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .2s;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--muted)}
+.act:hover{background:rgba(255,255,255,0.06);transform:translateY(-1px)}
 .act.warn.on{background:rgba(0,136,255,0.1);color:var(--brand);border-color:rgba(0,136,255,0.2)}
 .act.kick.on{background:rgba(245,158,11,0.1);color:var(--warn);border-color:rgba(245,158,11,0.2)}
 .act.ban.on{background:rgba(255,107,107,0.1);color:var(--danger);border-color:rgba(255,107,107,0.2)}
-.send{width:100%;padding:10px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;letter-spacing:.03em}
-.send:hover:not(:disabled){background:var(--brand2)}
+.send{width:100%;padding:10px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;letter-spacing:.03em}
+.send:hover:not(:disabled){background:var(--brand2);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,136,255,0.25)}
 .send:disabled{opacity:.25;cursor:not-allowed}
 .send:active:not(:disabled){transform:scale(.98)}
 .msg{text-align:center;font-size:11px;font-weight:600;min-height:18px;margin-top:6px}
 .msg.ok{color:#10b981}.msg.err{color:var(--danger)}
-.mod-info{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--sub)}
-.mod-info .mod-av{width:20px;height:20px;border-radius:50%;background:var(--brand);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
-.mod-info .mod-av img{width:100%;height:100%;object-fit:cover}
-.mod-info span{font-weight:600;color:var(--text)}
+
+/* Mod Info Bar */
+.mod-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--sub);flex-shrink:0}
+.mod-av{width:20px;height:20px;border-radius:50%;background:var(--brand);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.mod-av img{width:100%;height:100%;object-fit:cover}
+
+/* Logo */
+.logo{position:absolute;bottom:8px;right:12px;opacity:0.06;pointer-events:none;font-size:28px;font-weight:900;letter-spacing:-0.03em;color:#fff;font-family:'Inter',sans-serif}
+
+/* === SETTINGS PAGE === */
+.s-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace}
+.s-group{margin-bottom:16px}
+.s-label{font-size:11px;color:var(--sub);margin-bottom:6px;display:flex;justify-content:space-between}
+.s-label span{color:var(--brand);font-family:'JetBrains Mono',monospace;font-size:10px}
+.s-slider{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,0.08);outline:none;transition:background .2s}
+.s-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--brand);cursor:pointer;box-shadow:0 0 8px rgba(0,136,255,0.3);transition:transform .15s}
+.s-slider::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.s-back{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--brand);cursor:pointer;margin-bottom:14px;transition:transform .15s}
+.s-back:hover{transform:translateX(-3px)}
+.s-body{padding:14px;flex:1;overflow-y:auto}
 </style>
 </head>
 <body>
-<div class="panel">
+<div class="panel" id="panel">
     <div class="hdr">
         <div class="hdr-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
         <span class="hdr-t">Moderation</span>
-        <button class="hdr-x" onclick="window.close()">&times;</button>
+        <button class="hdr-btn" onclick="showPage('settings')" title="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/></svg></button>
+        <button class="hdr-btn close" onclick="window.close()" title="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="search"><input id="q" placeholder="Roblox Username suchen..." autofocus></div>
-    <div class="res" id="res"><div class="empty">Username eingeben</div></div>
-    <div class="ft">
-        <div class="sel" id="sel"></div>
-        <input class="inp" id="reason" placeholder="Grund eingeben...">
-        <div class="acts">
-            <div class="act warn" onclick="pick('Warn',this)">Warn</div>
-            <div class="act kick" onclick="pick('Kick',this)">Kick</div>
-            <div class="act ban" onclick="pick('Ban',this)">Ban</div>
+
+    <!-- MAIN PAGE -->
+    <div class="page active" id="pageMain">
+        <div class="search"><input id="q" placeholder="Roblox Username suchen..." autofocus></div>
+        <div class="res" id="res"><div class="empty">Username eingeben</div></div>
+        <div class="ft">
+            <div class="sel" id="sel"></div>
+            <input class="inp" id="reason" placeholder="Grund eingeben...">
+            <div class="acts">
+                <div class="act warn" onclick="pick('Warn',this)">Warn</div>
+                <div class="act kick" onclick="pick('Kick',this)">Kick</div>
+                <div class="act ban" onclick="pick('Ban',this)">Ban</div>
+            </div>
+            <button class="send" id="send" disabled onclick="go()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Senden
+            </button>
+            <div class="msg" id="msg"></div>
         </div>
-        <button class="send" id="send" disabled onclick="go()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Senden
-        </button>
-        <div class="msg" id="msg"></div>
     </div>
-    <div class="mod-info" id="modInfo">
+
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="pageSettings">
+        <div class="s-body">
+            <div class="s-back" onclick="showPage('main')">← Zurück</div>
+            <div class="s-title">Darstellung</div>
+            <div class="s-group">
+                <div class="s-label">Transparenz <span id="transVal">60%</span></div>
+                <input type="range" class="s-slider" min="20" max="95" value="60" id="transSlider" oninput="setTrans(this.value)">
+            </div>
+            <div class="s-group">
+                <div class="s-label">Blur-Stärke <span id="blurVal">40px</span></div>
+                <input type="range" class="s-slider" min="0" max="80" value="40" id="blurSlider" oninput="setBlur(this.value)">
+            </div>
+        </div>
+    </div>
+
+    <div class="mod-bar">
         <div class="mod-av" id="modAv">M</div>
-        Eingeloggt als <span id="modName">Moderator</span>
+        Eingeloggt als <span style="font-weight:600;color:var(--text);margin-left:2px" id="modName">Moderator</span>
     </div>
+    <div class="logo">EN</div>
 </div>
+
 <script>
 const WH='https://discord.com/api/webhooks/1490116180466204712/rQW5nx0lsvkyjqAZTmq1ESKOvN9v2fd7rtQnEyrLb7yCH0tCASIUsMdARnAOunFF9BEG';
 let user=null,action=null,timer=null;
-let mod={name:'Moderator',avatar:'',discordId:''};
-try{
-    const s=JSON.parse(localStorage.getItem('en_session')||'null');
-    if(s?.user){
-        mod.name=s.user.username||'Moderator';
-        mod.avatar=s.user.avatar||'';
-        mod.discordId=s.user.discordId||'';
-    }
-}catch(e){}
-// Mod-Info unten anzeigen
+let mod={name:'Moderator',avatar:''};
+try{const s=JSON.parse(localStorage.getItem('en_session')||'null');if(s?.user){mod.name=s.user.username||'Moderator';mod.avatar=s.user.avatar||''}}catch(e){}
 document.getElementById('modName').textContent=mod.name;
-if(mod.avatar){document.getElementById('modAv').innerHTML='<img src="'+mod.avatar+'">';}
-else{document.getElementById('modAv').textContent=(mod.name[0]||'M').toUpperCase();}
+if(mod.avatar)document.getElementById('modAv').innerHTML='<img src="'+mod.avatar+'">';
+
+// Load saved settings
+try{
+    const s=JSON.parse(localStorage.getItem('mod_panel_settings')||'{}');
+    if(s.trans){document.getElementById('transSlider').value=s.trans;setTrans(s.trans)}
+    if(s.blur){document.getElementById('blurSlider').value=s.blur;setBlur(s.blur)}
+}catch(e){}
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
+function showPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById('page'+p.charAt(0).toUpperCase()+p.slice(1)).classList.add('active')}
+
+function setTrans(v){
+    document.getElementById('transVal').textContent=v+'%';
+    document.querySelector('.panel').style.background=`rgba(13,15,28,${v/100})`;
+    saveSettings();
+}
+function setBlur(v){
+    document.getElementById('blurVal').textContent=v+'px';
+    const f=`blur(${v}px) saturate(1.5)`;
+    document.querySelector('.panel').style.backdropFilter=f;
+    document.querySelector('.panel').style.webkitBackdropFilter=f;
+    saveSettings();
+}
+function saveSettings(){
+    localStorage.setItem('mod_panel_settings',JSON.stringify({
+        trans:document.getElementById('transSlider').value,
+        blur:document.getElementById('blurSlider').value
+    }));
+}
 
 document.getElementById('q').oninput=e=>{
     clearTimeout(timer);const v=e.target.value.trim();
@@ -110,38 +187,31 @@ async function search(q){
     try{
         const r=await fetch('https://users.roblox.com/v1/usernames/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usernames:[q],excludeBannedUsers:false})});
         const d=await r.json();if(!d.data?.length){document.getElementById('res').innerHTML='<div class="empty">Nicht gefunden</div>';return}
-
-        // User-Details + Avatar laden
         const u=d.data[0];
-        let avatar='',created='';
+        let avatar='',created='',displayName='';
         try{
             const [pRes,aRes]=await Promise.all([
                 fetch('https://users.roblox.com/v1/users/'+u.id),
                 fetch('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds='+u.id+'&size=150x150&format=Png&isCircular=false')
             ]);
-            const pData=await pRes.json();
-            const aData=await aRes.json();
+            const pData=await pRes.json();const aData=await aRes.json();
             avatar=aData.data?.[0]?.imageUrl||'';
+            displayName=pData.displayName||u.displayName||u.name;
             created=pData.created?new Date(pData.created).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
-        }catch(e){}
-
-        document.getElementById('res').innerHTML=`<div class="usr${user?.id===u.id?' on':''}" onclick="sel(${u.id},'${esc(u.name)}','${esc(u.displayName||u.name)}','${esc(avatar)}','${esc(created)}')">
+        }catch(e){displayName=u.displayName||u.name}
+        document.getElementById('res').innerHTML=`<div class="usr${user?.id===u.id?' on':''}" onclick="sel(${u.id},'${esc(u.name)}','${esc(displayName)}','${esc(avatar)}','${esc(created)}')">
             <div class="av">${avatar?'<img src="'+avatar+'">':esc((u.name[0]||'?').toUpperCase())}</div>
-            <div><div class="nm">${esc(u.displayName||u.name)}</div><div class="id">@${esc(u.name)} · ${u.id}${created?' · '+created:''}</div></div>
-        </div>`;
+            <div><div class="nm">${esc(displayName)}</div><div class="id">@${esc(u.name)} · ${u.id}${created?' · '+created:''}</div></div></div>`;
     }catch(e){document.getElementById('res').innerHTML='<div class="empty" style="color:#ff6b6b">Fehler</div>'}
 }
-
 function sel(id,name,display,av,created){
     user={id,name,display,av,created};
     document.querySelectorAll('.usr').forEach(e=>e.classList.remove('on'));
     event?.target?.closest('.usr')?.classList.add('on');
-    const s=document.getElementById('sel');s.textContent=`${display} (@${name}) · ${id}`;s.classList.add('show');
-    upd();
+    const s=document.getElementById('sel');s.textContent=`${display} (@${name}) · ${id}`;s.classList.add('show');upd();
 }
 function pick(t,el){action=t;document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));el.classList.add('on');upd()}
 function upd(){document.getElementById('send').disabled=!(user&&action)}
-
 async function go(){
     if(!user||!action)return;
     const reason=document.getElementById('reason').value.trim()||'Kein Grund';
@@ -150,10 +220,8 @@ async function go(){
     document.getElementById('send').disabled=true;
     try{
         await fetch(WH,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-            username:'Emden Network Moderation',
-            avatar_url:user.av||'https://github.com/princearmy2024.png',
-            embeds:[{
-                color:c,
+            username:'Emden Network Moderation',avatar_url:user.av||'https://github.com/princearmy2024.png',
+            embeds:[{color:c,
                 author:{name:user.display,icon_url:user.av||'https://github.com/princearmy2024.png'},
                 title:`Moderation | ${user.id}`,
                 thumbnail:{url:user.av||''},
@@ -161,6 +229,7 @@ async function go(){
                     {name:'User ID',value:'`'+user.id+'`',inline:true},
                     {name:'Display Name',value:user.display,inline:true},
                     {name:'Account Created',value:user.created||'Unbekannt',inline:true},
+                    {name:'Username',value:'@'+user.name,inline:true},
                     {name:'Reason',value:reason,inline:false},
                     {name:'Punishment',value:action,inline:true},
                 ],
@@ -169,8 +238,8 @@ async function go(){
             }]
         })});
         show('✓ '+action+' gesendet','ok');
-        document.getElementById('reason').value='';
-        action=null;document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));
+        document.getElementById('reason').value='';action=null;
+        document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));
     }catch(e){show('✗ Fehler','err')}
     upd();
 }
