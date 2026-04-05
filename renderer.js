@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.19.0'; // Stand: 05.04.2026 (Mod-Button + Glass Panel + Send)
+let CURRENT_VERSION = '4.19.1'; // Stand: 05.04.2026 (Mod-Button Klick Fix)
 
 // =============================================================
 // CONFIG — Bot-API

@@ -1,5 +1,5 @@
 {
-    "version": "4.19.0",
+    "version": "4.19.1",
     "releaseDate": "2026-04-05",
     "notes": "v4.18.0: Overlay komplett neu gebaut — kein Flicker, kein Focus-Spam.",
     "forceUpdate": true
