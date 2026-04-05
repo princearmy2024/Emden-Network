@@ -805,8 +805,12 @@ const apiServer = http.createServer(async (req, res) => {
                                 // Höchste passende Rolle finden
                                 const roles = member.roles.cache.sort((a, b) => b.position - a.position);
                                 for (const [, role] of roles) {
-                                    const key = role.name.toLowerCase();
-                                    if (rankEmojis[key]) { modRankEmoji = rankEmojis[key]; modRankName = role.name; break; }
+                                    const roleLower = role.name.toLowerCase();
+                                    // Prüfe ob der Rollenname einen der Keys enthält
+                                    for (const [key, emojiVal] of Object.entries(rankEmojis)) {
+                                        if (roleLower.includes(key)) { modRankEmoji = emojiVal; modRankName = role.name; break; }
+                                    }
+                                    if (modRankName !== 'Moderator') break; // Gefunden, aufhören
                                 }
                             }
                         }
