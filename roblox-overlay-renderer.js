@@ -62,6 +62,12 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
+        // Panels sofort sichtbar — wenn Overlay offen ist, läuft Roblox
+        setTimeout(() => {
+            document.body.classList.add('overlay-active');
+            setGameRunning(true);
+        }, 300);
+
         startClock();
         connectSocket();
         setupKeys();
