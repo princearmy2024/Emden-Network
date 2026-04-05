@@ -3,7 +3,9 @@ import {
     Client, GatewayIntentBits, REST, Routes,
     Partials, ActivityType, SlashCommandBuilder,
     ModalBuilder, TextInputBuilder, TextInputStyle,
-    ActionRowBuilder, EmbedBuilder
+    ActionRowBuilder, EmbedBuilder, MessageFlags,
+    ContainerBuilder, TextDisplayBuilder, SectionBuilder,
+    SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -767,82 +769,57 @@ const apiServer = http.createServer(async (req, res) => {
                 const MOD_CHANNEL_ID = "1367243128284905573";
                 const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
                 const accentColor = action === 'Ban' ? 0xFF4444 : action === 'Kick' ? 0xF59E0B : 0x0088FF;
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-                // Components v2 Message (Container-based) — korrektes Format via Discohook
-                const components = [
-                    {
-                        type: 17, // Container
-                        accent_color: accentColor,
-                        components: [
-                            // Header Section: Text + Avatar Thumbnail
-                            {
-                                type: 10, // Section
-                                components: [
-                                    { type: 12, content: `${emoji} **${action}**\n### ${displayName || username}` }
-                                ],
-                                accessory: avatar ? {
-                                    type: 11, // Thumbnail
-                                    media: { url: avatar }
-                                } : undefined
-                            },
-                            // Separator
-                            { type: 14, divider: true, spacing: 0 },
-                            // Info
-                            { type: 12, content: `**User ID** · \`${userId}\`\n**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}` },
-                            // Separator
-                            { type: 14, divider: true, spacing: 0 },
-                            // Reason + Punishment
-                            { type: 12, content: `**Reason**\n${reason || 'Kein Grund angegeben'}` },
-                            { type: 12, content: `**Punishment**\n${emoji} ${action}` },
-                            // Separator
-                            { type: 14, divider: true, spacing: 1 },
-                            // Footer
-                            { type: 12, content: `-# 👮 Moderator: @${moderator || 'Unbekannt'} • ${dateStr} um ${timeStr} Uhr` }
-                        ]
-                    }
-                ];
-
-                // Discord API direkt aufrufen (Components v2 braucht flags: 131072)
-                const apiRes = await fetch(`https://discord.com/api/v10/channels/${MOD_CHANNEL_ID}/messages`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bot ${process.env.TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        components,
-                        flags: 131072 // IS_COMPONENTS_V2
-                    })
-                });
-
-                if (!apiRes.ok) {
-                    const errData = await apiRes.json().catch(() => ({}));
-                    console.error('[Mod] Discord API Error:', JSON.stringify(errData));
-                    // Fallback: Klassisches Embed wenn Components v2 nicht geht
-                    const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
-                    if (channel) {
-                        const embed = new EmbedBuilder()
-                            .setColor(accentColor)
-                            .setAuthor({ name: `${emoji} ${action}`, iconURL: avatar || undefined })
-                            .setTitle(`${displayName || username}`)
-                            .setThumbnail(avatar || null)
-                            .addFields(
-                                { name: 'User ID', value: `\`${userId}\``, inline: true },
-                                { name: 'Display Name', value: displayName || '—', inline: true },
-                                { name: 'Account Created', value: created || 'Unbekannt', inline: true },
-                                { name: 'Username', value: `@${username}`, inline: true },
-                                { name: 'Punishment', value: `${emoji} ${action}`, inline: true },
-                                { name: '\u200b', value: '\u200b', inline: true },
-                                { name: 'Reason', value: reason || 'Kein Grund angegeben' },
-                            )
-                            .setFooter({ text: `Moderator: @${moderator || 'Unbekannt'}`, iconURL: moderatorAvatar || undefined })
-                            .setTimestamp();
-                        await channel.send({ embeds: [embed] });
-                    }
+                // Components V2 via discord.js Builder
+                const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
+                if (!channel) {
+                    res.writeHead(500);
+                    return res.end(JSON.stringify({ success: false, error: "Kanal nicht gefunden" }));
                 }
+
+                // Header Section mit Avatar
+                const headerSection = new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`${emoji} **${action}**\n### ${displayName || username}`)
+                    );
+                if (avatar) {
+                    headerSection.setThumbnailAccessory(
+                        new ThumbnailBuilder().setURL(avatar)
+                    );
+                }
+
+                // Container bauen
+                const container = new ContainerBuilder()
+                    .setAccentColor(accentColor)
+                    .addSectionComponents(headerSection)
+                    .addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                    )
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(
+                            `**User ID** · \`${userId}\`\n**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}`
+                        )
+                    )
+                    .addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                    )
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`**Reason**\n${reason || 'Kein Grund angegeben'}`)
+                    )
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`**Punishment**\n${emoji} ${action}`)
+                    )
+                    .addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
+                    )
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`-# 👮 Moderator: @${moderator || 'Unbekannt'}`)
+                    );
+
+                await channel.send({
+                    components: [container],
+                    flags: MessageFlags.IsComponentsV2
+                });
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
                 res.writeHead(200);
