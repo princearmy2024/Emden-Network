@@ -752,7 +752,7 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
-    // POST /api/mod-action — Moderation via Bot (Components v2 Style)
+    // POST /api/mod-action — Moderation via Bot (Components v2 Container)
     if (req.method === "POST" && url.pathname === "/api/mod-action") {
         let body = "";
         req.on("data", c => (body += c));
@@ -765,34 +765,103 @@ const apiServer = http.createServer(async (req, res) => {
                 }
 
                 const MOD_CHANNEL_ID = "1367243128284905573";
-                const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
-                if (!channel) {
-                    res.writeHead(500);
-                    return res.end(JSON.stringify({ success: false, error: "Mod-Kanal nicht gefunden" }));
-                }
-
-                const color = action === 'Ban' ? 0xFF4444 : action === 'Kick' ? 0xF59E0B : 0x0088FF;
                 const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
-                const actionColor = action === 'Ban' ? '🔴' : action === 'Kick' ? '🟡' : '🔵';
+                const accentColor = action === 'Ban' ? 0xFF4444 : action === 'Kick' ? 0xF59E0B : 0x0088FF;
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-                const embed = new EmbedBuilder()
-                    .setColor(color)
-                    .setAuthor({ name: `${emoji} ${action}`, iconURL: avatar || undefined })
-                    .setTitle(`${displayName || username}`)
-                    .setThumbnail(avatar || null)
-                    .addFields(
-                        { name: 'User ID', value: `\`${userId}\``, inline: true },
-                        { name: 'Display Name', value: displayName || '—', inline: true },
-                        { name: 'Account Created', value: created || 'Unbekannt', inline: true },
-                        { name: 'Username', value: `@${username}`, inline: true },
-                        { name: 'Punishment', value: `${actionColor} ${action}`, inline: true },
-                        { name: '\u200b', value: '\u200b', inline: true },
-                        { name: 'Reason', value: reason || 'Kein Grund angegeben' },
-                    )
-                    .setFooter({ text: `Moderator: @${moderator || 'Unbekannt'}`, iconURL: moderatorAvatar || undefined })
-                    .setTimestamp();
+                // Components v2 Message (Container-based)
+                const components = [
+                    {
+                        type: 17, // Container
+                        accent_color: accentColor,
+                        components: [
+                            // Header: Avatar + Action
+                            {
+                                type: 10, // Section
+                                components: [
+                                    {
+                                        type: 10, // TextDisplay in section
+                                        content: `${emoji} **${action}**\n### ${displayName || username}`
+                                    }
+                                ],
+                                accessory: avatar ? {
+                                    type: 11, // Thumbnail
+                                    media: { url: avatar }
+                                } : undefined
+                            },
+                            // Separator
+                            { type: 14, spacing: 1 },
+                            // Info Fields
+                            {
+                                type: 10,
+                                content: `**User ID**\n\`${userId}\``
+                            },
+                            {
+                                type: 10,
+                                content: `**Display Name** · ${displayName || '—'}\n**Username** · @${username}\n**Account Created** · ${created || 'Unbekannt'}`
+                            },
+                            // Separator
+                            { type: 14, spacing: 1 },
+                            // Reason
+                            {
+                                type: 10,
+                                content: `**Reason**\n${reason || 'Kein Grund angegeben'}`
+                            },
+                            {
+                                type: 10,
+                                content: `**Punishment**\n${emoji} ${action}`
+                            },
+                            // Separator
+                            { type: 14, spacing: 2 },
+                            // Footer
+                            {
+                                type: 10,
+                                content: `-# ${moderatorAvatar ? '' : '👮 '}Moderator: @${moderator || 'Unbekannt'} • ${dateStr} um ${timeStr} Uhr`
+                            }
+                        ]
+                    }
+                ];
 
-                await channel.send({ embeds: [embed] });
+                // Discord API direkt aufrufen (Components v2 braucht flags: 32768)
+                const apiRes = await fetch(`https://discord.com/api/v10/channels/${MOD_CHANNEL_ID}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bot ${process.env.TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        components,
+                        flags: 32768 // IS_COMPONENTS_V2
+                    })
+                });
+
+                if (!apiRes.ok) {
+                    const errData = await apiRes.json().catch(() => ({}));
+                    console.error('[Mod] Discord API Error:', JSON.stringify(errData));
+                    // Fallback: Klassisches Embed wenn Components v2 nicht geht
+                    const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
+                    if (channel) {
+                        const embed = new EmbedBuilder()
+                            .setColor(accentColor)
+                            .setAuthor({ name: `${emoji} ${action}`, iconURL: avatar || undefined })
+                            .setTitle(`${displayName || username}`)
+                            .setThumbnail(avatar || null)
+                            .addFields(
+                                { name: 'User ID', value: `\`${userId}\``, inline: true },
+                                { name: 'Display Name', value: displayName || '—', inline: true },
+                                { name: 'Account Created', value: created || 'Unbekannt', inline: true },
+                                { name: 'Username', value: `@${username}`, inline: true },
+                                { name: 'Punishment', value: `${emoji} ${action}`, inline: true },
+                                { name: '\u200b', value: '\u200b', inline: true },
+                                { name: 'Reason', value: reason || 'Kein Grund angegeben' },
+                            )
+                            .setFooter({ text: `Moderator: @${moderator || 'Unbekannt'}`, iconURL: moderatorAvatar || undefined })
+                            .setTimestamp();
+                        await channel.send({ embeds: [embed] });
+                    }
+                }
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
                 res.writeHead(200);
