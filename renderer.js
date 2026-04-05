@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.23.0'; // Stand: 05.04.2026 (Settings, Animationen, Webhook Fix)
+let CURRENT_VERSION = '4.23.1'; // Stand: 05.04.2026 (Logo, Blur Fix, Clear User)
 
 // =============================================================
 // CONFIG — Bot-API

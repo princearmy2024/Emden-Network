@@ -47,8 +47,10 @@ html,body{background:transparent;color:var(--text);font-family:'Inter',sans-seri
 
 /* Footer Actions */
 .ft{padding:12px;border-top:1px solid var(--border);flex-shrink:0}
-.sel{display:none;padding:8px 10px;margin-bottom:8px;background:rgba(0,136,255,0.06);border-radius:8px;font-size:11px;color:var(--brand);font-weight:600;border:1px solid rgba(0,136,255,0.1);animation:fadeIn .2s}
-.sel.show{display:block}
+.sel{display:none;padding:8px 10px;margin-bottom:8px;background:rgba(0,136,255,0.06);border-radius:8px;font-size:11px;color:var(--brand);font-weight:600;border:1px solid rgba(0,136,255,0.1);animation:fadeIn .2s;align-items:center;justify-content:space-between}
+.sel.show{display:flex}
+.sel-x{background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:14px;padding:0 2px;transition:color .15s;flex-shrink:0}
+.sel-x:hover{color:var(--danger)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .inp{width:100%;padding:9px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:inherit;outline:none;margin-bottom:8px;transition:border-color .2s}
 .inp:focus{border-color:rgba(0,136,255,0.3)}
@@ -72,7 +74,7 @@ html,body{background:transparent;color:var(--text);font-family:'Inter',sans-seri
 .mod-av img{width:100%;height:100%;object-fit:cover}
 
 /* Logo */
-.logo{position:absolute;bottom:8px;right:12px;opacity:0.06;pointer-events:none;font-size:28px;font-weight:900;letter-spacing:-0.03em;color:#fff;font-family:'Inter',sans-serif}
+.logo{position:absolute;bottom:8px;right:12px;opacity:0.08;pointer-events:none;width:40px;height:auto;filter:grayscale(0.3)}
 
 /* === SETTINGS PAGE === */
 .s-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace}
@@ -129,6 +131,10 @@ html,body{background:transparent;color:var(--text);font-family:'Inter',sans-seri
                 <div class="s-label">Blur-Stärke <span id="blurVal">40px</span></div>
                 <input type="range" class="s-slider" min="0" max="80" value="40" id="blurSlider" oninput="setBlur(this.value)">
             </div>
+            <div class="s-group">
+                <div class="s-label">Logo-Größe <span id="logoVal">40px</span></div>
+                <input type="range" class="s-slider" min="20" max="120" value="40" id="logoSlider" oninput="setLogo(this.value)">
+            </div>
         </div>
     </div>
 
@@ -136,7 +142,7 @@ html,body{background:transparent;color:var(--text);font-family:'Inter',sans-seri
         <div class="mod-av" id="modAv">M</div>
         Eingeloggt als <span style="font-weight:600;color:var(--text);margin-left:2px" id="modName">Moderator</span>
     </div>
-    <div class="logo">EN</div>
+    <img class="logo" id="logo" src="assets/logoEN.png" draggable="false">
 </div>
 
 <script>
@@ -152,6 +158,7 @@ try{
     const s=JSON.parse(localStorage.getItem('mod_panel_settings')||'{}');
     if(s.trans){document.getElementById('transSlider').value=s.trans;setTrans(s.trans)}
     if(s.blur){document.getElementById('blurSlider').value=s.blur;setBlur(s.blur)}
+    if(s.logo){document.getElementById('logoSlider').value=s.logo;setLogo(s.logo)}
 }catch(e){}
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
@@ -164,15 +171,19 @@ function setTrans(v){
 }
 function setBlur(v){
     document.getElementById('blurVal').textContent=v+'px';
-    const f=`blur(${v}px) saturate(1.5)`;
-    document.querySelector('.panel').style.backdropFilter=f;
-    document.querySelector('.panel').style.webkitBackdropFilter=f;
+    document.documentElement.style.setProperty('--blur',v+'px');
+    saveSettings();
+}
+function setLogo(v){
+    document.getElementById('logoVal').textContent=v+'px';
+    document.getElementById('logo').style.width=v+'px';
     saveSettings();
 }
 function saveSettings(){
     localStorage.setItem('mod_panel_settings',JSON.stringify({
         trans:document.getElementById('transSlider').value,
-        blur:document.getElementById('blurSlider').value
+        blur:document.getElementById('blurSlider').value,
+        logo:document.getElementById('logoSlider').value
     }));
 }
 
@@ -208,7 +219,16 @@ function sel(id,name,display,av,created){
     user={id,name,display,av,created};
     document.querySelectorAll('.usr').forEach(e=>e.classList.remove('on'));
     event?.target?.closest('.usr')?.classList.add('on');
-    const s=document.getElementById('sel');s.textContent=`${display} (@${name}) · ${id}`;s.classList.add('show');upd();
+    const s=document.getElementById('sel');
+    s.innerHTML=`<span>${display} (@${name}) · ${id}</span><button class="sel-x" onclick="clearUser(event)">&times;</button>`;
+    s.classList.add('show');upd();
+}
+function clearUser(e){
+    e?.stopPropagation();
+    user=null;
+    document.querySelectorAll('.usr').forEach(el=>el.classList.remove('on'));
+    const s=document.getElementById('sel');s.classList.remove('show');s.innerHTML='';
+    upd();
 }
 function pick(t,el){action=t;document.querySelectorAll('.act').forEach(a=>a.classList.remove('on'));el.classList.add('on');upd()}
 function upd(){document.getElementById('send').disabled=!(user&&action)}
