@@ -429,9 +429,10 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
     
     robloxOverlayWin.once('ready-to-show', () => {
+        // Exakt den vollen Bildschirm abdecken (inkl. Taskbar-Bereich)
+        const { width: sw, height: sh } = screen.getPrimaryDisplay().size;
+        robloxOverlayWin.setBounds({ x: 0, y: 0, width: sw, height: sh });
         robloxOverlayWin.show();
-        // Maximize damit es wirklich den ganzen Bildschirm abdeckt (Vollbild-Gap fix)
-        robloxOverlayWin.maximize();
     });
 }
 
