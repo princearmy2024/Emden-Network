@@ -55,6 +55,28 @@ function saveLinks() {
     } catch (e) { console.error("❌ Fehler beim Speichern der Roblox-Links:", e.message); }
 }
 
+// === Mod History ===
+const MOD_HISTORY_FILE = path.join(path.resolve(), "data", "modHistory.json");
+let modHistory = {};
+if (fs.existsSync(MOD_HISTORY_FILE)) {
+    try { modHistory = JSON.parse(fs.readFileSync(MOD_HISTORY_FILE, "utf-8")); } catch(e) {}
+}
+function saveModHistory() {
+    try {
+        if (!fs.existsSync(path.dirname(MOD_HISTORY_FILE))) fs.mkdirSync(path.dirname(MOD_HISTORY_FILE), { recursive: true });
+        fs.writeFileSync(MOD_HISTORY_FILE, JSON.stringify(modHistory, null, 2));
+    } catch(e) {}
+}
+function addModEntry(robloxUserId, entry) {
+    if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
+    modHistory[robloxUserId].push(entry);
+    saveModHistory();
+    return modHistory[robloxUserId].length;
+}
+function getModHistory(robloxUserId) {
+    return modHistory[robloxUserId] || [];
+}
+
 const robloxPresenceState = new Map();
 const overlayClients = new Map();
 
@@ -817,6 +839,14 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 } catch(e) {}
 
+                // History speichern + Eintragsnummer holen
+                const history = getModHistory(userId);
+                const entryNum = addModEntry(userId, {
+                    action, reason: reason || 'Kein Grund', moderator, date: new Date().toISOString(),
+                    displayName: displayName || username
+                });
+                const prevCount = entryNum - 1;
+
                 // Components V2 via discord.js Builder
                 const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
                 if (!channel) {
@@ -877,7 +907,23 @@ const apiServer = http.createServer(async (req, res) => {
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
                     .addActionRowComponents(buttonRow)
-                    .addSeparatorComponents(
+                // Historie-Info wenn vorherige Einträge existieren
+                if (prevCount > 0) {
+                    const historyLines = history.slice(-3).map((h, i) => {
+                        const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
+                        const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        return `-# ${hEmoji} ${h.action} · ${h.reason} · ${hDate}`;
+                    }).join('\n');
+
+                    container.addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                    );
+                    container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`📋 **Eintrag #${entryNum}** — ${prevCount} vorherige Bestrafung${prevCount > 1 ? 'en' : ''}\n${historyLines}`)
+                    );
+                }
+
+                container.addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
                     )
                     .addTextDisplayComponents(
