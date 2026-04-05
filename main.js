@@ -661,11 +661,29 @@ app.whenReady().then(() => {
         }
     });
 
-    // F4: Mod-Panel Toggle (Focus + Panel öffnen/schließen)
+    // F4: Mod-Panel als separates Fenster öffnen/schließen
+    let modPanelWin = null;
     globalShortcut.register('F4', () => {
-        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-            robloxOverlayWin.webContents.send('toggle-mod-panel');
+        if (modPanelWin && !modPanelWin.isDestroyed()) {
+            modPanelWin.close();
+            modPanelWin = null;
+            return;
         }
+        modPanelWin = new BrowserWindow({
+            width: 380, height: 520,
+            frame: false, transparent: false,
+            backgroundColor: '#0a0a16',
+            alwaysOnTop: true, skipTaskbar: true,
+            resizable: true, minimizable: false,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+        modPanelWin.setAlwaysOnTop(true, 'screen-saver', 2);
+        modPanelWin.loadFile('mod-panel.html');
+        modPanelWin.on('closed', () => { modPanelWin = null; });
     });
 
     app.on('activate', () => {

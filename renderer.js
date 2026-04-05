@@ -13,7 +13,7 @@
 
 'use strict';
 
-let CURRENT_VERSION = '4.16.3'; // Stand: 05.04.2026 (Overlay bleibt bei Mod-Panel)
+let CURRENT_VERSION = '4.17.0'; // Stand: 05.04.2026 (Mod-Panel eigenes Fenster)
 
 // =============================================================
 // CONFIG — Bot-API
