@@ -769,6 +769,49 @@ const apiServer = http.createServer(async (req, res) => {
                 const MOD_CHANNEL_ID = "1367243128284905573";
                 const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
 
+                // Moderator Rang-Emoji ermitteln
+                const rankEmojis = {
+                    'projektleitung': '<:Projektleitung:1489311699625578666>',
+                    'stv. projektleitung': '<:StvPrpjektleitung:1489311731950944559>',
+                    'management': '<:Manager:1489311838016635151>',
+                    'manager': '<:Manager:1489311838016635151>',
+                    'teamleitung': '<:Teamleitung:1489312932415410237>',
+                    'stv. teamleitung': '<:StvTeamleitung:1489312944574435458>',
+                    'sen. admin': '<:Administration:1489312566030110721>',
+                    'admin': '<:Administration:1489312566030110721>',
+                    'administrator': '<:Administration:1489312566030110721>',
+                    'jun. admin': '<:Administration:1489312566030110721>',
+                    'sen. mod': '<:Moderation:1489312529254449353>',
+                    'moderator': '<:Moderation:1489312529254449353>',
+                    'mod': '<:Moderation:1489312529254449353>',
+                    'trial mod': '<:Trialmoderation:1489312502088073308>',
+                    'trial moderator': '<:Trialmoderation:1489312502088073308>',
+                };
+
+                // Moderator-Rolle aus Discord holen
+                let modRankEmoji = '<:Trialmoderation:1489312502088073308>';
+                try {
+                    const guild = client.guilds.cache.get(GUILD_ID);
+                    if (guild) {
+                        // Moderator Discord-ID aus allKnownUsers finden
+                        let modDiscordId = null;
+                        for (const [id, u] of allKnownUsers.entries()) {
+                            if (u.username === moderator) { modDiscordId = id; break; }
+                        }
+                        if (modDiscordId) {
+                            const member = await guild.members.fetch(modDiscordId).catch(() => null);
+                            if (member) {
+                                // Höchste passende Rolle finden
+                                const roles = member.roles.cache.sort((a, b) => b.position - a.position);
+                                for (const [, role] of roles) {
+                                    const key = role.name.toLowerCase();
+                                    if (rankEmojis[key]) { modRankEmoji = rankEmojis[key]; break; }
+                                }
+                            }
+                        }
+                    }
+                } catch(e) {}
+
                 // Components V2 via discord.js Builder
                 const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
                 if (!channel) {
@@ -789,14 +832,14 @@ const apiServer = http.createServer(async (req, res) => {
                     );
                 }
 
-                // Roblox Profil Button
+                // Roblox Profil Button mit Custom Emoji
                 const { ButtonBuilder, ButtonStyle } = await import('discord.js');
                 const buttonRow = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setLabel('Roblox Profil')
                         .setStyle(ButtonStyle.Link)
                         .setURL(profileUrl)
-                        .setEmoji('🎮')
+                        .setEmoji({ name: 'roblox', id: '1433535007246516446' })
                 );
 
                 // Container bauen
@@ -817,7 +860,7 @@ const apiServer = http.createServer(async (req, res) => {
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`**Reason**\n> ${reason || 'Kein Grund angegeben'}`)
+                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${reason || 'Kein Grund angegeben'}`)
                     )
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
@@ -833,7 +876,7 @@ const apiServer = http.createServer(async (req, res) => {
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
                     )
                     .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`-# 👮 Moderator: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
+                        new TextDisplayBuilder().setContent(`-# ${modRankEmoji} Moderator: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
                 await channel.send({
