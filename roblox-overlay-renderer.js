@@ -7,7 +7,7 @@
 
 // CONFIG
 const OVL_CONFIG = {
-    API_URL: 'http://localhost:5009',
+    API_URL: 'http://91.98.124.212:5009',
     EMDEN_PLACE_ID: 12716055617,
     ON_DUTY_ROLE_ID: 'PLACEHOLDER_ON_DUTY_ROLE_ID',
 };
@@ -541,7 +541,9 @@ const Overlay = (() => {
 
     // ─── SUPPORTER COUNT ────────────────────────────────────────
     function setSupporter(count) {
-        document.getElementById('supporter-count').textContent = `${count} Supporter`;
+        const el = document.getElementById('supporter-count');
+        if (el) el.textContent = `${count} Supporter`;
+        console.log('[Overlay] Supporter count:', count);
     }
 
     // ─── SMALL NOTIFICATIONS ────────────────────────────────────

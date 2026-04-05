@@ -263,18 +263,24 @@ html, body {
 #panel-left.collapsed .panel-pin-wrap,
 #panel-left.collapsed .grid-pattern { opacity: 0; pointer-events: none; }
 
-/* Eintragen Button — unten im Fade, clean verbunden */
+/* Eintragen Button — eigener Fade von unten nach oben */
 #mod-trigger {
   position: fixed;
-  bottom: clamp(6px, 0.8vh, 14px);
+  bottom: 0;
   right: clamp(140px, 12vw, 220px);
-  height: clamp(28px, 2.2vw, 36px);
-  padding: 0 clamp(12px, 1vw, 18px);
-  border-radius: 8px;
-  background: rgba(0, 136, 255, 0.08);
-  border: 1px solid rgba(0, 136, 255, 0.15);
+  padding: clamp(10px, 1vh, 16px) clamp(16px, 1.4vw, 24px) clamp(8px, 0.8vh, 12px);
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(to top,
+    rgba(6, 8, 18, 0.9) 0%,
+    rgba(10, 18, 40, 0.5) 50%,
+    transparent 100%
+  );
+  border: none;
+  border-top: 1px solid rgba(0, 136, 255, 0.12);
+  border-left: 1px solid rgba(255,255,255,0.04);
+  border-right: 1px solid rgba(255,255,255,0.04);
   display: none; align-items: center; justify-content: center;
-  gap: 6px;
+  gap: 7px;
   cursor: pointer;
   color: var(--accent);
   z-index: 200;
@@ -283,14 +289,17 @@ html, body {
   font-family: 'Inter', sans-serif;
 }
 #mod-trigger:hover {
-  background: rgba(0, 136, 255, 0.18);
-  border-color: rgba(0, 136, 255, 0.35);
-  box-shadow: 0 4px 16px rgba(0, 136, 255, 0.12);
+  background: linear-gradient(to top,
+    rgba(6, 12, 30, 0.95) 0%,
+    rgba(10, 24, 55, 0.6) 50%,
+    transparent 100%
+  );
+  border-top-color: rgba(0, 136, 255, 0.3);
 }
-#mod-trigger i, #mod-trigger svg { width: clamp(12px, 0.85vw, 15px); height: clamp(12px, 0.85vw, 15px); pointer-events: none; }
+#mod-trigger i, #mod-trigger svg { width: clamp(13px, 0.9vw, 16px); height: clamp(13px, 0.9vw, 16px); pointer-events: none; }
 .mod-trigger-text {
-  font-size: clamp(9px, 0.65vw, 11px); font-weight: 700;
-  letter-spacing: 0.03em; pointer-events: none;
+  font-size: clamp(10px, 0.7vw, 12px); font-weight: 700;
+  letter-spacing: 0.04em; pointer-events: none;
 }
 body.overlay-active.is-admin #mod-trigger { display: flex; }
 
@@ -298,8 +307,8 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #mod-trigger::before {
   content: '';
   position: absolute;
-  top: -10px; left: -10px; right: -10px; bottom: -10px;
-  border-radius: 14px;
+  top: -8px; left: -8px; right: -8px; bottom: 0;
+  border-radius: 14px 14px 0 0;
   background: rgba(0, 0, 10, 0.01);
 }
 
@@ -575,10 +584,10 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
   transition: opacity 1.2s ease; overflow: hidden; border-radius: 4px;
 }
 #logo-img {
-  width: clamp(44px, 3.5vw, 64px); height: clamp(44px, 3.5vw, 64px);
+  width: clamp(64px, 5.5vw, 100px); height: clamp(64px, 5.5vw, 100px);
   object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
-  opacity: 0.6; display: block;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  opacity: 0.7; display: block;
 }
 #logo-container::after {
   content: ''; position: absolute;
