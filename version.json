@@ -1,6 +1,6 @@
 {
-    "version": "4.24.0",
+    "version": "4.25.0",
     "releaseDate": "2026-04-05",
-    "notes": "v4.24.0: Mod-Panel sendet via Bot statt Webhook.",
+    "notes": "v4.25.0: Neues Gradient Panel Frame Overlay — modernes HUD um das Spiel herum.",
     "forceUpdate": true
 }

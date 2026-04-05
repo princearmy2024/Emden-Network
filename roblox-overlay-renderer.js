@@ -434,9 +434,14 @@ const Overlay = (() => {
     function setGameRunning(running, startTime = null) {
         isGameRunning = running;
         if (running) {
-            setTimeout(() => document.getElementById('info-bar').classList.add('visible'), 100);
+            // Activate gradient panels
+            setTimeout(() => {
+                document.body.classList.add('overlay-active');
+                document.getElementById('info-bar').classList.add('visible');
+            }, 100);
             startPlaytime(startTime);
         } else {
+            document.body.classList.remove('overlay-active');
             document.getElementById('info-bar').classList.remove('visible');
             stopPlaytime();
         }
