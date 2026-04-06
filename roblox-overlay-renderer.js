@@ -862,6 +862,36 @@ const Overlay = (() => {
             avatarEl.innerHTML = avatar ? '<img src="' + avatar + '" />' : '';
         }
 
+        // Mod-History laden
+        const historyEl = document.getElementById('modHistory');
+        const historyTitle = document.getElementById('modHistoryTitle');
+        const historyList = document.getElementById('modHistoryList');
+        historyEl.style.display = 'none';
+        try {
+            const histRes = await fetch(API_URL + '/api/mod-history?userId=' + id, {
+                headers: { 'x-api-key': API_KEY }
+            });
+            const histData = await histRes.json();
+            if (histData.success && histData.count > 0) {
+                historyTitle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${histData.count} Eintrag${histData.count > 1 ? 'e' : ''}`;
+                historyList.innerHTML = histData.entries.map(h => {
+                    const emoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
+                    const cls = (h.action || '').toLowerCase();
+                    const date = h.date ? new Date(h.date).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+                    const time = h.date ? new Date(h.date).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
+                    return `<div class="mod-history-entry ${cls}">
+                        <div class="mod-history-emoji">${emoji}</div>
+                        <div class="mod-history-info">
+                            <div class="mod-history-action"><span class="tag ${cls}">${esc(h.action || '?')}</span> ${esc(h.displayName || '—')}</div>
+                            <div class="mod-history-reason">${esc(h.reason || 'Kein Grund')}</div>
+                            <div class="mod-history-meta"><span>${date} ${time}</span><span>von ${esc(h.moderator || '?')}</span></div>
+                        </div>
+                    </div>`;
+                }).join('');
+                historyEl.style.display = 'flex';
+            }
+        } catch(e) {}
+
         // Discord-Lookup
         const discordInfo = document.getElementById('modDiscordInfo');
         discordInfo.style.display = 'none';
@@ -898,10 +928,11 @@ const Overlay = (() => {
         document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         const sel = document.getElementById('modSelectedUser');
         if (sel) { sel.classList.remove('show'); sel.innerHTML = ''; }
-        // Profile zurücksetzen
+        // Profile + History zurücksetzen
         document.getElementById('modProfileEmpty').style.display = 'flex';
         document.getElementById('modProfileContent').style.display = 'none';
         document.getElementById('modDiscordInfo').style.display = 'none';
+        document.getElementById('modHistory').style.display = 'none';
         updateModSendBtn();
     }
 

@@ -947,6 +947,15 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/mod-history?userId=xxx — Gibt Mod-History eines Users zurück
+    if (req.method === "GET" && url.pathname === "/api/mod-history") {
+        const userId = url.searchParams.get("userId");
+        if (!userId) { res.writeHead(400); return res.end(JSON.stringify({ error: "userId required" })); }
+        const history = getModHistory(userId);
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, userId, count: history.length, entries: history }));
+    }
+
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
     if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
         const robloxId = url.searchParams.get("robloxId");
