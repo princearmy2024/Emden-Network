@@ -841,9 +841,16 @@ const apiServer = http.createServer(async (req, res) => {
 
                 // History speichern + Eintragsnummer holen
                 const history = getModHistory(userId);
+                // Moderator-Avatar aus allKnownUsers holen
+                let modAvatarUrl = moderatorAvatar || null;
+                if (!modAvatarUrl) {
+                    for (const [, u] of allKnownUsers.entries()) {
+                        if (u.username === moderator) { modAvatarUrl = u.avatar || null; break; }
+                    }
+                }
                 const entryNum = addModEntry(userId, {
                     action, reason: reason || 'Kein Grund', moderator, date: new Date().toISOString(),
-                    displayName: displayName || username
+                    displayName: displayName || username, modAvatar: modAvatarUrl
                 });
                 const prevCount = entryNum - 1;
 
@@ -955,12 +962,12 @@ const apiServer = http.createServer(async (req, res) => {
 
         // Moderator-Avatare aus allKnownUsers holen
         const enriched = history.map((h, i) => {
-            let modAvatar = null;
+            let modAvatar = h.modAvatar || null;
             let modDiscordId = null;
             if (h.moderator) {
                 for (const [id, u] of allKnownUsers.entries()) {
                     if (u.username === h.moderator) {
-                        modAvatar = u.avatar || null;
+                        if (!modAvatar) modAvatar = u.avatar || null;
                         modDiscordId = id;
                         break;
                     }

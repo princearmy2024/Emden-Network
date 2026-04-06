@@ -1071,13 +1071,13 @@ const Overlay = (() => {
 
         content.innerHTML = `
             <div class="detail-card">
-                <div class="detail-header">
-                    <div class="detail-header-emoji">${emoji}</div>
-                    <div class="detail-header-info">
-                        <div class="detail-header-action">${esc(h.action || '?')}</div>
-                        <div class="detail-header-num">Eintrag #${h.index || index + 1}${h.source === 'trident' ? ' · Trident Import' : ''}</div>
+                <div class="detail-action-bar ${cls}">
+                    <div class="detail-action-emoji">${emoji}</div>
+                    <div class="detail-action-info">
+                        <div class="detail-action-title">${esc(h.action || '?')}</div>
+                        <div class="detail-action-sub">Eintrag #${h.index || index + 1}${h.source === 'trident' ? ' · Trident' : ''}</div>
                     </div>
-                    <span class="detail-header-tag ${cls}">${esc(h.action || '?')}</span>
+                    <span class="detail-action-tag ${cls}">${esc(h.action || '?')}</span>
                 </div>
                 <div class="detail-body">
                     <div class="detail-row">
@@ -1089,10 +1089,6 @@ const Overlay = (() => {
                         <span class="detail-value muted" style="font-family:var(--font-mono);font-size:11px;">${esc(String(userId))}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Aktion</span>
-                        <span class="detail-value">${emoji} ${esc(h.action || '—')}</span>
-                    </div>
-                    <div class="detail-row">
                         <span class="detail-label">Datum</span>
                         <span class="detail-value">${date}</span>
                     </div>
@@ -1100,17 +1096,17 @@ const Overlay = (() => {
                         <span class="detail-label">Uhrzeit</span>
                         <span class="detail-value">${time}</span>
                     </div>
-                    <div class="detail-row" style="flex-direction:column;gap:4px;">
-                        <span class="detail-label">Grund</span>
-                        <div class="detail-value reason">${esc(h.reason || 'Kein Grund angegeben')}</div>
-                    </div>
+                </div>
+                <div class="detail-reason-section">
+                    <div class="detail-reason-label">Grund</div>
+                    <div class="detail-reason-box">${esc(h.reason || 'Kein Grund angegeben')}</div>
                 </div>
                 <div class="detail-mod">
                     ${h.modAvatar
                         ? `<div class="detail-mod-av"><img src="${h.modAvatar}" /></div>`
-                        : `<div class="detail-mod-av" style="display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);">${esc((h.moderator||'?')[0].toUpperCase())}</div>`
+                        : `<div class="detail-mod-av">${esc((h.moderator||'?')[0].toUpperCase())}</div>`
                     }
-                    <div class="detail-mod-info">
+                    <div>
                         <div class="detail-mod-name">${esc(h.moderator || 'Unbekannt')}</div>
                         <div class="detail-mod-role">Moderator</div>
                     </div>
