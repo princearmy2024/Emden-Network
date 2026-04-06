@@ -62,13 +62,13 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
-        // Intro abspielen, dann Overlay aktivieren
+        // Intro abspielen, danach NUR Watermark — Overlay erst bei F4
+        if (isAdmin) document.body.classList.add('is-admin');
         playIntro(() => {
-            if (isAdmin) {
-                document.body.classList.add('overlay-active');
-                document.body.classList.add('is-admin');
-            }
+            // Nach Intro: Watermark zeigen, Overlay NICHT aktiv
+            document.body.classList.add('watermark-visible');
             setGameRunning(true);
+            // overlay-active wird NICHT gesetzt — erst bei F4
         });
 
         // Click outside Mod Panel → Focus zurück ans Spiel
@@ -478,14 +478,18 @@ const Overlay = (() => {
     let overlayHidden = false;
 
     function toggleOverlayVisibility() {
-        overlayHidden = !overlayHidden;
-        if (overlayHidden) {
-            // Alles verstecken
+        const isActive = document.body.classList.contains('overlay-active');
+        if (isActive) {
+            // Overlay aus → zurück zum Watermark
             document.body.classList.remove('overlay-active');
+            document.body.classList.add('watermark-visible');
             if (modSlideOpen) toggleModSlide();
+            overlayHidden = true;
         } else {
-            // Alles wieder zeigen
-            if (isAdmin) document.body.classList.add('overlay-active');
+            // Overlay an → Panels + Logo zeigen, Watermark weg
+            document.body.classList.add('overlay-active');
+            document.body.classList.remove('watermark-visible');
+            overlayHidden = false;
         }
     }
 

@@ -799,6 +799,26 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #intro-overlay.fade-out .intro-line { opacity: 0; transition: opacity 0.5s ease; }
 #intro-overlay.gone { display: none; }
 
+/* ================================================================
+   BACKGROUND WATERMARK — grosses Logo, immer sichtbar, blass
+   ================================================================ */
+#bg-watermark {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+#bg-watermark img {
+  width: clamp(300px, 35vw, 550px);
+  height: auto;
+  opacity: 0.04;
+  filter: grayscale(30%);
+}
+body.watermark-visible #bg-watermark { opacity: 1; }
+
 /* LEGACY — hidden elements for compat */
 #mod-panel, #mod-toggle, #mod-hint { display: none !important; }
 #info-bar { display: none; }
@@ -988,7 +1008,12 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <img class="mod-logo" src="assets/logoEN.png" draggable="false">
 </div>
 
-<!-- LOGO -->
+<!-- BACKGROUND WATERMARK LOGO (immer sichtbar, blass) -->
+<div id="bg-watermark">
+  <img src="assets/LOGO BIG.png" alt="" />
+</div>
+
+<!-- LOGO (nur wenn Overlay aktiv) -->
 <div id="logo-container"><img id="logo-img" src="assets/logoEN.png" alt="EN" /></div>
 
 <!-- ========== INTRO SEQUENCE ========== -->
