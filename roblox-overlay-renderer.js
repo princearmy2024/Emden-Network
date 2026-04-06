@@ -81,21 +81,29 @@ const Overlay = (() => {
         });
 
         // Hover-System für gepinntes Panel: Focus nur wenn Maus drüber
+        let modFocusTimer = null;
         const modSlideEl = document.getElementById('mod-slide');
         if (modSlideEl) {
             modSlideEl.addEventListener('mouseenter', () => {
-                if (modSlideOpen) requestFocus(true);
+                if (modSlideOpen) {
+                    clearTimeout(modFocusTimer);
+                    modFocusTimer = null;
+                    requestFocus(true);
+                }
             });
             modSlideEl.addEventListener('mouseleave', () => {
                 if (modSlideOpen && modPinned) {
-                    requestFocus(false);
+                    // Delay bevor Focus abgegeben wird — verhindert Flicker
+                    // beim Wechsel zwischen Elementen im Panel
+                    clearTimeout(modFocusTimer);
+                    modFocusTimer = setTimeout(() => {
+                        if (modPinned && modSlideOpen) requestFocus(false);
+                        modFocusTimer = null;
+                    }, 300);
                 }
             });
-            // Scroll im Panel erlauben wenn Focus da ist
             modSlideEl.addEventListener('wheel', (e) => {
-                if (modSlideOpen) {
-                    e.stopPropagation();
-                }
+                if (modSlideOpen) e.stopPropagation();
             }, { passive: true });
         }
 
