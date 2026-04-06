@@ -63,9 +63,11 @@ const Overlay = (() => {
         document.body.style.transition = 'opacity 0.8s ease';
 
         // Start: GAR NICHTS — kein Intro, kein Watermark, kein Overlay
-        // Alles erst bei F4
         if (isAdmin) document.body.classList.add('is-admin');
         setGameRunning(true);
+
+        // Gespeicherte Settings laden
+        loadSettings();
 
         // Click outside Mod Panel → schließen (wenn nicht gepinnt)
         document.addEventListener('mousedown', (e) => {
@@ -105,6 +107,13 @@ const Overlay = (() => {
             modSlideEl.addEventListener('wheel', (e) => {
                 if (modSlideOpen) e.stopPropagation();
             }, { passive: true });
+        }
+
+        // Settings Panel — gleicher Hover-Focus
+        const settingsEl = document.getElementById('settings-panel');
+        if (settingsEl) {
+            settingsEl.addEventListener('mouseenter', () => { if (settingsOpen) requestFocus(true); });
+            settingsEl.addEventListener('mouseleave', () => { if (settingsOpen && !modSlideOpen) requestFocus(false); });
         }
 
         // Mod Trigger Button — Focus anfordern bei Hover (sonst click-through!)
@@ -1043,6 +1052,116 @@ const Overlay = (() => {
         }, 6500);
     }
 
+    // ─── SETTINGS ────────────────────────────────────────────
+    let settingsOpen = false;
+    const SETTINGS_KEY = 'en_overlay_settings_' + discordId;
+    const COLOR_MAP = {
+        'default':   { solid: 'rgba(6,8,18,', mid: 'rgba(10,18,40,', fade: 'rgba(14,24,55,' },
+        'pure-dark': { solid: 'rgba(6,6,6,',  mid: 'rgba(10,10,10,', fade: 'rgba(16,16,16,' },
+        'navy':      { solid: 'rgba(8,16,32,', mid: 'rgba(14,28,56,', fade: 'rgba(18,36,70,' },
+        'purple':    { solid: 'rgba(14,8,22,', mid: 'rgba(28,14,48,', fade: 'rgba(38,20,60,' },
+        'green':     { solid: 'rgba(6,14,10,', mid: 'rgba(8,24,16,',  fade: 'rgba(12,32,22,' },
+        'red':       { solid: 'rgba(14,6,6,',  mid: 'rgba(28,10,10,', fade: 'rgba(38,16,16,' },
+    };
+    let currentColor = 'default';
+
+    function toggleSettings() {
+        settingsOpen = !settingsOpen;
+        const panel = document.getElementById('settings-panel');
+        if (panel) panel.classList.toggle('open', settingsOpen);
+        if (settingsOpen) requestFocus(true);
+        else if (!modSlideOpen) requestFocus(false);
+    }
+
+    function loadSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+            if (!saved) return;
+            const el = (id) => document.getElementById(id);
+            if (saved.fadeEnabled !== undefined) el('settFadeEnabled').checked = saved.fadeEnabled;
+            if (saved.fadeStr) el('settFadeStr').value = saved.fadeStr;
+            if (saved.gridEnabled !== undefined) el('settGridEnabled').checked = saved.gridEnabled;
+            if (saved.shimmerEnabled !== undefined) el('settShimmerEnabled').checked = saved.shimmerEnabled;
+            if (saved.logoOpacity) el('settLogoOpacity').value = saved.logoOpacity;
+            if (saved.wmOpacity) el('settWmOpacity').value = saved.wmOpacity;
+            if (saved.color) {
+                currentColor = saved.color;
+                document.querySelectorAll('.settings-color-opt').forEach(o => o.classList.toggle('active', o.dataset.color === saved.color));
+            }
+            applySetting();
+        } catch(e) {}
+    }
+
+    function saveSettings() {
+        try {
+            const data = {
+                fadeEnabled: document.getElementById('settFadeEnabled').checked,
+                fadeStr: document.getElementById('settFadeStr').value,
+                gridEnabled: document.getElementById('settGridEnabled').checked,
+                shimmerEnabled: document.getElementById('settShimmerEnabled').checked,
+                logoOpacity: document.getElementById('settLogoOpacity').value,
+                wmOpacity: document.getElementById('settWmOpacity').value,
+                color: currentColor,
+            };
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+        } catch(e) {}
+    }
+
+    function applySetting() {
+        const fadeOn = document.getElementById('settFadeEnabled').checked;
+        const fadeStr = parseInt(document.getElementById('settFadeStr').value);
+        const gridOn = document.getElementById('settGridEnabled').checked;
+        const shimmerOn = document.getElementById('settShimmerEnabled').checked;
+        const logoOp = parseInt(document.getElementById('settLogoOpacity').value);
+        const wmOp = parseInt(document.getElementById('settWmOpacity').value);
+
+        // Update value displays
+        document.getElementById('settFadeStrVal').textContent = fadeStr + '%';
+        document.getElementById('settLogoVal').textContent = logoOp + '%';
+        document.getElementById('settWmVal').textContent = wmOp + '%';
+
+        // Toggle classes
+        document.body.classList.toggle('no-fade', !fadeOn);
+        document.body.classList.toggle('no-grid', !gridOn);
+        document.body.classList.toggle('no-shimmer', !shimmerOn);
+
+        // Fade strength — update CSS variables
+        const str = fadeStr / 100;
+        const c = COLOR_MAP[currentColor] || COLOR_MAP['default'];
+        document.documentElement.style.setProperty('--panel-solid', c.solid + (str * 0.95).toFixed(2) + ')');
+        document.documentElement.style.setProperty('--panel-mid', c.mid + (str * 0.6).toFixed(2) + ')');
+        document.documentElement.style.setProperty('--panel-fade', c.fade + (str * 0.2).toFixed(2) + ')');
+
+        // Logo opacity
+        const logoImg = document.getElementById('logo-img');
+        if (logoImg) logoImg.style.opacity = (logoOp / 100).toFixed(2);
+
+        // Watermark opacity
+        const wmImg = document.querySelector('#bg-watermark img');
+        if (wmImg) wmImg.style.opacity = (wmOp / 100).toFixed(2);
+
+        saveSettings();
+    }
+
+    function pickColor(color, el) {
+        currentColor = color;
+        document.querySelectorAll('.settings-color-opt').forEach(o => o.classList.remove('active'));
+        if (el) el.classList.add('active');
+        applySetting();
+    }
+
+    function resetSettings() {
+        currentColor = 'default';
+        document.getElementById('settFadeEnabled').checked = true;
+        document.getElementById('settFadeStr').value = 92;
+        document.getElementById('settGridEnabled').checked = true;
+        document.getElementById('settShimmerEnabled').checked = true;
+        document.getElementById('settLogoOpacity').value = 70;
+        document.getElementById('settWmOpacity').value = 4;
+        document.querySelectorAll('.settings-color-opt').forEach(o => o.classList.toggle('active', o.dataset.color === 'default'));
+        applySetting();
+    }
+
     // ─── PANEL PIN/UNPIN ─────────────────────────────────────
     let panelPinned = true;
 
@@ -1135,7 +1254,7 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail };
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());

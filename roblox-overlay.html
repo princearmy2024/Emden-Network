@@ -1085,6 +1085,138 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #intro-overlay.gone { display: none; }
 
 /* ================================================================
+   SETTINGS PANEL
+   ================================================================ */
+#settings-panel {
+  position: fixed; top: 0; left: 0;
+  width: clamp(300px, 22vw, 400px); height: 100vh;
+  z-index: 400;
+  transform: translateX(-100%);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  pointer-events: none;
+}
+#settings-panel.open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.settings-bg {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to right,
+    rgba(8, 10, 22, 0.97) 0%,
+    rgba(10, 14, 30, 0.92) 70%,
+    rgba(12, 18, 38, 0.7) 90%,
+    transparent 100%
+  );
+  backdrop-filter: blur(40px);
+}
+.settings-content {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; height: 100%;
+  padding: 0 clamp(16px, 1.5vw, 28px);
+}
+.settings-hdr {
+  display: flex; align-items: center; gap: 10px;
+  padding: clamp(16px, 2vh, 28px) 0 12px;
+  flex-shrink: 0;
+}
+.settings-hdr-ico { color: var(--accent); display: flex; }
+.settings-hdr-ico i, .settings-hdr-ico svg { width: 18px; height: 18px; }
+.settings-hdr-title { font-size: 15px; font-weight: 800; color: #fff; flex: 1; }
+.settings-close {
+  width: 28px; height: 28px; border-radius: 8px; border: none;
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.35);
+  font-size: 16px; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; transition: all 0.15s;
+}
+.settings-close:hover { background: rgba(255,107,107,0.1); color: #FF6B6B; }
+
+.settings-body {
+  flex: 1; overflow-y: auto; padding: 8px 0 20px;
+  scrollbar-width: none;
+}
+.settings-body::-webkit-scrollbar { display: none; }
+
+.settings-group {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.settings-label {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5);
+  margin-bottom: 8px; display: flex; justify-content: space-between;
+}
+.settings-val {
+  color: var(--accent); font-family: var(--font-mono); font-size: 10px;
+}
+.settings-desc {
+  font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 500;
+}
+
+/* Toggle Switch */
+.settings-toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.settings-switch {
+  position: relative; width: 36px; height: 20px; flex-shrink: 0;
+}
+.settings-switch input { opacity: 0; width: 0; height: 0; }
+.settings-slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.08); border-radius: 20px;
+  transition: background 0.2s;
+}
+.settings-slider::before {
+  content: ''; position: absolute; height: 14px; width: 14px;
+  left: 3px; bottom: 3px; background: rgba(255,255,255,0.5);
+  border-radius: 50%; transition: all 0.2s;
+}
+.settings-switch input:checked + .settings-slider { background: rgba(0,136,255,0.3); }
+.settings-switch input:checked + .settings-slider::before {
+  transform: translateX(16px); background: var(--accent);
+}
+
+/* Range Slider */
+.settings-range {
+  width: 100%; -webkit-appearance: none; height: 4px;
+  border-radius: 2px; background: rgba(255,255,255,0.08); outline: none;
+}
+.settings-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,136,255,0.3);
+}
+.settings-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+/* Color Picker */
+.settings-colors {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.settings-color-opt {
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.2s;
+}
+.settings-color-opt:hover { transform: scale(1.1); }
+.settings-color-opt.active { border-color: var(--accent); box-shadow: 0 0 10px rgba(0,136,255,0.25); }
+
+/* Reset Button */
+.settings-reset {
+  width: 100%; padding: 9px; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; background: rgba(255,255,255,0.03);
+  color: rgba(255,255,255,0.35); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.settings-reset:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+/* Body classes for settings */
+body.no-fade #panel-left, body.no-fade #panel-bottom,
+body.no-fade #panel-right, body.no-fade #corner-bl,
+body.no-fade #corner-br { opacity: 0 !important; }
+body.no-grid .grid-pattern { display: none !important; }
+body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { display: none !important; }
+
+/* ================================================================
    BACKGROUND WATERMARK — grosses Logo, immer sichtbar, blass
    ================================================================ */
 #bg-watermark {
@@ -1207,8 +1339,100 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
       <div><div class="panel-info-label">Push to Talk</div><div class="panel-info-value" style="font-size:11px;">V</div></div>
     </div>
   </div>
+  <div class="panel-sep"></div>
+  <!-- Settings Button -->
+  <div class="panel-section">
+    <div class="panel-info-card panel-settings-btn" onclick="Overlay.toggleSettings()" style="opacity:0.5;cursor:pointer;">
+      <div class="panel-info-icon"><i data-lucide="settings"></i></div>
+      <div><div class="panel-info-label">Einstellungen</div></div>
+    </div>
+  </div>
   <div class="panel-spacer"></div>
   <div id="notif-area"></div>
+</div>
+
+<!-- SETTINGS PANEL — slides from left -->
+<div id="settings-panel">
+  <div class="settings-bg"></div>
+  <div class="settings-content">
+    <div class="settings-hdr">
+      <div class="settings-hdr-ico"><i data-lucide="settings"></i></div>
+      <span class="settings-hdr-title">Einstellungen</span>
+      <button class="settings-close" onclick="Overlay.toggleSettings()">&times;</button>
+    </div>
+
+    <div class="settings-body" id="settingsBody">
+      <!-- Fade An/Aus -->
+      <div class="settings-group">
+        <div class="settings-label">Fade-Effekt</div>
+        <div class="settings-toggle-row">
+          <span class="settings-desc">Gradient-Panels anzeigen</span>
+          <label class="settings-switch">
+            <input type="checkbox" id="settFadeEnabled" checked onchange="Overlay.applySetting()">
+            <span class="settings-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Fade Staerke -->
+      <div class="settings-group">
+        <div class="settings-label">Fade-Staerke <span class="settings-val" id="settFadeStrVal">92%</span></div>
+        <input type="range" class="settings-range" id="settFadeStr" min="20" max="100" value="92" oninput="Overlay.applySetting()">
+      </div>
+
+      <!-- Fade Farbe -->
+      <div class="settings-group">
+        <div class="settings-label">Fade-Farbe</div>
+        <div class="settings-colors" id="settColorPicker">
+          <div class="settings-color-opt active" data-color="default" onclick="Overlay.pickColor('default',this)" style="background:linear-gradient(135deg,#0a0a14,#0e1837);"></div>
+          <div class="settings-color-opt" data-color="pure-dark" onclick="Overlay.pickColor('pure-dark',this)" style="background:#0a0a0a;"></div>
+          <div class="settings-color-opt" data-color="navy" onclick="Overlay.pickColor('navy',this)" style="background:linear-gradient(135deg,#0a1628,#162850);"></div>
+          <div class="settings-color-opt" data-color="purple" onclick="Overlay.pickColor('purple',this)" style="background:linear-gradient(135deg,#140a20,#2d1650);"></div>
+          <div class="settings-color-opt" data-color="green" onclick="Overlay.pickColor('green',this)" style="background:linear-gradient(135deg,#0a140e,#0d2818);"></div>
+          <div class="settings-color-opt" data-color="red" onclick="Overlay.pickColor('red',this)" style="background:linear-gradient(135deg,#140a0a,#2d1010);"></div>
+        </div>
+      </div>
+
+      <!-- Grid-Muster -->
+      <div class="settings-group">
+        <div class="settings-toggle-row">
+          <span class="settings-desc">Grid-Muster</span>
+          <label class="settings-switch">
+            <input type="checkbox" id="settGridEnabled" checked onchange="Overlay.applySetting()">
+            <span class="settings-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Shimmer -->
+      <div class="settings-group">
+        <div class="settings-toggle-row">
+          <span class="settings-desc">Shimmer-Animation</span>
+          <label class="settings-switch">
+            <input type="checkbox" id="settShimmerEnabled" checked onchange="Overlay.applySetting()">
+            <span class="settings-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Logo Sichtbarkeit -->
+      <div class="settings-group">
+        <div class="settings-label">Logo-Sichtbarkeit <span class="settings-val" id="settLogoVal">70%</span></div>
+        <input type="range" class="settings-range" id="settLogoOpacity" min="0" max="100" value="70" oninput="Overlay.applySetting()">
+      </div>
+
+      <!-- Watermark -->
+      <div class="settings-group">
+        <div class="settings-label">Watermark-Sichtbarkeit <span class="settings-val" id="settWmVal">4%</span></div>
+        <input type="range" class="settings-range" id="settWmOpacity" min="0" max="20" value="4" oninput="Overlay.applySetting()">
+      </div>
+
+      <!-- Reset -->
+      <div class="settings-group" style="margin-top:12px;">
+        <button class="settings-reset" onclick="Overlay.resetSettings()">Auf Standard zuruecksetzen</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="panel-bottom">
