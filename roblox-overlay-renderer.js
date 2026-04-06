@@ -67,11 +67,21 @@ const Overlay = (() => {
         if (isAdmin) document.body.classList.add('is-admin');
         setGameRunning(true);
 
-        // Click outside Mod Panel → Focus zurück ans Spiel (nur wenn nicht gepinnt)
+        // Click outside Mod Panel
         document.addEventListener('mousedown', (e) => {
-            if (!modSlideOpen || modPinned) return;
+            if (!modSlideOpen) return;
             const panel = document.getElementById('mod-slide');
-            if (panel && !panel.contains(e.target) && !e.target.closest('#mod-trigger')) {
+            const isOutside = panel && !panel.contains(e.target) && !e.target.closest('#mod-trigger');
+            if (!isOutside) return;
+
+            if (modPinned) {
+                // Gepinnt: kurz Focus abgeben damit Klick ans Spiel geht, dann zurückholen
+                requestFocus(false);
+                setTimeout(() => {
+                    if (modPinned && modSlideOpen) requestFocus(true);
+                }, 100);
+            } else {
+                // Nicht gepinnt: Panel schließen
                 toggleModSlide();
             }
         });
@@ -742,9 +752,11 @@ const Overlay = (() => {
         panel.classList.toggle('open', modSlideOpen);
         document.body.classList.toggle('mod-open', modSlideOpen);
 
-        requestFocus(modSlideOpen);
         if (modSlideOpen) {
+            requestFocus(true);
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
+        } else if (!modPinned) {
+            requestFocus(false);
         }
     }
 
@@ -983,6 +995,10 @@ const Overlay = (() => {
         modPinned = !modPinned;
         const btn = document.getElementById('modPinBtn');
         if (btn) btn.classList.toggle('pinned', modPinned);
+        // Wenn gepinnt: Focus bleibt dauerhaft an
+        if (modPinned && modSlideOpen) {
+            requestFocus(true);
+        }
     }
 
     return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility };
