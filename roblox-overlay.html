@@ -267,7 +267,7 @@ html, body {
 #mod-trigger {
   position: fixed;
   bottom: 0;
-  left: 50%; transform: translateX(-50%);
+  right: clamp(120px, 10vw, 200px);
   padding: clamp(14px, 1.4vh, 22px) clamp(28px, 2.5vw, 44px) clamp(10px, 1vh, 16px);
   border-radius: 14px 14px 0 0;
   background: linear-gradient(to top,
@@ -337,7 +337,7 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #mod-slide {
   position: fixed;
   top: 0; right: 0;
-  width: clamp(320px, 24vw, 420px);
+  width: clamp(380px, 30vw, 520px);
   height: 100vh;
   z-index: 300;
   display: flex; flex-direction: column;
@@ -412,6 +412,7 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
   transition: all 0.15s;
 }
 .mod-hdr-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.mod-hdr-btn.pinned { color: var(--accent); background: rgba(0,136,255,0.1); }
 .mod-hdr-btn.close:hover { background: rgba(255,107,107,0.1); color: #FF6B6B; }
 .mod-hdr-btn svg { width: 15px; height: 15px; }
 
@@ -445,7 +446,7 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 .mod-profile-content::-webkit-scrollbar { display: none; }
 
 .mod-avatar-full {
-  width: clamp(140px, 16vh, 220px); height: clamp(180px, 22vh, 300px);
+  width: clamp(180px, 22vh, 300px); height: clamp(220px, 28vh, 380px);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; margin: 8px 0;
   filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
@@ -716,110 +717,181 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 .cmd-esc:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
 
 /* ================================================================
-   INTRO SEQUENCE
+   CINEMATIC INTRO
    ================================================================ */
 #intro-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   z-index: 9999;
   display: none; align-items: center; justify-content: center;
   pointer-events: none;
+  perspective: 1000px;
 }
 #intro-overlay.playing { display: flex; }
+
 .intro-bg {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(ellipse at center,
-    rgba(8, 12, 28, 0.97) 0%,
-    rgba(4, 6, 16, 0.99) 60%,
-    rgba(2, 3, 10, 1) 100%
-  );
+  background: #020308;
   opacity: 1;
-  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Animated particles/stars background */
+.intro-bg::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(1px 1px at 10% 20%, rgba(59,130,246,0.4) 50%, transparent 50%),
+    radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.2) 50%, transparent 50%),
+    radial-gradient(1px 1px at 50% 30%, rgba(59,130,246,0.3) 50%, transparent 50%),
+    radial-gradient(1px 1px at 70% 70%, rgba(255,255,255,0.15) 50%, transparent 50%),
+    radial-gradient(1px 1px at 90% 40%, rgba(59,130,246,0.25) 50%, transparent 50%),
+    radial-gradient(1px 1px at 20% 80%, rgba(255,255,255,0.2) 50%, transparent 50%),
+    radial-gradient(1px 1px at 60% 10%, rgba(59,130,246,0.2) 50%, transparent 50%),
+    radial-gradient(1px 1px at 80% 90%, rgba(255,255,255,0.15) 50%, transparent 50%);
+  animation: intro-stars 4s ease-in-out infinite alternate;
+}
+@keyframes intro-stars {
+  0% { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0.8; transform: scale(1.1); }
+}
+
+/* Cinematic light sweep */
+.intro-bg::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; right: 0; bottom: 0;
+  width: 300%;
+  background: linear-gradient(105deg,
+    transparent 0%, transparent 40%,
+    rgba(0, 136, 255, 0.03) 44%,
+    rgba(255,255,255, 0.04) 46%,
+    rgba(0, 136, 255, 0.03) 48%,
+    transparent 52%, transparent 100%
+  );
+  animation: intro-sweep 3s ease-in-out 0.5s;
+}
+@keyframes intro-sweep {
+  0% { transform: translateX(-30%); }
+  100% { transform: translateX(60%); }
+}
+
 .intro-content {
   position: relative; z-index: 2;
   display: flex; flex-direction: column; align-items: center;
   gap: 0;
 }
 
-/* Title */
+/* Horizontal cinematic bars */
+.intro-bar-top, .intro-bar-bottom {
+  position: absolute; left: 0; right: 0;
+  height: clamp(40px, 6vh, 80px);
+  background: #000;
+  z-index: 3;
+  transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.intro-bar-top { top: 0; }
+.intro-bar-bottom { bottom: 0; }
+#intro-overlay.fade-out .intro-bar-top,
+#intro-overlay.fade-out .intro-bar-bottom { height: 0; }
+
+/* Title — cinematic reveal */
 .intro-text-group {
   text-align: center;
-  opacity: 0; transform: translateY(20px);
-  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0; transform: translateY(30px) scale(0.95);
+  transition: opacity 1s ease, transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.intro-text-group.show { opacity: 1; transform: translateY(0); }
+.intro-text-group.show { opacity: 1; transform: translateY(0) scale(1); }
 
 .intro-title {
-  font-size: clamp(28px, 3.5vw, 52px);
+  font-size: clamp(32px, 4vw, 64px);
   font-weight: 900;
-  letter-spacing: 0.25em;
-  color: #fff;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, #c0c8d8 0%, #ffffff 40%, #6db3f2 70%, #0088FF 100%);
+  background: linear-gradient(135deg, #8a92a8 0%, #ffffff 30%, #6db3f2 60%, #0088FF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-shadow: none;
+  animation: intro-title-glow 2s ease-in-out 1s;
 }
+@keyframes intro-title-glow {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.4); }
+  100% { filter: brightness(1); }
+}
+
 .intro-subtitle {
-  font-size: clamp(12px, 1.2vw, 18px);
-  font-weight: 500;
-  letter-spacing: 0.35em;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: clamp(11px, 1.1vw, 16px);
+  font-weight: 600;
+  letter-spacing: 0.5em;
+  color: rgba(255, 255, 255, 0.25);
   text-transform: uppercase;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
-/* Logo */
+/* Logo — dramatic scale in */
 .intro-logo {
-  opacity: 0; transform: scale(0.85);
-  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  margin: clamp(20px, 3vh, 40px) 0;
+  opacity: 0; transform: scale(0.7) translateZ(-50px);
+  transition: opacity 1s ease, transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin: clamp(24px, 3.5vh, 48px) 0;
 }
-.intro-logo.show { opacity: 1; transform: scale(1); }
+.intro-logo.show { opacity: 1; transform: scale(1) translateZ(0); }
 .intro-logo img {
-  width: clamp(200px, 22vw, 380px);
+  width: clamp(220px, 25vw, 420px);
   height: auto;
-  filter: drop-shadow(0 8px 32px rgba(0, 136, 255, 0.15));
+  filter: drop-shadow(0 0 40px rgba(0, 136, 255, 0.2))
+          drop-shadow(0 12px 32px rgba(0, 0, 0, 0.5));
+  animation: intro-logo-float 3s ease-in-out infinite;
+}
+@keyframes intro-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
-/* Greeting */
+/* Greeting — slide up */
 .intro-greeting {
-  opacity: 0; transform: translateY(12px);
-  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex; align-items: center; gap: 10px;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; align-items: center; gap: 12px;
 }
 .intro-greeting.show { opacity: 1; transform: translateY(0); }
 .intro-hello {
-  font-size: clamp(16px, 1.5vw, 24px);
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: clamp(18px, 1.6vw, 28px);
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.05em;
 }
 .intro-username {
-  font-size: clamp(16px, 1.5vw, 24px);
+  font-size: clamp(18px, 1.6vw, 28px);
   font-weight: 800;
   color: #fff;
+  background: linear-gradient(90deg, #fff 0%, #6db3f2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* Decorative line */
+/* Decorative lines */
 .intro-line {
   position: absolute;
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
   width: 0; height: 1px;
   background: linear-gradient(to right,
-    transparent 0%, rgba(0, 136, 255, 0.3) 30%,
-    rgba(0, 136, 255, 0.5) 50%,
-    rgba(0, 136, 255, 0.3) 70%, transparent 100%
+    transparent 0%, rgba(0, 136, 255, 0.2) 20%,
+    rgba(0, 136, 255, 0.6) 50%,
+    rgba(0, 136, 255, 0.2) 80%, transparent 100%
   );
-  transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1;
 }
-.intro-line.show { width: clamp(300px, 40vw, 600px); }
+.intro-line.show { width: clamp(400px, 50vw, 800px); }
 
-/* Fade out */
+/* Fade out — cinematic */
 #intro-overlay.fade-out .intro-bg { opacity: 0; }
-#intro-overlay.fade-out .intro-content { opacity: 0; transform: scale(1.05); transition: opacity 0.8s ease, transform 0.8s ease; }
-#intro-overlay.fade-out .intro-line { opacity: 0; transition: opacity 0.5s ease; }
+#intro-overlay.fade-out .intro-content {
+  opacity: 0; transform: scale(1.08);
+  transition: opacity 1s ease, transform 1.2s ease;
+}
+#intro-overlay.fade-out .intro-line { opacity: 0; transition: opacity 0.6s ease; }
 #intro-overlay.gone { display: none; }
 
 /* ================================================================
@@ -980,6 +1052,9 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <div class="mod-hdr">
       <div class="mod-hdr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
       <span class="mod-hdr-title">Moderation</span>
+      <button class="mod-hdr-btn" id="modPinBtn" onclick="Overlay.toggleModPin()" title="Panel fixieren">
+        <i data-lucide="pin"></i>
+      </button>
       <button class="mod-hdr-btn close" onclick="Overlay.toggleModSlide()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="mod-search-wrap">
@@ -1044,6 +1119,8 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <!-- ========== INTRO SEQUENCE ========== -->
 <div id="intro-overlay">
   <div class="intro-bg"></div>
+  <div class="intro-bar-top"></div>
+  <div class="intro-bar-bottom"></div>
   <div class="intro-content">
     <div class="intro-text-group" id="introTextGroup">
       <div class="intro-title" id="introTitle">EMDEN NETWORK</div>

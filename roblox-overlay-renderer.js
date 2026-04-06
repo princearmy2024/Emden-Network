@@ -67,9 +67,9 @@ const Overlay = (() => {
         if (isAdmin) document.body.classList.add('is-admin');
         setGameRunning(true);
 
-        // Click outside Mod Panel → Focus zurück ans Spiel
+        // Click outside Mod Panel → Focus zurück ans Spiel (nur wenn nicht gepinnt)
         document.addEventListener('mousedown', (e) => {
-            if (!modSlideOpen) return;
+            if (!modSlideOpen || modPinned) return;
             const panel = document.getElementById('mod-slide');
             if (panel && !panel.contains(e.target) && !e.target.closest('#mod-trigger')) {
                 toggleModSlide();
@@ -725,6 +725,7 @@ const Overlay = (() => {
     const API_URL = 'http://91.98.124.212:5009';
     const API_KEY = 'emden-super-secret-key-2026';
     let modSlideOpen = false;
+    let modPinned = false;
     let modSelectedUser = null;
     let modSelectedAction = null;
     let modSearchTimer = null;
@@ -950,21 +951,21 @@ const Overlay = (() => {
         // Reset
         [line, textGroup, logo, greeting].forEach(el => { if (el) el.classList.remove('show'); });
 
-        // Timeline
-        setTimeout(() => { if (line) line.classList.add('show'); }, 200);
-        setTimeout(() => { if (textGroup) textGroup.classList.add('show'); }, 600);
-        setTimeout(() => { if (logo) logo.classList.add('show'); }, 1400);
-        setTimeout(() => { if (greeting) greeting.classList.add('show'); }, 2200);
+        // Cinematic Timeline — more dramatic
+        setTimeout(() => { if (line) line.classList.add('show'); }, 300);
+        setTimeout(() => { if (textGroup) textGroup.classList.add('show'); }, 800);
+        setTimeout(() => { if (logo) logo.classList.add('show'); }, 2000);
+        setTimeout(() => { if (greeting) greeting.classList.add('show'); }, 3200);
 
         // Fade out
-        setTimeout(() => { intro.classList.add('fade-out'); }, 3800);
+        setTimeout(() => { intro.classList.add('fade-out'); }, 5000);
 
         // Entfernen + Overlay aktivieren
         setTimeout(() => {
             intro.classList.add('gone');
             intro.classList.remove('playing');
             onComplete();
-        }, 5000);
+        }, 6500);
     }
 
     // ─── PANEL PIN/UNPIN ─────────────────────────────────────
@@ -978,7 +979,13 @@ const Overlay = (() => {
         if (btn) btn.classList.toggle('unpinned', !panelPinned);
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility };
+    function toggleModPin() {
+        modPinned = !modPinned;
+        const btn = document.getElementById('modPinBtn');
+        if (btn) btn.classList.toggle('pinned', modPinned);
+    }
+
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());
