@@ -763,8 +763,12 @@ const Overlay = (() => {
         if (modSlideOpen) {
             requestFocus(true);
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
-        } else if (!modPinned) {
+        } else {
+            // IMMER Focus abgeben wenn Panel geschlossen wird
             requestFocus(false);
+            modPinned = false;
+            const btn = document.getElementById('modPinBtn');
+            if (btn) btn.classList.remove('pinned');
         }
     }
 
