@@ -263,40 +263,61 @@ html, body {
 #panel-left.collapsed .panel-pin-wrap,
 #panel-left.collapsed .grid-pattern { opacity: 0; pointer-events: none; }
 
-/* Eintragen Button — eigener Fade von unten nach oben */
+/* Eintragen Button — smooth integriert in Bottom-Fade */
 #mod-trigger {
   position: fixed;
   bottom: 0;
-  right: clamp(140px, 12vw, 220px);
-  padding: clamp(10px, 1vh, 16px) clamp(16px, 1.4vw, 24px) clamp(8px, 0.8vh, 12px);
-  border-radius: 10px 10px 0 0;
+  left: 50%; transform: translateX(-50%);
+  padding: clamp(14px, 1.4vh, 22px) clamp(28px, 2.5vw, 44px) clamp(10px, 1vh, 16px);
+  border-radius: 14px 14px 0 0;
   background: linear-gradient(to top,
-    rgba(6, 8, 18, 0.9) 0%,
-    rgba(10, 18, 40, 0.5) 50%,
+    rgba(6, 8, 18, 0.92) 0%,
+    rgba(8, 14, 32, 0.6) 40%,
+    rgba(12, 20, 45, 0.2) 75%,
     transparent 100%
   );
   border: none;
-  display: none; align-items: center; justify-content: center;
-  gap: 7px;
+  display: none; flex-direction: column; align-items: center;
+  gap: 0;
   cursor: pointer;
-  color: var(--accent);
+  color: rgba(0, 136, 255, 0.7);
   z-index: 200;
   pointer-events: auto;
-  transition: all 0.25s ease;
+  transition: color 0.3s ease;
   font-family: 'Inter', sans-serif;
 }
 #mod-trigger:hover {
-  background: linear-gradient(to top,
-    rgba(6, 12, 30, 0.95) 0%,
-    rgba(10, 24, 55, 0.6) 50%,
+  color: #4da3ff;
+}
+
+/* Hover Line Animation */
+#mod-trigger::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 1px;
+  margin-top: 6px;
+  background: linear-gradient(to right,
+    transparent 0%,
+    rgba(0, 136, 255, 0.5) 30%,
+    rgba(0, 136, 255, 0.8) 50%,
+    rgba(0, 136, 255, 0.5) 70%,
     transparent 100%
   );
-  color: #4da3ff;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#mod-trigger:hover::after {
+  width: 100%;
+}
+
+.mod-trigger-inner {
+  display: flex; align-items: center; gap: 7px;
 }
 #mod-trigger i, #mod-trigger svg { width: clamp(13px, 0.9vw, 16px); height: clamp(13px, 0.9vw, 16px); pointer-events: none; }
 .mod-trigger-text {
-  font-size: clamp(10px, 0.7vw, 12px); font-weight: 700;
-  letter-spacing: 0.04em; pointer-events: none;
+  font-size: clamp(10px, 0.75vw, 13px); font-weight: 700;
+  letter-spacing: 0.06em; pointer-events: none;
+  text-transform: uppercase;
 }
 body.overlay-active.is-admin #mod-trigger { display: flex; }
 
@@ -304,9 +325,10 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #mod-trigger::before {
   content: '';
   position: absolute;
-  top: -8px; left: -8px; right: -8px; bottom: 0;
+  top: -6px; left: -10px; right: -10px; bottom: 0;
   border-radius: 14px 14px 0 0;
   background: rgba(0, 0, 10, 0.01);
+  z-index: -1;
 }
 
 /* ================================================================
@@ -944,8 +966,10 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 
 <!-- MOD TRIGGER BUTTON — "Eintragen" -->
 <div id="mod-trigger" onclick="Overlay.toggleModSlide()">
-  <i data-lucide="clipboard-edit"></i>
-  <span class="mod-trigger-text">Eintragen</span>
+  <div class="mod-trigger-inner">
+    <i data-lucide="clipboard-edit"></i>
+    <span class="mod-trigger-text">Eintragen</span>
+  </div>
 </div>
 
 <!-- MOD SLIDE PANEL -->
