@@ -276,9 +276,6 @@ html, body {
     transparent 100%
   );
   border: none;
-  border-top: 1px solid rgba(0, 136, 255, 0.12);
-  border-left: 1px solid rgba(255,255,255,0.04);
-  border-right: 1px solid rgba(255,255,255,0.04);
   display: none; align-items: center; justify-content: center;
   gap: 7px;
   cursor: pointer;
@@ -294,7 +291,7 @@ html, body {
     rgba(10, 24, 55, 0.6) 50%,
     transparent 100%
   );
-  border-top-color: rgba(0, 136, 255, 0.3);
+  color: #4da3ff;
 }
 #mod-trigger i, #mod-trigger svg { width: clamp(13px, 0.9vw, 16px); height: clamp(13px, 0.9vw, 16px); pointer-events: none; }
 .mod-trigger-text {
@@ -578,8 +575,8 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
    ================================================================ */
 #logo-container {
   position: fixed;
-  bottom: clamp(50px, calc(5.5vh + 12px), 78px);
-  right: clamp(14px, 1.5vw, 28px);
+  bottom: clamp(8px, 1vh, 16px);
+  right: clamp(10px, 1vw, 20px);
   z-index: 55; pointer-events: none; opacity: 0;
   transition: opacity 1.2s ease; overflow: hidden; border-radius: 4px;
 }
@@ -696,6 +693,112 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 }
 .cmd-esc:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
 
+/* ================================================================
+   INTRO SEQUENCE
+   ================================================================ */
+#intro-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.intro-bg {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center,
+    rgba(8, 12, 28, 0.97) 0%,
+    rgba(4, 6, 16, 0.99) 60%,
+    rgba(2, 3, 10, 1) 100%
+  );
+  opacity: 1;
+  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.intro-content {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0;
+}
+
+/* Title */
+.intro-text-group {
+  text-align: center;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-text-group.show { opacity: 1; transform: translateY(0); }
+
+.intro-title {
+  font-size: clamp(28px, 3.5vw, 52px);
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: #fff;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #c0c8d8 0%, #ffffff 40%, #6db3f2 70%, #0088FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.intro-subtitle {
+  font-size: clamp(12px, 1.2vw, 18px);
+  font-weight: 500;
+  letter-spacing: 0.35em;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Logo */
+.intro-logo {
+  opacity: 0; transform: scale(0.85);
+  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  margin: clamp(20px, 3vh, 40px) 0;
+}
+.intro-logo.show { opacity: 1; transform: scale(1); }
+.intro-logo img {
+  width: clamp(200px, 22vw, 380px);
+  height: auto;
+  filter: drop-shadow(0 8px 32px rgba(0, 136, 255, 0.15));
+}
+
+/* Greeting */
+.intro-greeting {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; align-items: center; gap: 10px;
+}
+.intro-greeting.show { opacity: 1; transform: translateY(0); }
+.intro-hello {
+  font-size: clamp(16px, 1.5vw, 24px);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
+}
+.intro-username {
+  font-size: clamp(16px, 1.5vw, 24px);
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Decorative line */
+.intro-line {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0; height: 1px;
+  background: linear-gradient(to right,
+    transparent 0%, rgba(0, 136, 255, 0.3) 30%,
+    rgba(0, 136, 255, 0.5) 50%,
+    rgba(0, 136, 255, 0.3) 70%, transparent 100%
+  );
+  transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1;
+}
+.intro-line.show { width: clamp(300px, 40vw, 600px); }
+
+/* Fade out */
+#intro-overlay.fade-out .intro-bg { opacity: 0; }
+#intro-overlay.fade-out .intro-content { opacity: 0; transform: scale(1.05); transition: opacity 0.8s ease, transform 0.8s ease; }
+#intro-overlay.fade-out .intro-line { opacity: 0; transition: opacity 0.5s ease; }
+#intro-overlay.gone { display: none; }
+
 /* LEGACY — hidden elements for compat */
 #mod-panel, #mod-toggle, #mod-hint { display: none !important; }
 #info-bar { display: none; }
@@ -807,7 +910,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <div class="grid-pattern"></div>
   <div class="bottom-bar-content">
     <div class="bottom-hint"><kbd>F2</kbd> Dashboard <kbd>F3</kbd> Commands <kbd>F4</kbd> Mod <kbd>V</kbd> Talk</div>
-    <div class="bottom-version">Emden Network v4.28.1</div>
+    <div class="bottom-version">Emden Network v4.29.0</div>
   </div>
 </div>
 
@@ -887,6 +990,25 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 
 <!-- LOGO -->
 <div id="logo-container"><img id="logo-img" src="assets/logoEN.png" alt="EN" /></div>
+
+<!-- ========== INTRO SEQUENCE ========== -->
+<div id="intro-overlay">
+  <div class="intro-bg"></div>
+  <div class="intro-content">
+    <div class="intro-text-group" id="introTextGroup">
+      <div class="intro-title" id="introTitle">EMDEN NETWORK</div>
+      <div class="intro-subtitle" id="introSubtitle">Control Center</div>
+    </div>
+    <div class="intro-logo" id="introLogo">
+      <img src="assets/LOGO BIG.png" alt="EN RP II" />
+    </div>
+    <div class="intro-greeting" id="introGreeting">
+      <span class="intro-hello">Hallo</span>
+      <span class="intro-username" id="introUsername"></span>
+    </div>
+  </div>
+  <div class="intro-line" id="introLine"></div>
+</div>
 
 <!-- Hidden compat -->
 <div id="info-bar"></div>

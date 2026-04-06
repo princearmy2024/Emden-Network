@@ -62,14 +62,14 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
-        // Panels sofort sichtbar — NUR für Admins
-        setTimeout(() => {
+        // Intro abspielen, dann Overlay aktivieren
+        playIntro(() => {
             if (isAdmin) {
                 document.body.classList.add('overlay-active');
                 document.body.classList.add('is-admin');
             }
             setGameRunning(true);
-        }, 300);
+        });
 
         // Click outside Mod Panel → Focus zurück ans Spiel
         document.addEventListener('mousedown', (e) => {
@@ -916,6 +916,38 @@ const Overlay = (() => {
     function showModMsg(text, type) {
         const m = document.getElementById('modMsg');
         if (m) { m.textContent = text; m.className = 'mod-msg ' + type; setTimeout(() => { m.textContent = ''; m.className = 'mod-msg'; }, 3000); }
+    }
+
+    // ─── INTRO SEQUENCE ──────────────────────────────────────
+    function playIntro(onComplete) {
+        const intro = document.getElementById('intro-overlay');
+        if (!intro) { onComplete(); return; }
+
+        // Username setzen
+        const usernameEl = document.getElementById('introUsername');
+        if (usernameEl) usernameEl.textContent = voiceUsername || 'User';
+
+        const line = document.getElementById('introLine');
+        const textGroup = document.getElementById('introTextGroup');
+        const logo = document.getElementById('introLogo');
+        const greeting = document.getElementById('introGreeting');
+
+        // Timeline
+        setTimeout(() => { if (line) line.classList.add('show'); }, 200);
+        setTimeout(() => { if (textGroup) textGroup.classList.add('show'); }, 600);
+        setTimeout(() => { if (logo) logo.classList.add('show'); }, 1400);
+        setTimeout(() => { if (greeting) greeting.classList.add('show'); }, 2200);
+
+        // Fade out nach 4s
+        setTimeout(() => {
+            intro.classList.add('fade-out');
+        }, 3800);
+
+        // Komplett entfernen nach 5s
+        setTimeout(() => {
+            intro.classList.add('gone');
+            onComplete();
+        }, 5000);
     }
 
     // ─── PANEL PIN/UNPIN ─────────────────────────────────────
