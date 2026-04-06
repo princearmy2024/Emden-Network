@@ -88,10 +88,15 @@ const Overlay = (() => {
             });
             modSlideEl.addEventListener('mouseleave', () => {
                 if (modSlideOpen && modPinned) {
-                    // Gepinnt: Focus abgeben wenn Maus weg → Spiel spielbar
                     requestFocus(false);
                 }
             });
+            // Scroll im Panel erlauben wenn Focus da ist
+            modSlideEl.addEventListener('wheel', (e) => {
+                if (modSlideOpen) {
+                    e.stopPropagation();
+                }
+            }, { passive: true });
         }
 
         // Mod Trigger Button — Focus anfordern bei Hover (sonst click-through!)
