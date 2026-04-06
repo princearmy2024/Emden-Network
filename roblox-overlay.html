@@ -122,14 +122,7 @@ html, body {
    GLOW LINES
    ================================================================ */
 .glow-line-left {
-  position: fixed; top: 38vh;
-  left: clamp(179px, calc(14vw - 1px), 239px);
-  bottom: clamp(44px, calc(5.5vh + 2px), 66px);
-  width: 1px;
-  background: linear-gradient(to bottom,
-    transparent 0%, rgba(59,130,246,0.06) 25%,
-    rgba(59,130,246,0.1) 50%, rgba(59,130,246,0.06) 75%, transparent 100%);
-  z-index: 52; pointer-events: none; opacity: 0; transition: opacity 1.2s ease;
+  display: none !important;
 }
 .glow-line-bottom {
   position: fixed; bottom: clamp(41px, calc(5.5vh - 1px), 63px);
@@ -271,23 +264,22 @@ html, body {
   padding: clamp(14px, 1.4vh, 22px) clamp(28px, 2.5vw, 44px) clamp(10px, 1vh, 16px);
   border-radius: 14px 14px 0 0;
   background: linear-gradient(to top,
-    rgba(6, 8, 18, 0.92) 0%,
-    rgba(8, 14, 32, 0.6) 40%,
-    rgba(12, 20, 45, 0.2) 75%,
+    rgba(6, 8, 18, 0.5) 0%,
+    rgba(8, 14, 32, 0.2) 50%,
     transparent 100%
   );
   border: none;
   display: none; flex-direction: column; align-items: center;
   gap: 0;
   cursor: pointer;
-  color: rgba(0, 136, 255, 0.7);
+  color: rgba(255, 255, 255, 0.6);
   z-index: 200;
   pointer-events: auto;
   transition: color 0.3s ease;
   font-family: 'Inter', sans-serif;
 }
 #mod-trigger:hover {
-  color: #4da3ff;
+  color: #fff;
 }
 
 /* Hover Line Animation */
@@ -299,9 +291,9 @@ html, body {
   margin-top: 6px;
   background: linear-gradient(to right,
     transparent 0%,
-    rgba(0, 136, 255, 0.5) 30%,
-    rgba(0, 136, 255, 0.8) 50%,
-    rgba(0, 136, 255, 0.5) 70%,
+    rgba(255, 255, 255, 0.2) 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.2) 70%,
     transparent 100%
   );
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
