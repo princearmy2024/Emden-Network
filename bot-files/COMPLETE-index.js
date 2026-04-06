@@ -952,8 +952,25 @@ const apiServer = http.createServer(async (req, res) => {
         const userId = url.searchParams.get("userId");
         if (!userId) { res.writeHead(400); return res.end(JSON.stringify({ error: "userId required" })); }
         const history = getModHistory(userId);
+
+        // Moderator-Avatare aus allKnownUsers holen
+        const enriched = history.map((h, i) => {
+            let modAvatar = null;
+            let modDiscordId = null;
+            if (h.moderator) {
+                for (const [id, u] of allKnownUsers.entries()) {
+                    if (u.username === h.moderator) {
+                        modAvatar = u.avatar || null;
+                        modDiscordId = id;
+                        break;
+                    }
+                }
+            }
+            return { ...h, index: i + 1, modAvatar, modDiscordId };
+        });
+
         res.writeHead(200);
-        return res.end(JSON.stringify({ success: true, userId, count: history.length, entries: history }));
+        return res.end(JSON.stringify({ success: true, userId, count: enriched.length, entries: enriched }));
     }
 
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist

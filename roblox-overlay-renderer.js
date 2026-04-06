@@ -752,6 +752,7 @@ const Overlay = (() => {
     let modSelectedUser = null;
     let modSelectedAction = null;
     let modSearchTimer = null;
+    let modHistoryData = [];
 
     function requestFocus(on) {
         if (window.electronAPI?.overlayRequestFocus) window.electronAPI.overlayRequestFocus(on);
@@ -878,19 +879,23 @@ const Overlay = (() => {
             });
             const histData = await histRes.json();
             if (histData.success && histData.count > 0) {
+                // Speichere History-Daten für Detail-Ansicht
+                modHistoryData = histData.entries;
                 historyTitle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${histData.count} Eintrag${histData.count > 1 ? 'e' : ''}`;
-                historyList.innerHTML = histData.entries.map(h => {
+                historyList.innerHTML = histData.entries.map((h, i) => {
                     const emoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
                     const cls = (h.action || '').toLowerCase();
                     const date = h.date ? new Date(h.date).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
                     const time = h.date ? new Date(h.date).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
-                    return `<div class="mod-history-entry ${cls}">
+                    const modAvHtml = h.modAvatar ? `<div class="mod-history-mod-av"><img src="${h.modAvatar}" /></div>` : `<div class="mod-history-mod-av" style="display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);">${esc((h.moderator||'?')[0].toUpperCase())}</div>`;
+                    return `<div class="mod-history-entry ${cls}" onclick="Overlay.openHistoryDetail(${i})" style="cursor:pointer;">
                         <div class="mod-history-emoji">${emoji}</div>
                         <div class="mod-history-info">
                             <div class="mod-history-action"><span class="tag ${cls}">${esc(h.action || '?')}</span> ${esc(h.displayName || '—')}</div>
                             <div class="mod-history-reason">${esc(h.reason || 'Kein Grund')}</div>
                             <div class="mod-history-meta"><span>${date} ${time}</span><span>von ${esc(h.moderator || '?')}</span></div>
                         </div>
+                        ${modAvHtml}
                     </div>`;
                 }).join('');
                 historyEl.style.display = 'flex';
@@ -933,11 +938,13 @@ const Overlay = (() => {
         document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         const sel = document.getElementById('modSelectedUser');
         if (sel) { sel.classList.remove('show'); sel.innerHTML = ''; }
-        // Profile + History zurücksetzen
+        // Profile + History + Detail zurücksetzen
         document.getElementById('modProfileEmpty').style.display = 'flex';
         document.getElementById('modProfileContent').style.display = 'none';
         document.getElementById('modDiscordInfo').style.display = 'none';
         document.getElementById('modHistory').style.display = 'none';
+        document.getElementById('modDetail').style.display = 'none';
+        modHistoryData = [];
         updateModSendBtn();
     }
 
@@ -1039,6 +1046,80 @@ const Overlay = (() => {
         if (btn) btn.classList.toggle('unpinned', !panelPinned);
     }
 
+    function openHistoryDetail(index) {
+        const h = modHistoryData[index];
+        if (!h) return;
+
+        const detail = document.getElementById('modDetail');
+        const content = document.getElementById('modDetailContent');
+        if (!detail || !content) return;
+
+        const emoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
+        const cls = (h.action || '').toLowerCase();
+        const date = h.date ? new Date(h.date).toLocaleDateString('de-DE', {weekday:'long', day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+        const time = h.date ? new Date(h.date).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+        const userName = modSelectedUser?.displayName || modSelectedUser?.username || '—';
+        const userId = modSelectedUser?.id || '—';
+
+        content.innerHTML = `
+            <div class="detail-card">
+                <div class="detail-header">
+                    <div class="detail-header-emoji">${emoji}</div>
+                    <div class="detail-header-info">
+                        <div class="detail-header-action">${esc(h.action || '?')}</div>
+                        <div class="detail-header-num">Eintrag #${h.index || index + 1}${h.source === 'trident' ? ' · Trident Import' : ''}</div>
+                    </div>
+                    <span class="detail-header-tag ${cls}">${esc(h.action || '?')}</span>
+                </div>
+                <div class="detail-body">
+                    <div class="detail-row">
+                        <span class="detail-label">User</span>
+                        <span class="detail-value">${esc(h.displayName || userName)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">User ID</span>
+                        <span class="detail-value muted" style="font-family:var(--font-mono);font-size:11px;">${esc(String(userId))}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Aktion</span>
+                        <span class="detail-value">${emoji} ${esc(h.action || '—')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Datum</span>
+                        <span class="detail-value">${date}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Uhrzeit</span>
+                        <span class="detail-value">${time}</span>
+                    </div>
+                    <div class="detail-row" style="flex-direction:column;gap:4px;">
+                        <span class="detail-label">Grund</span>
+                        <div class="detail-value reason">${esc(h.reason || 'Kein Grund angegeben')}</div>
+                    </div>
+                </div>
+                <div class="detail-mod">
+                    ${h.modAvatar
+                        ? `<div class="detail-mod-av"><img src="${h.modAvatar}" /></div>`
+                        : `<div class="detail-mod-av" style="display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);">${esc((h.moderator||'?')[0].toUpperCase())}</div>`
+                    }
+                    <div class="detail-mod-info">
+                        <div class="detail-mod-name">${esc(h.moderator || 'Unbekannt')}</div>
+                        <div class="detail-mod-role">Moderator</div>
+                    </div>
+                </div>
+            </div>`;
+
+        // Lucide Icons refreshen
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        detail.style.display = 'flex';
+    }
+
+    function closeHistoryDetail() {
+        const detail = document.getElementById('modDetail');
+        if (detail) detail.style.display = 'none';
+    }
+
     function toggleModPin() {
         modPinned = !modPinned;
         const btn = document.getElementById('modPinBtn');
@@ -1050,7 +1131,7 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility };
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail };
 })();
 
 window.addEventListener('DOMContentLoaded', () => Overlay.init());
