@@ -699,9 +699,10 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 #intro-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   pointer-events: none;
 }
+#intro-overlay.playing { display: flex; }
 .intro-bg {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   background: radial-gradient(ellipse at center,

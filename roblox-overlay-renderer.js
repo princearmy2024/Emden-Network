@@ -62,9 +62,9 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
-        // Start: nur Watermark, kein Overlay, kein Intro
+        // Start: GAR NICHTS — kein Intro, kein Watermark, kein Overlay
+        // Alles erst bei F4
         if (isAdmin) document.body.classList.add('is-admin');
-        document.body.classList.add('watermark-visible');
         setGameRunning(true);
 
         // Click outside Mod Panel → Focus zurück ans Spiel
@@ -938,10 +938,17 @@ const Overlay = (() => {
         const usernameEl = document.getElementById('introUsername');
         if (usernameEl) usernameEl.textContent = voiceUsername || 'User';
 
+        // Intro sichtbar machen
+        intro.classList.remove('gone', 'fade-out');
+        intro.classList.add('playing');
+
         const line = document.getElementById('introLine');
         const textGroup = document.getElementById('introTextGroup');
         const logo = document.getElementById('introLogo');
         const greeting = document.getElementById('introGreeting');
+
+        // Reset
+        [line, textGroup, logo, greeting].forEach(el => { if (el) el.classList.remove('show'); });
 
         // Timeline
         setTimeout(() => { if (line) line.classList.add('show'); }, 200);
@@ -949,14 +956,13 @@ const Overlay = (() => {
         setTimeout(() => { if (logo) logo.classList.add('show'); }, 1400);
         setTimeout(() => { if (greeting) greeting.classList.add('show'); }, 2200);
 
-        // Fade out nach 4s
-        setTimeout(() => {
-            intro.classList.add('fade-out');
-        }, 3800);
+        // Fade out
+        setTimeout(() => { intro.classList.add('fade-out'); }, 3800);
 
-        // Komplett entfernen nach 5s
+        // Entfernen + Overlay aktivieren
         setTimeout(() => {
             intro.classList.add('gone');
+            intro.classList.remove('playing');
             onComplete();
         }, 5000);
     }
