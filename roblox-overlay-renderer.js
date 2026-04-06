@@ -67,24 +67,32 @@ const Overlay = (() => {
         if (isAdmin) document.body.classList.add('is-admin');
         setGameRunning(true);
 
-        // Click outside Mod Panel
+        // Click outside Mod Panel → schließen (wenn nicht gepinnt)
         document.addEventListener('mousedown', (e) => {
             if (!modSlideOpen) return;
             const panel = document.getElementById('mod-slide');
             const isOutside = panel && !panel.contains(e.target) && !e.target.closest('#mod-trigger');
             if (!isOutside) return;
 
-            if (modPinned) {
-                // Gepinnt: kurz Focus abgeben damit Klick ans Spiel geht, dann zurückholen
-                requestFocus(false);
-                setTimeout(() => {
-                    if (modPinned && modSlideOpen) requestFocus(true);
-                }, 100);
-            } else {
-                // Nicht gepinnt: Panel schließen
+            if (!modPinned) {
                 toggleModSlide();
             }
+            // Wenn gepinnt: nichts tun — Hover-System regelt den Focus
         });
+
+        // Hover-System für gepinntes Panel: Focus nur wenn Maus drüber
+        const modSlideEl = document.getElementById('mod-slide');
+        if (modSlideEl) {
+            modSlideEl.addEventListener('mouseenter', () => {
+                if (modSlideOpen) requestFocus(true);
+            });
+            modSlideEl.addEventListener('mouseleave', () => {
+                if (modSlideOpen && modPinned) {
+                    // Gepinnt: Focus abgeben wenn Maus weg → Spiel spielbar
+                    requestFocus(false);
+                }
+            });
+        }
 
         // Mod Trigger Button — Focus anfordern bei Hover (sonst click-through!)
         const modTrigger = document.getElementById('mod-trigger');
@@ -995,9 +1003,10 @@ const Overlay = (() => {
         modPinned = !modPinned;
         const btn = document.getElementById('modPinBtn');
         if (btn) btn.classList.toggle('pinned', modPinned);
-        // Wenn gepinnt: Focus bleibt dauerhaft an
+        // Wenn gerade gepinnt: Focus abgeben damit Spiel sofort spielbar
+        // Focus kommt zurück wenn Maus über Panel hovert
         if (modPinned && modSlideOpen) {
-            requestFocus(true);
+            requestFocus(false);
         }
     }
 
