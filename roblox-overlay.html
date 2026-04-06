@@ -1210,9 +1210,11 @@ body.overlay-active.is-admin #mod-trigger { display: flex; }
 .settings-reset:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
 /* Body classes for settings */
-body.no-fade #panel-left, body.no-fade #panel-bottom,
+body.no-fade #panel-bottom,
 body.no-fade #panel-right, body.no-fade #corner-bl,
 body.no-fade #corner-br { opacity: 0 !important; }
+body.no-fade #panel-left { background: none !important; }
+body.no-fade .glow-line-left, body.no-fade .glow-line-bottom { opacity: 0 !important; }
 body.no-grid .grid-pattern { display: none !important; }
 body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { display: none !important; }
 
