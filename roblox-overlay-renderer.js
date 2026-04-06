@@ -109,6 +109,13 @@ const Overlay = (() => {
             }, { passive: true });
         }
 
+        // Settings Button — Hover Focus
+        const settingsBtn = document.querySelector('.panel-settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('mouseenter', () => requestFocus(true));
+            settingsBtn.addEventListener('mouseleave', () => { if (!settingsOpen && !modSlideOpen) requestFocus(false); });
+        }
+
         // Settings Panel — gleicher Hover-Focus
         const settingsEl = document.getElementById('settings-panel');
         if (settingsEl) {
