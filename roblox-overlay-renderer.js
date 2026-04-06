@@ -62,14 +62,10 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
-        // Intro abspielen, danach NUR Watermark — Overlay erst bei F4
+        // Start: nur Watermark, kein Overlay, kein Intro
         if (isAdmin) document.body.classList.add('is-admin');
-        playIntro(() => {
-            // Nach Intro: Watermark zeigen, Overlay NICHT aktiv
-            document.body.classList.add('watermark-visible');
-            setGameRunning(true);
-            // overlay-active wird NICHT gesetzt — erst bei F4
-        });
+        document.body.classList.add('watermark-visible');
+        setGameRunning(true);
 
         // Click outside Mod Panel → Focus zurück ans Spiel
         document.addEventListener('mousedown', (e) => {
@@ -475,7 +471,8 @@ const Overlay = (() => {
 
     // ─── OVERLAY VISIBILITY ─────────────────────────────────────
     let isGameRunning = false;
-    let overlayHidden = false;
+    let overlayHidden = true;
+    let introPlayed = false;
 
     function toggleOverlayVisibility() {
         const isActive = document.body.classList.contains('overlay-active');
@@ -486,10 +483,20 @@ const Overlay = (() => {
             if (modSlideOpen) toggleModSlide();
             overlayHidden = true;
         } else {
-            // Overlay an → Panels + Logo zeigen, Watermark weg
-            document.body.classList.add('overlay-active');
-            document.body.classList.remove('watermark-visible');
-            overlayHidden = false;
+            // Erstes Mal: Intro abspielen, dann Overlay
+            if (!introPlayed) {
+                introPlayed = true;
+                document.body.classList.remove('watermark-visible');
+                playIntro(() => {
+                    document.body.classList.add('overlay-active');
+                    overlayHidden = false;
+                });
+            } else {
+                // Ab dem 2. Mal: direkt Overlay an
+                document.body.classList.add('overlay-active');
+                document.body.classList.remove('watermark-visible');
+                overlayHidden = false;
+            }
         }
     }
 
