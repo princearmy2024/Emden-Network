@@ -980,6 +980,67 @@ const apiServer = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ success: true, userId, count: enriched.length, entries: enriched }));
     }
 
+    // GET /api/mod-log — Gibt die letzten Moderations-Einträge zurück (alle User)
+    if (req.method === "GET" && url.pathname === "/api/mod-log") {
+        const limit = parseInt(url.searchParams.get("limit")) || 50;
+        const allEntries = [];
+        for (const [userId, entries] of Object.entries(modHistory)) {
+            for (const e of entries) {
+                allEntries.push({ ...e, userId });
+            }
+        }
+        // Nach Datum sortieren (neueste zuerst)
+        allEntries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        const limited = allEntries.slice(0, limit);
+
+        // Moderator-Avatare anreichern
+        const enriched = limited.map(e => {
+            let moderatorAvatar = e.modAvatar || null;
+            if (e.moderator) {
+                for (const [id, u] of allKnownUsers.entries()) {
+                    if (u.username === e.moderator) {
+                        if (!moderatorAvatar) moderatorAvatar = u.avatar || null;
+                        break;
+                    }
+                }
+            }
+            return { ...e, moderatorAvatar };
+        });
+
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, log: enriched }));
+    }
+
+    // GET /api/on-duty — Gibt alle Member mit der On-Duty Rolle zurück
+    if (req.method === "GET" && url.pathname === "/api/on-duty") {
+        try {
+            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const role = guild.roles.cache.get(ON_DUTY_ROLE_ID);
+            if (!role) {
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true, staff: [] }));
+            }
+            await guild.members.fetch().catch(() => {});
+            const staff = role.members.map(m => ({
+                discordId: m.id,
+                username: m.user.username,
+                displayName: m.displayName,
+                avatar: m.user.displayAvatarURL({ size: 128 }),
+                roles: m.roles.cache
+                    .filter(r => r.id !== guild.id)
+                    .sort((a, b) => b.position - a.position)
+                    .map(r => r.name)
+                    .slice(0, 3),
+            }));
+            res.writeHead(200);
+            return res.end(JSON.stringify({ success: true, staff }));
+        } catch (e) {
+            console.error("[API] on-duty error:", e.message);
+            res.writeHead(500);
+            return res.end(JSON.stringify({ success: false, error: "Server error" }));
+        }
+    }
+
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
     if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
         const robloxId = url.searchParams.get("robloxId");

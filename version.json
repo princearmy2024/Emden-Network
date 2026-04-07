@@ -1,6 +1,6 @@
 {
-    "version": "4.34.0",
+    "version": "4.35.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.34.0: Moderation Dashboard — Shift Control, Mod-Form, Log, Active Staff.",
+    "notes": "v4.35.0: Moderation Dashboard — Glassmorphism UI, On-Duty Staff, Mod-Log History.",
     "forceUpdate": true
 }

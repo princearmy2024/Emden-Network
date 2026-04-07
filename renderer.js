@@ -4030,60 +4030,8 @@ Object.assign(App, {
 // MODERATION PANEL
 // =============================================================
 const ModPanel = {
-    _shiftState: 'off',   // off | active | break
-    _shiftStart: null,
-    _shiftTimerInterval: null,
     _selectedUser: null,
     _logData: [],
-
-    // ── Shift Control ──
-    startShift() {
-        if (this._shiftState === 'active') return;
-        this._shiftState = 'active';
-        this._shiftStart = Date.now();
-        this._startTimer();
-        document.getElementById('modStartShift').style.opacity = '0.5';
-        document.getElementById('modStartBreak').style.opacity = '1';
-        App.showNotification('Shift', 'Dein Shift hat begonnen!', 'success');
-    },
-
-    startBreak() {
-        if (this._shiftState !== 'active') return;
-        this._shiftState = 'break';
-        this._stopTimer();
-        document.getElementById('modStartBreak').style.opacity = '0.5';
-        App.showNotification('Shift', 'Pause gestartet.', 'info');
-    },
-
-    endShift() {
-        if (this._shiftState === 'off') return;
-        this._shiftState = 'off';
-        this._shiftStart = null;
-        this._stopTimer();
-        document.getElementById('modShiftTimer').textContent = '00:00:00';
-        document.getElementById('modStartShift').style.opacity = '1';
-        document.getElementById('modStartBreak').style.opacity = '1';
-        App.showNotification('Shift', 'Shift beendet.', 'info');
-    },
-
-    _startTimer() {
-        this._stopTimer();
-        this._shiftTimerInterval = setInterval(() => {
-            if (!this._shiftStart) return;
-            const diff = Date.now() - this._shiftStart;
-            const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
-            const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-            const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-            document.getElementById('modShiftTimer').textContent = `${h}:${m}:${s}`;
-        }, 1000);
-    },
-
-    _stopTimer() {
-        if (this._shiftTimerInterval) {
-            clearInterval(this._shiftTimerInterval);
-            this._shiftTimerInterval = null;
-        }
-    },
 
     // ── User Search (Roblox API) ──
     async searchUser() {
@@ -4244,10 +4192,10 @@ const ModPanel = {
         });
     },
 
-    // ── Load Active Staff ──
+    // ── Load Active Staff (On Duty Role) ──
     async loadStaff() {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mod-staff`, {
+            const res = await fetch(`${CONFIG.API_URL}/api/on-duty`, {
                 headers: { 'x-api-key': CONFIG.API_KEY },
             });
             const data = await res.json();
@@ -4256,6 +4204,8 @@ const ModPanel = {
             }
         } catch (err) {
             console.error('[ModPanel] Staff load error:', err);
+            const list = document.getElementById('modStaffList');
+            if (list) list.innerHTML = '<div class="mod-staff-empty">Konnte nicht geladen werden</div>';
         }
     },
 
@@ -4263,31 +4213,23 @@ const ModPanel = {
         const list = document.getElementById('modStaffList');
         if (!list) return;
         if (!staff.length) {
-            list.innerHTML = '<div class="mod-staff-empty">Keine Moderatoren online</div>';
+            list.innerHTML = '<div class="mod-staff-empty">Keine Moderatoren On Duty</div>';
             return;
         }
         list.innerHTML = staff.map(s => {
-            const avatar = s.avatar
-                ? `<img class="mod-staff-avatar" src="${this._escHtml(s.avatar)}" onerror="this.textContent='${(s.username || '?')[0].toUpperCase()}';">`
-                : `<div class="mod-staff-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text-muted);">${(s.username || '?')[0].toUpperCase()}</div>`;
-            const time = s.shiftStart ? this._durationSince(s.shiftStart) : '';
+            const initial = (s.username || '?')[0].toUpperCase();
+            const avatarInner = s.avatar
+                ? `<img src="${this._escHtml(s.avatar)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center">${initial}</span>`
+                : initial;
+            const topRole = s.roles?.[0] || 'On Duty';
             return `<div class="mod-staff-item">
-                ${avatar}
+                <div class="mod-staff-avatar">${avatarInner}</div>
                 <div class="mod-staff-info">
-                    <span class="mod-staff-name"><span class="mod-staff-dot"></span>${this._escHtml(s.username || '?')}</span>
-                    <span class="mod-staff-role">${this._escHtml(s.dutyType || 'On Duty')}</span>
-                    ${time ? `<span class="mod-staff-time">${time}</span>` : ''}
+                    <span class="mod-staff-name"><span class="mod-staff-dot"></span>${this._escHtml(s.displayName || s.username || '?')}</span>
+                    <span class="mod-staff-role">${this._escHtml(topRole)}</span>
                 </div>
             </div>`;
         }).join('');
-    },
-
-    // ── Toolbox ──
-    gameInfo() {
-        App.showNotification('Toolbox', 'Game Info wird geladen...', 'info');
-    },
-    vehicleCheck() {
-        App.showNotification('Toolbox', 'Vehicle Check wird geladen...', 'info');
     },
 
     // ── Helpers ──
@@ -4309,13 +4251,6 @@ const ModPanel = {
         return days + ' days ago';
     },
 
-    _durationSince(ts) {
-        const diff = Date.now() - new Date(ts).getTime();
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        if (h > 0) return `${h} hour${h > 1 ? 's' : ''}, ${m} minute${m !== 1 ? 's' : ''}`;
-        return `${m} minute${m !== 1 ? 's' : ''}`;
-    },
 };
 
 // Enter-Key in Username-Feld löst Suche aus
