@@ -1213,75 +1213,83 @@ body.no-grid .grid-pattern { display: none !important; }
 body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { display: none !important; }
 
 /* ── Mod Notification (top center, glass) ── */
+/* iOS-style Glass Notification — fade to transparent at bottom */
 .ov-mod-notif {
     position: fixed;
-    top: 24px;
+    top: 16px;
     left: 50%;
-    transform: translateX(-50%) translateY(-100px);
+    transform: translateX(-50%) translateY(-120px);
     z-index: 9999;
-    width: 440px;
-    max-width: 90vw;
-    background: rgba(6,8,20,0.88);
-    backdrop-filter: blur(50px) saturate(1.8);
-    -webkit-backdrop-filter: blur(50px) saturate(1.8);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 80px rgba(0,136,255,0.08);
+    width: 420px;
+    max-width: 88vw;
     opacity: 0;
     pointer-events: none;
 }
 .ov-mod-notif.show {
     opacity: 1;
     pointer-events: auto;
-    animation: ovModNotifIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: ovModNotifIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .ov-mod-notif.hide {
-    animation: ovModNotifOut 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+    animation: ovModNotifOut 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
 }
 @keyframes ovModNotifIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(-50px) scale(0.96); }
+    from { opacity: 0; transform: translateX(-50%) translateY(-60px) scale(0.92); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 @keyframes ovModNotifOut {
     from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-    to   { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.97); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(-50px) scale(0.95); }
 }
+
+/* Main card */
 .ov-mod-notif-inner {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 18px 22px 24px;
+    padding: 16px 20px 28px;
+    background: rgba(12,14,30,0.75);
+    backdrop-filter: blur(60px) saturate(1.8);
+    -webkit-backdrop-filter: blur(60px) saturate(1.8);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    /* Bottom fade — iOS style */
+    mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
 }
 .ov-mod-notif-icon {
-    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
+    color: var(--text-main);
 }
-.ov-mod-notif-icon.warn { background: rgba(0,136,255,0.12); }
-.ov-mod-notif-icon.kick { background: rgba(245,158,11,0.12); }
-.ov-mod-notif-icon.ban  { background: rgba(239,68,68,0.12); }
+.ov-mod-notif-icon.warn { background: rgba(0,136,255,0.15); color: #3b9eff; }
+.ov-mod-notif-icon.kick { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.ov-mod-notif-icon.ban  { background: rgba(239,68,68,0.15); color: #ef4444; }
 .ov-mod-notif-body { flex: 1; min-width: 0; }
 .ov-mod-notif-action {
-    font-size: 18px; font-weight: 800; color: #fff;
-    margin-bottom: 2px;
+    font-size: 15px; font-weight: 800; color: #fff;
+    margin-bottom: 2px; letter-spacing: -0.01em;
 }
 .ov-mod-notif-text {
-    font-size: 12px; color: rgba(255,255,255,0.5);
-    line-height: 1.4;
+    font-size: 12px; color: rgba(255,255,255,0.45);
+    line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ov-mod-notif-badge {
-    padding: 4px 12px; border-radius: 8px; font-size: 10px;
-    font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 8px; font-size: 9px;
+    font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     flex-shrink: 0;
 }
-.ov-mod-notif-badge.warn { background: rgba(0,136,255,0.15); color: #0088FF; }
+.ov-mod-notif-badge.warn { background: rgba(0,136,255,0.15); color: #3b9eff; }
 .ov-mod-notif-badge.kick { background: rgba(245,158,11,0.15); color: #f59e0b; }
 .ov-mod-notif-badge.ban  { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+/* Progress bar — below the card, fades with it */
 .ov-mod-notif-bar {
-    height: 3px;
-    background: linear-gradient(90deg, #0088FF, #00D1A7);
-    width: 100%; transform-origin: left;
+    height: 2px; margin: -6px 24px 0;
+    background: linear-gradient(90deg, rgba(0,136,255,0.5), rgba(0,209,167,0.3));
+    border-radius: 1px;
+    transform-origin: left;
 }
 .ov-mod-notif-bar.animate { animation: ovModNotifBar 6s linear forwards; }
 @keyframes ovModNotifBar {
