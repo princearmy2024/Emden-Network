@@ -1,6 +1,6 @@
 {
-    "version": "4.48.3",
+    "version": "4.48.4",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.3: Teleport — SendInput mit try/catch + SendKeys Fallback, bessere Logs.",
+    "notes": "v4.48.4: App startet als Administrator — SendInput kann jetzt an Roblox senden (UIPI Fix).",
     "forceUpdate": true
 }
