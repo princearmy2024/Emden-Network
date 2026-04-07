@@ -48,6 +48,7 @@ const Overlay = (() => {
         discordId  = p.get('discordId') || '';
         robloxId   = p.get('robloxId')  || '';
         isAdmin    = p.get('admin') === '1';
+        const isStaff = p.get('staff') === '1';
         voiceDiscordId = discordId;
 
         // User-Info aus dem Dashboard localStorage lesen
@@ -64,6 +65,7 @@ const Overlay = (() => {
 
         // Start: GAR NICHTS — kein Intro, kein Watermark, kein Overlay
         if (isAdmin) document.body.classList.add('is-admin');
+        if (isStaff || isAdmin) document.body.classList.add('is-staff');
         setGameRunning(true);
 
         // Gespeicherte Settings laden

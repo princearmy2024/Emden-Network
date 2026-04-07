@@ -417,7 +417,7 @@ ipcMain.on('start-roblox-callback-server', (event, { botCallbackUrl }) => {
 });
 
 // === ROBLOX GAME OVERLAY ===
-function createRobloxOverlay(discordId, robloxId, isAdmin) {
+function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.close();
     }
@@ -444,8 +444,9 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
         robloxOverlayWin.webContents.setAudioMuted(false);
     });
     const adminFlag = isAdmin ? '1' : '0';
+    const staffFlag = isStaff ? '1' : '0';
     robloxOverlayWin.loadFile('roblox-overlay.html', {
-        query: { discordId, robloxId, admin: adminFlag }
+        query: { discordId, robloxId, admin: adminFlag, staff: staffFlag }
     });
     
     robloxOverlayWin.once('ready-to-show', () => {
@@ -566,8 +567,8 @@ const OverlayState = {
 };
 
 // Show/hide Roblox overlay via IPC (called from renderer.js)
-ipcMain.on('show-roblox-overlay', (event, { discordId, robloxId, isAdmin }) => {
-    createRobloxOverlay(discordId, robloxId, isAdmin);
+ipcMain.on('show-roblox-overlay', (event, { discordId, robloxId, isAdmin, isStaff }) => {
+    createRobloxOverlay(discordId, robloxId, isAdmin, isStaff);
     OverlayState.start();
 });
 ipcMain.on('hide-roblox-overlay', () => {

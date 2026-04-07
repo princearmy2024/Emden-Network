@@ -887,10 +887,10 @@ const App = window.App = {
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
-        // Overlay für Admins starten (F4 für Mod-Panel)
-        if (user.role === 'admin' && window.electronAPI?.showRobloxOverlay) {
+        // Overlay für Staff + Admins starten
+        if ((user.role === 'admin' || user.role === 'staff' || user.isStaff) && window.electronAPI?.showRobloxOverlay) {
             const rblxProfile = RobloxService.getProfile();
-            window.electronAPI.showRobloxOverlay(user.discordId, rblxProfile?.userId || '', true);
+            window.electronAPI.showRobloxOverlay(user.discordId, rblxProfile?.userId || '', user.role === 'admin', user.role === 'staff' || user.isStaff);
         }
 
         // Demo: Notifications nach kurzer Zeit
@@ -3285,7 +3285,7 @@ Object.assign(App, {
         // Overlay starten
         const user = AuthService.getUser();
         if (user && window.electronAPI?.showRobloxOverlay) {
-            window.electronAPI.showRobloxOverlay(user.discordId, profile.userId, user.role === 'admin');
+            window.electronAPI.showRobloxOverlay(user.discordId, profile.userId, user.role === 'admin', user.role === 'staff' || user.isStaff);
         }
     },
 

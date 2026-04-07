@@ -59,7 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Startet den lokalen OAuth-Callback-Server
     startRobloxCallbackServer: (botCallbackUrl) => ipcRenderer.send('start-roblox-callback-server', { botCallbackUrl }),
 
-    showRobloxOverlay: (discordId, robloxId, isAdmin) => ipcRenderer.send('show-roblox-overlay', { discordId, robloxId, isAdmin }),
+    showRobloxOverlay: (discordId, robloxId, isAdmin, isStaff) => ipcRenderer.send('show-roblox-overlay', { discordId, robloxId, isAdmin, isStaff }),
     hideRobloxOverlay: () => ipcRenderer.send('hide-roblox-overlay'),
     testRobloxOverlay: () => ipcRenderer.send('test-roblox-overlay'),
 
