@@ -690,7 +690,7 @@ const App = window.App = {
                 this._refreshUserRole().then(() => {
                     const user = AuthService.getUser();
                     if (user?.role === 'staff' || user?.role === 'admin' || user?.isStaff) {
-                        document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
+                        document.querySelectorAll('.staff-only').forEach(el => { el.classList.remove('hidden'); el.style.display = ''; });
                     }
                     if (user?.role === 'admin') {
                         document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
@@ -761,10 +761,13 @@ const App = window.App = {
             else if (data.isStaff) { user.role = 'staff'; user.isStaff = true; }
         } catch(e) { console.log('[App] check-staff fehlgeschlagen:', e.message); }
         console.log(`[App] Rolle nach Check: ${user.role} (war: ${oldRole})`);
-        // IMMER Staff-UI aktualisieren (nicht nur bei Aenderung)
+        // IMMER Staff-UI aktualisieren
         if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
-            document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
-            console.log(`[App] Staff-UI aktiviert (${document.querySelectorAll('.staff-only').length} Elemente)`);
+            document.querySelectorAll('.staff-only').forEach(el => {
+                el.classList.remove('hidden');
+                el.style.display = '';
+                console.log(`[App] Staff sichtbar:`, el.tagName, el.dataset?.view || el.id);
+            });
         }
         if (user.role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
@@ -926,7 +929,7 @@ const App = window.App = {
         }
         // Staff-Elemente (EN Team Rolle + Admins)
         if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
-            document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
+            document.querySelectorAll('.staff-only').forEach(el => { el.classList.remove('hidden'); el.style.display = ''; });
         }
     },
 
@@ -1950,7 +1953,7 @@ const App = window.App = {
         await sleep(600);
         // Admin + Staff Elemente zurücksetzen
         document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.staff-only').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.staff-only').forEach(el => { el.classList.add('hidden'); el.style.display = 'none'; });
         this.showScreen('loginScreen');
     },
 
