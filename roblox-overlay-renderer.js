@@ -118,6 +118,13 @@ const Overlay = (() => {
             shiftSection.addEventListener('mouseleave', () => { if (!settingsOpen && !modSlideOpen) requestFocus(false); });
         }
 
+        // Panic Button — Hover Focus
+        const panicBtn = document.getElementById('panicBtn');
+        if (panicBtn) {
+            panicBtn.addEventListener('mouseenter', () => requestFocus(true));
+            panicBtn.addEventListener('mouseleave', () => { if (!settingsOpen && !modSlideOpen) requestFocus(false); });
+        }
+
         // Settings Button — Hover Focus
         const settingsBtn = document.querySelector('.panel-settings-btn');
         if (settingsBtn) {
