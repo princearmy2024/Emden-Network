@@ -1401,14 +1401,26 @@ const PanicSystem = {
 
     teleport() {
         if (!this._targetUsername) return;
-        console.log(`[PANIC] Teleportiere zu: ${this._targetUsername}`);
+        const target = this._targetUsername;
+        console.log(`[PANIC] Teleportiere zu: ${target}`);
 
-        // IPC: Main Process simuliert Tastatureingabe
-        if (window.electronAPI?.robloxTeleport) {
-            window.electronAPI.robloxTeleport(this._targetUsername);
-        }
+        // ERST Focus-Loop + Timer stoppen, damit Roblox Focus behalten kann
+        if (this._focusInterval) { clearInterval(this._focusInterval); this._focusInterval = null; }
+        if (this._autoCloseTimer) { clearInterval(this._autoCloseTimer); this._autoCloseTimer = null; }
 
-        this.dismiss();
+        // Alert sofort schliessen + Focus abgeben
+        const el = document.getElementById('panicAlert');
+        if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+        this._targetUsername = null;
+        const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
+        if (reqFocus) reqFocus(false);
+
+        // Kurz warten damit Roblox Focus hat, dann Teleport senden
+        setTimeout(() => {
+            if (window.electronAPI?.robloxTeleport) {
+                window.electronAPI.robloxTeleport(target);
+            }
+        }, 300);
     },
 
     dismiss() {
