@@ -1306,32 +1306,32 @@ const PanicSystem = {
     _targetUsername: null,
 
     trigger() {
-        // Eigenen Panic Button drücken
         const session = JSON.parse(localStorage.getItem('en_session') || 'null');
         const user = session?.user;
-        if (!user?.discordId) return;
+        if (!user?.discordId) { console.log('[PANIC] Kein User eingeloggt'); return; }
 
-        // Roblox Username aus dem Profil holen
+        // Roblox Username holen (verschiedene Keys probieren)
         let robloxUsername = '';
         try {
-            const rblx = JSON.parse(localStorage.getItem('en_roblox_profile') || 'null');
+            const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
             robloxUsername = rblx?.username || rblx?.displayName || '';
         } catch(e) {}
+        if (!robloxUsername) robloxUsername = user.username || '?';
 
-        const p = new URLSearchParams(window.location.search);
-        const robloxId = p.get('robloxId') || '';
-
-        // Socket emit
         const socket = window._overlaySocket;
+        console.log(`[PANIC] Button gedrückt! Socket connected: ${!!socket?.connected}, User: ${user.username}, Roblox: ${robloxUsername}`);
+
         if (socket?.connected) {
             socket.emit('panic_button', {
                 discordId: user.discordId,
                 username: user.username || 'Unbekannt',
-                robloxUsername: robloxUsername || user.username || '?',
+                robloxUsername: robloxUsername,
                 avatar: user.avatar || '',
             });
+            console.log('[PANIC] Socket emit gesendet');
+        } else {
+            console.log('[PANIC] Socket NICHT verbunden!');
         }
-        console.log(`[PANIC] Panic Button gedrückt! Roblox: ${robloxUsername}`);
     },
 
     showAlert(data) {
