@@ -1216,7 +1216,7 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 /* iOS-style Glass Notification — fade to transparent at bottom */
 .ov-mod-notif {
     position: fixed;
-    top: 16px;
+    top: 40px;
     left: 50%;
     transform: translateX(-50%) translateY(-120px);
     z-index: 9999;
@@ -1254,9 +1254,9 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 20px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
-    /* Bottom fade — iOS style */
-    mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+    /* Top fade — transparent oben, sichtbar unten */
+    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%, black 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%, black 100%);
 }
 .ov-mod-notif-icon {
     width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
