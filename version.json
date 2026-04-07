@@ -1,6 +1,6 @@
 {
-    "version": "4.48.2",
+    "version": "4.48.3",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.2: Fix Teleport IPC — Debug Logs ob electronAPI.robloxTeleport existiert, Guard gegen Mehrfach-Klick.",
+    "notes": "v4.48.3: Teleport — SendInput mit try/catch + SendKeys Fallback, bessere Logs.",
     "forceUpdate": true
 }
