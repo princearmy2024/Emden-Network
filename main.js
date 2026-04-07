@@ -106,49 +106,36 @@ ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
         robloxOverlayWin.blur();
     }
 
-    // VBScript — WshShell.SendKeys + WMI fuer Roblox PID
-    const safeUsername = robloxUsername.replace(/"/g, '""');
-    const vbsContent = [
-        'Set WshShell = CreateObject("WScript.Shell")',
-        'Set objWMI = GetObject("winmgmts:\\\\.\\root\\cimv2")',
+    // Hybrid: PowerShell AppActivate (funktioniert!) + WScript.Shell SendKeys (funktioniert!)
+    const safeUsername = robloxUsername.replace(/'/g, "''");
+    const lines = [
+        'Add-Type -AssemblyName Microsoft.VisualBasic',
         '',
-        'Function FindRobloxPID()',
-        '    FindRobloxPID = 0',
-        '    Set colProcs = objWMI.ExecQuery("Select ProcessId from Win32_Process Where Name = \'RobloxPlayerBeta.exe\'")',
-        '    For Each proc In colProcs',
-        '        FindRobloxPID = proc.ProcessId',
-        '        Exit For',
-        '    Next',
-        '    If FindRobloxPID = 0 Then',
-        '        Set colProcs = objWMI.ExecQuery("Select ProcessId from Win32_Process Where Name = \'RobloxPlayer.exe\'")',
-        '        For Each proc In colProcs',
-        '            FindRobloxPID = proc.ProcessId',
-        '            Exit For',
-        '        Next',
-        '    End If',
-        'End Function',
+        '# Roblox finden',
+        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
+        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
+        'if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }',
+        'Write-Host "Roblox PID: $($roblox.Id)"',
         '',
-        'pid = FindRobloxPID()',
-        'If pid = 0 Then',
-        '    WScript.Echo "FEHLER: Roblox nicht gefunden"',
-        '    WScript.Quit 1',
-        'End If',
+        '# PowerShell AppActivate — bringt Roblox in den Vordergrund',
+        '[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)',
+        'Start-Sleep -Milliseconds 800',
         '',
-        'WScript.Echo "Roblox PID: " & pid',
-        'WshShell.AppActivate pid',
-        'WScript.Sleep 800',
-        'WshShell.SendKeys "-"',
-        'WScript.Sleep 500',
-        'WshShell.SendKeys "/tp ' + safeUsername + '"',
-        'WScript.Sleep 200',
-        'WshShell.SendKeys "{ENTER}"',
-        'WScript.Echo "OK: -/tp ' + safeUsername + '"',
-    ].join('\r\n');
+        '# WScript.Shell COM-Objekt fuer SendKeys (zuverlaessiger als System.Windows.Forms)',
+        '$wsh = New-Object -ComObject WScript.Shell',
+        '$wsh.SendKeys("-")',
+        'Start-Sleep -Milliseconds 500',
+        '$wsh.SendKeys("/tp ' + safeUsername + '")',
+        'Start-Sleep -Milliseconds 200',
+        '$wsh.SendKeys("{ENTER}")',
+        'Write-Host "OK: -/tp ' + safeUsername + '"',
+    ];
+    const psContent = lines.join('\r\n');
 
-    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.vbs`);
-    fs.writeFileSync(tmpFile, vbsContent, 'utf-8');
+    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
+    fs.writeFileSync(tmpFile, psContent, 'utf-8');
 
-    exec(`cscript //nologo "${tmpFile}"`, { timeout: 10000 }, (err, stdout, stderr) => {
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`, { timeout: 10000 }, (err, stdout, stderr) => {
         if (stdout.trim()) console.log(`[Teleport] stdout: ${stdout.trim()}`);
         if (err) console.error('[Teleport] Fehler:', err.message, stderr);
         else console.log(`[Teleport] -/tp ${robloxUsername} gesendet!`);

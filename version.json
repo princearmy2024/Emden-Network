@@ -1,6 +1,6 @@
 {
-    "version": "4.48.6",
+    "version": "4.48.7",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.6: Fix Teleport — VBScript mit WMI PID-Suche, Roblox Username von API statt Discord-Name.",
+    "notes": "v4.48.7: Teleport Hybrid — PowerShell AppActivate + WScript.Shell SendKeys.",
     "forceUpdate": true
 }
