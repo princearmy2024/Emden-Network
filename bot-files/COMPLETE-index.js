@@ -1291,6 +1291,25 @@ const apiServer = http.createServer(async (req, res) => {
         }); return;
     }
 
+    // POST /api/check-staff — Prüft ob ein User Staff (EN Team) oder Admin ist
+    if (req.method === "POST" && url.pathname === "/api/check-staff") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
+            try {
+                const { discordId } = JSON.parse(body || "{}");
+                const EN_TEAM_ROLE_ID = "1365083291044282389";
+                let isStaff = false, isAdmin = false;
+                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+                const member = await guild.members.fetch(discordId).catch(() => null);
+                if (member) {
+                    isAdmin = member.permissions.has("Administrator") || member.roles.cache.some(r => r.name.toLowerCase().includes("admin"));
+                    isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID) || isAdmin;
+                }
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true, isStaff, isAdmin }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
     if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
         const robloxId = url.searchParams.get("robloxId");

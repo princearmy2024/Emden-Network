@@ -685,6 +685,8 @@ const App = window.App = {
             this.initLoginHandlers();
 
             if (AuthService.loadSession() && AuthService.isLoggedIn()) {
+                // Auto-Rollen-Check: Staff/Admin Status vom Server aktualisieren
+                this._refreshUserRole();
                 this.showDashboard(AuthService.getUser());
                 this.renderActiveVoiceCard();
                 this.syncSoundUI();
@@ -734,6 +736,47 @@ const App = window.App = {
     },
 
     // --- LOGIN ---
+    async _refreshUserRole() {
+        const user = AuthService.getUser();
+        if (!user?.discordId) return;
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/check-lead`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: user.discordId }),
+            });
+            const data = await res.json();
+            // Update role in session if changed
+            const oldRole = user.role;
+            if (data.isLead && oldRole !== 'admin') {
+                user.role = user.role === 'admin' ? 'admin' : 'staff';
+                user.isStaff = true;
+            }
+            // Also check staff via allKnownUsers on server
+            const statusRes = await fetch(`${CONFIG.API_URL}/api/check-staff`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: user.discordId }),
+            }).catch(() => null);
+            if (statusRes) {
+                const staffData = await statusRes.json().catch(() => ({}));
+                if (staffData.isStaff && user.role === 'user') {
+                    user.role = 'staff';
+                    user.isStaff = true;
+                }
+                if (staffData.isAdmin) user.role = 'admin';
+            }
+            if (user.role !== oldRole) {
+                AuthService.saveSession();
+                if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
+                    document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
+                }
+                if (user.role === 'admin') {
+                    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                }
+                console.log(`[App] Rolle aktualisiert: ${oldRole} -> ${user.role}`);
+            }
+        } catch(e) {}
+    },
+
     initLoginHandlers() {
         const btnVerify = document.getElementById('btnVerify');
         const btnDiscord = document.getElementById('btnDiscord');

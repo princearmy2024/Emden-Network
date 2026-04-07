@@ -536,14 +536,12 @@ const Overlay = (() => {
             if (modSlideOpen) toggleModSlide();
             overlayHidden = true;
         } else {
-            // F4 Sound abspielen
-            try {
-                const snd = document.getElementById('ovStartSound');
-                if (snd) { snd.currentTime = 0; snd.volume = 0.4; snd.play().catch(() => {}); }
-                else if (window.electronAPI?.playNotificationSound) window.electronAPI.playNotificationSound();
-            } catch(e) {}
-
             if (!introPlayed) {
+                // Startsound nur beim ersten Mal (mit Intro zusammen)
+                try {
+                    const snd = document.getElementById('ovStartSound');
+                    if (snd) { snd.currentTime = 0; snd.volume = 0.4; snd.play().catch(() => {}); }
+                } catch(e) {}
                 introPlayed = true;
                 document.body.classList.remove('watermark-visible');
                 playIntro(() => {
