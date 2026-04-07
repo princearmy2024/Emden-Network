@@ -1,6 +1,6 @@
 {
-    "version": "4.40.0",
+    "version": "4.41.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.40.0: Moderation nur für EN Team sichtbar, Staff-Rollen-System.",
+    "notes": "v4.41.0: Auto Staff-Rolle, On-Duty Rolle bei Start/End, Shift-System, Rangliste, iOS Notification, F4 Sound, Break-Tracking, Lead Zeit-Modal.",
     "forceUpdate": true
 }
