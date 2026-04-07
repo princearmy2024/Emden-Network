@@ -108,35 +108,85 @@ ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
         robloxOverlayWin.blur();
     }
 
-    // PowerShell-Script als temp-Datei schreiben (vermeidet Escaping-Probleme)
+    // SendInput (Hardware-Level) — Roblox blockiert SendKeys (Software-Level)
+    // Script wird als .ps1 Datei geschrieben um Escaping-Chaos zu vermeiden
     const safeUsername = robloxUsername.replace(/'/g, "''");
-    const psContent = `
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName Microsoft.VisualBasic
-
-# Roblox finden
-$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }
-if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }
-
-Write-Host "Roblox PID: $($roblox.Id)"
-
-# Roblox in den Vordergrund
-[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)
-Start-Sleep -Milliseconds 600
-
-# Chat oeffnen mit /
-[System.Windows.Forms.SendKeys]::SendWait("/")
-Start-Sleep -Milliseconds 400
-
-# Command tippen: tp username (ohne / weil / schon den Chat oeffnet)
-[System.Windows.Forms.SendKeys]::SendWait("tp ${safeUsername}")
-Start-Sleep -Milliseconds 200
-
-# Enter
-[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-Write-Host "OK: /tp ${safeUsername} gesendet"
-`;
+    const lines = [
+        'Add-Type -AssemblyName Microsoft.VisualBasic',
+        '',
+        'Add-Type @"',
+        'using System;',
+        'using System.Runtime.InteropServices;',
+        'using System.Threading;',
+        '',
+        'public class HWInput {',
+        '    [StructLayout(LayoutKind.Sequential)]',
+        '    public struct INPUT { public uint type; public INPUTUNION u; }',
+        '',
+        '    [StructLayout(LayoutKind.Explicit)]',
+        '    public struct INPUTUNION { [FieldOffset(0)] public KEYBDINPUT ki; }',
+        '',
+        '    [StructLayout(LayoutKind.Sequential)]',
+        '    public struct KEYBDINPUT {',
+        '        public ushort wVk; public ushort wScan; public uint dwFlags;',
+        '        public uint time; public IntPtr dwExtraInfo;',
+        '    }',
+        '',
+        '    const uint INPUT_KEYBOARD = 1;',
+        '    const uint KEYEVENTF_SCANCODE = 0x0008;',
+        '    const uint KEYEVENTF_KEYUP = 0x0002;',
+        '    const uint KEYEVENTF_UNICODE = 0x0004;',
+        '',
+        '    [DllImport("user32.dll", SetLastError = true)]',
+        '    static extern uint SendInput(uint n, INPUT[] inputs, int size);',
+        '',
+        '    [DllImport("user32.dll")]',
+        '    static extern uint MapVirtualKey(uint code, uint mapType);',
+        '',
+        '    public static void PressKey(ushort vk) {',
+        '        ushort scan = (ushort)MapVirtualKey(vk, 0);',
+        '        INPUT[] inp = new INPUT[2];',
+        '        inp[0].type = INPUT_KEYBOARD; inp[0].u.ki.wVk = vk; inp[0].u.ki.wScan = scan; inp[0].u.ki.dwFlags = KEYEVENTF_SCANCODE;',
+        '        inp[1].type = INPUT_KEYBOARD; inp[1].u.ki.wVk = vk; inp[1].u.ki.wScan = scan; inp[1].u.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;',
+        '        SendInput(2, inp, Marshal.SizeOf(typeof(INPUT)));',
+        '    }',
+        '',
+        '    public static void TypeUnicode(string text) {',
+        '        foreach (char c in text) {',
+        '            INPUT[] inp = new INPUT[2];',
+        '            inp[0].type = INPUT_KEYBOARD; inp[0].u.ki.wScan = (ushort)c; inp[0].u.ki.dwFlags = KEYEVENTF_UNICODE;',
+        '            inp[1].type = INPUT_KEYBOARD; inp[1].u.ki.wScan = (ushort)c; inp[1].u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;',
+        '            SendInput(2, inp, Marshal.SizeOf(typeof(INPUT)));',
+        '            Thread.Sleep(15);',
+        '        }',
+        '    }',
+        '}',
+        '"@',
+        '',
+        '# Roblox finden',
+        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
+        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
+        'if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }',
+        '',
+        'Write-Host "Roblox PID: $($roblox.Id)"',
+        '',
+        '# Roblox in den Vordergrund',
+        '[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)',
+        'Start-Sleep -Milliseconds 800',
+        '',
+        '# Chat oeffnen mit - (Minus)',
+        '[HWInput]::TypeUnicode("-")',
+        'Start-Sleep -Milliseconds 500',
+        '',
+        '# Command tippen: /tp username',
+        '[HWInput]::TypeUnicode("/tp ' + safeUsername + '")',
+        'Start-Sleep -Milliseconds 200',
+        '',
+        '# Enter',
+        '[HWInput]::PressKey(0x0D)',
+        'Write-Host "OK: /tp ' + safeUsername + ' gesendet"',
+    ];
+    const psContent = lines.join('\r\n');
 
     const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
     fs.writeFileSync(tmpFile, psContent, 'utf-8');

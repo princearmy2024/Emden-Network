@@ -1,6 +1,6 @@
 {
-    "version": "4.48.0",
+    "version": "4.48.1",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.0: Fix Teleport — PS1 temp file + AppActivate + / oeffnet Roblox Chat direkt.",
+    "notes": "v4.48.1: Teleport mit SendInput (Hardware-Level) — Roblox Anti-Cheat kompatibel. Minus oeffnet Chat, dann /tp username.",
     "forceUpdate": true
 }
