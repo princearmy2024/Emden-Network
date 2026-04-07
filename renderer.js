@@ -238,6 +238,12 @@ const WebSocketService = {
                 showModNotifBanner(entry);
             });
 
+            // Panic Alert im Dashboard
+            this.socket.on('panic_alert', (data) => {
+                if (!window.App) return;
+                App.showNotification('PANIC', `${data.robloxUsername || data.username} braucht Hilfe!`, 'error');
+            });
+
             // Live Shift-Updates
             this.socket.on('shift_update', (data) => {
                 if (window.ModPanel && App.currentView === 'moderation') {

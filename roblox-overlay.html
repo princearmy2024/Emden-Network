@@ -1298,6 +1298,114 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
     to   { transform: scaleX(0); }
 }
 
+/* ── Panic Button ── */
+.panic-btn {
+    width: 100%;
+    padding: 8px 0;
+    border-radius: 10px;
+    border: 1px solid rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.1);
+    color: #ef4444;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+.panic-btn:hover {
+    background: rgba(239,68,68,0.25);
+    border-color: rgba(239,68,68,0.5);
+    box-shadow: 0 0 20px rgba(239,68,68,0.2);
+}
+#panelPanic { pointer-events: none; }
+body.overlay-active #panelPanic { pointer-events: auto; }
+
+/* ── Panic Alert Overlay ── */
+.panic-alert {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.panic-alert.active { display: flex; }
+.panic-alert-bg {
+    position: absolute; inset: 0;
+    background: rgba(180,20,20,0.15);
+    backdrop-filter: blur(8px);
+    animation: panicPulse 1.5s ease-in-out infinite;
+}
+@keyframes panicPulse {
+    0%, 100% { background: rgba(180,20,20,0.12); }
+    50% { background: rgba(220,30,30,0.25); }
+}
+.panic-alert-content {
+    position: relative; z-index: 2;
+    background: rgba(10,10,18,0.95);
+    backdrop-filter: blur(40px);
+    border: 2px solid rgba(239,68,68,0.4);
+    border-radius: 24px;
+    padding: 40px 56px;
+    text-align: center;
+    max-width: 440px;
+    box-shadow: 0 0 80px rgba(239,68,68,0.15), 0 24px 64px rgba(0,0,0,0.6);
+    animation: panicCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes panicCardIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.panic-alert-icon {
+    color: #ef4444;
+    margin-bottom: 16px;
+    animation: panicIconPulse 1s ease-in-out infinite;
+}
+@keyframes panicIconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+.panic-alert-title {
+    font-size: 28px; font-weight: 900; color: #ef4444;
+    letter-spacing: 0.15em; margin-bottom: 8px;
+}
+.panic-alert-user {
+    font-size: 20px; font-weight: 800; color: #fff;
+    margin-bottom: 4px;
+}
+.panic-alert-sub {
+    font-size: 13px; color: rgba(255,255,255,0.45);
+    margin-bottom: 28px;
+}
+.panic-alert-buttons {
+    display: flex; flex-direction: column; gap: 10px;
+}
+.panic-alert-btn {
+    width: 100%; padding: 14px; border-radius: 14px;
+    font-size: 14px; font-weight: 700; border: none;
+    cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 10px;
+    transition: all 0.2s; pointer-events: auto;
+}
+.panic-alert-btn:hover { transform: translateY(-2px); }
+.panic-tp {
+    background: linear-gradient(135deg, #0070d4, #0090ff);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(0,136,255,0.3);
+}
+.panic-tp:hover { box-shadow: 0 8px 32px rgba(0,136,255,0.4); }
+.panic-dismiss {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.panic-dismiss:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
 /* ── Overlay Shift Buttons ── */
 .ov-shift-btn {
   flex: 1; padding: 6px 0; border-radius: 6px; border: none;
@@ -1460,6 +1568,13 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
       <div class="panel-info-icon"><i data-lucide="settings"></i></div>
       <div><div class="panel-info-label">Einstellungen</div></div>
     </div>
+  </div>
+  <!-- Panic Button -->
+  <div class="panel-section" id="panelPanic">
+    <button class="panic-btn" id="panicBtn" onclick="PanicSystem.trigger()" style="pointer-events:auto;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      PANIC
+    </button>
   </div>
   <div class="panel-spacer"></div>
   <div id="notif-area"></div>
@@ -1697,6 +1812,28 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 </div>
 <audio id="ovModNotifSound" preload="auto" src="notif.mp3"></audio>
 <audio id="ovStartSound" preload="auto" src="startsound.mp3"></audio>
+
+<!-- PANIC ALERT OVERLAY -->
+<div id="panicAlert" class="panic-alert">
+    <div class="panic-alert-bg"></div>
+    <div class="panic-alert-content">
+        <div class="panic-alert-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="panic-alert-title">PANIC ALERT</div>
+        <div class="panic-alert-user" id="panicAlertUser">—</div>
+        <div class="panic-alert-sub">braucht sofort Hilfe!</div>
+        <div class="panic-alert-buttons">
+            <button class="panic-alert-btn panic-tp" onclick="PanicSystem.teleport()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 3L3 10.5l7.5 3 3 7.5z"/></svg>
+                Teleportieren
+            </button>
+            <button class="panic-alert-btn panic-dismiss" onclick="PanicSystem.dismiss()">
+                Wegmachen
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- BIG ANNOUNCEMENT -->
 <div id="big-ann">

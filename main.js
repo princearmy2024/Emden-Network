@@ -94,6 +94,36 @@ function createWindow() {
 
 // === IPC HANDLER (Hauptprozess-Seite) ===
 
+// Roblox Chat Teleport: Simuliert Tasteneingabe im Spiel
+ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
+    if (!robloxUsername) return;
+    // PowerShell: Simuliert Tastatureingabe für Roblox Chat
+    // 1. Drückt "-" (öffnet Chat in Roblox)
+    // 2. Wartet kurz
+    // 3. Tippt "/tp username"
+    // 4. Drückt Enter
+    const cmd = `/tp ${robloxUsername}`;
+    const psScript = `
+        Add-Type -AssemblyName System.Windows.Forms
+        Start-Sleep -Milliseconds 200
+        [System.Windows.Forms.SendKeys]::SendWait('-')
+        Start-Sleep -Milliseconds 400
+        [System.Windows.Forms.SendKeys]::SendWait('${cmd.replace(/'/g, "''")}')
+        Start-Sleep -Milliseconds 100
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    `.trim();
+    const { exec } = require('child_process');
+    // Overlay kurz verstecken damit Roblox Focus bekommt
+    if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+        robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
+        robloxOverlayWin.blur();
+    }
+    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, '; ')}"`, (err) => {
+        if (err) console.error('[Teleport] Fehler:', err.message);
+        else console.log(`[Teleport] /tp ${robloxUsername} gesendet`);
+    });
+});
+
 // Sound abspielen (delegiert an Main Window weil Overlay keinen Audio-Focus hat)
 ipcMain.on('play-notification-sound', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {

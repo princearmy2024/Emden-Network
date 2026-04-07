@@ -1434,6 +1434,18 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Panic Button: Broadcast an alle
+    socket.on("panic_button", (data) => {
+        console.log(`[PANIC] ${data.username} (${data.robloxUsername}) hat Panic Button gedrückt!`);
+        io.emit("panic_alert", {
+            discordId: data.discordId,
+            username: data.username,
+            robloxUsername: data.robloxUsername,
+            avatar: data.avatar,
+            timestamp: Date.now(),
+        });
+    });
+
     // Chat: User registriert sich mit discordId für PNs
     socket.on("chat_register", ({ discordId, username }) => {
         socket.chatUserId = discordId;

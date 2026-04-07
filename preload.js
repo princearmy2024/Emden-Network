@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Notification Sound (delegiert an Main Window)
     playNotificationSound: () => ipcRenderer.send('play-notification-sound'),
 
+    // Roblox Teleport (simuliert Chat-Eingabe)
+    robloxTeleport: (robloxUsername) => ipcRenderer.send('roblox-teleport', { robloxUsername }),
+
     // Mod-Button erstellen (für Admins)
     createModButton: () => ipcRenderer.send('create-mod-button'),
     toggleModPanel: () => ipcRenderer.send('toggle-mod-panel'),

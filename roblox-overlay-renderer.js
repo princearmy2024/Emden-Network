@@ -714,6 +714,7 @@ const Overlay = (() => {
             reconnectionAttempts: 10,
             reconnectionDelay: 3000,
         });
+        window._overlaySocket = socket; // Expose for PanicSystem
 
         socket.on('connect', () => {
             console.log('[Overlay] Socket verbunden');
@@ -740,6 +741,12 @@ const Overlay = (() => {
         // Mod-Eintrag: Custom Notification (top, glass, sound)
         socket.on('mod_new_entry', (entry) => {
             showOverlayModNotif(entry);
+        });
+
+        // Panic Alert empfangen
+        socket.on('panic_alert', (data) => {
+            console.log('[PANIC] Alert empfangen:', data.username, data.robloxUsername);
+            PanicSystem.showAlert(data);
         });
 
         if (window.electronAPI) {
@@ -1284,6 +1291,89 @@ const Overlay = (() => {
 
     return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings };
 })();
+
+// ══════════════════════════════════════════════
+// PANIC BUTTON SYSTEM
+// ══════════════════════════════════════════════
+const PanicSystem = {
+    _targetUsername: null,
+
+    trigger() {
+        // Eigenen Panic Button drücken
+        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+        const user = session?.user;
+        if (!user?.discordId) return;
+
+        // Roblox Username aus dem Profil holen
+        let robloxUsername = '';
+        try {
+            const rblx = JSON.parse(localStorage.getItem('en_roblox_profile') || 'null');
+            robloxUsername = rblx?.username || rblx?.displayName || '';
+        } catch(e) {}
+
+        const p = new URLSearchParams(window.location.search);
+        const robloxId = p.get('robloxId') || '';
+
+        // Socket emit
+        const socket = window._overlaySocket;
+        if (socket?.connected) {
+            socket.emit('panic_button', {
+                discordId: user.discordId,
+                username: user.username || 'Unbekannt',
+                robloxUsername: robloxUsername || user.username || '?',
+                avatar: user.avatar || '',
+            });
+        }
+        console.log(`[PANIC] Panic Button gedrückt! Roblox: ${robloxUsername}`);
+    },
+
+    showAlert(data) {
+        this._targetUsername = data.robloxUsername || data.username || '?';
+        const el = document.getElementById('panicAlert');
+        const userEl = document.getElementById('panicAlertUser');
+        if (!el) return;
+
+        userEl.textContent = this._targetUsername;
+        el.classList.add('active');
+
+        // Sound
+        try {
+            if (window.electronAPI?.playNotificationSound) {
+                window.electronAPI.playNotificationSound();
+            }
+        } catch(e) {}
+
+        // Focus anfordern damit man die Buttons drücken kann
+        if (window.electronAPI?.requestOverlayFocus) {
+            window.electronAPI.requestOverlayFocus(true);
+        }
+    },
+
+    teleport() {
+        if (!this._targetUsername) return;
+        console.log(`[PANIC] Teleportiere zu: ${this._targetUsername}`);
+
+        // IPC: Main Process simuliert Tastatureingabe
+        if (window.electronAPI?.robloxTeleport) {
+            window.electronAPI.robloxTeleport(this._targetUsername);
+        }
+
+        this.dismiss();
+    },
+
+    dismiss() {
+        const el = document.getElementById('panicAlert');
+        if (el) el.classList.remove('active');
+        this._targetUsername = null;
+
+        // Focus zurückgeben
+        if (window.electronAPI?.requestOverlayFocus) {
+            window.electronAPI.requestOverlayFocus(false);
+        }
+    },
+};
+
+window.PanicSystem = PanicSystem;
 
 // ══════════════════════════════════════════════
 // OVERLAY MOD NOTIFICATION (top, glass, fade, sound)
