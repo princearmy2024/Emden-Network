@@ -685,9 +685,17 @@ const App = window.App = {
             this.initLoginHandlers();
 
             if (AuthService.loadSession() && AuthService.isLoggedIn()) {
-                // Auto-Rollen-Check: Staff/Admin Status vom Server aktualisieren
-                this._refreshUserRole();
                 this.showDashboard(AuthService.getUser());
+                // Auto-Rollen-Check NACH Dashboard-Load (async, aktualisiert UI wenn Rolle sich ändert)
+                this._refreshUserRole().then(() => {
+                    const user = AuthService.getUser();
+                    if (user?.role === 'staff' || user?.role === 'admin' || user?.isStaff) {
+                        document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
+                    }
+                    if (user?.role === 'admin') {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                    }
+                }).catch(() => {});
                 this.renderActiveVoiceCard();
                 this.syncSoundUI();
             } else {
