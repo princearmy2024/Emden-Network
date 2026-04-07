@@ -97,10 +97,8 @@ function createWindow() {
 // Roblox Chat Teleport: Simuliert Tasteneingabe im Spiel
 ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
     if (!robloxUsername) return;
-    console.log(`[Teleport] Starte /tp ${robloxUsername}...`);
-    const { execFile } = require('child_process');
-    const fs = require('fs');
-    const os = require('os');
+    console.log(`[Teleport] Starte -/tp ${robloxUsername}...`);
+    const { exec } = require('child_process');
 
     // Overlay: Mouse-Events ignorieren damit Roblox klickbar ist
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
@@ -108,89 +106,26 @@ ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
         robloxOverlayWin.blur();
     }
 
-    // Zwei Methoden: Erst SendInput (Hardware), Fallback SendKeys (Software)
-    const safeUsername = robloxUsername.replace(/'/g, "''");
-    const lines = [
-        '$ErrorActionPreference = "Stop"',
-        'Add-Type -AssemblyName System.Windows.Forms',
-        'Add-Type -AssemblyName Microsoft.VisualBasic',
-        '',
-        '# Roblox finden',
-        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
-        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
-        'if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }',
-        'Write-Host "Roblox gefunden PID: $($roblox.Id)"',
-        '',
-        '# SendInput C# laden (Hardware-Level)',
-        '$sendInputLoaded = $false',
-        'try {',
-        '    $csCode = @"',
-        'using System;',
-        'using System.Runtime.InteropServices;',
-        'using System.Threading;',
-        'public class HWInput {',
-        '    [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public INPUTUNION u; }',
-        '    [StructLayout(LayoutKind.Explicit)] public struct INPUTUNION { [FieldOffset(0)] public KEYBDINPUT ki; }',
-        '    [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }',
-        '    [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint n, INPUT[] i, int s);',
-        '    [DllImport("user32.dll")] static extern uint MapVirtualKey(uint c, uint m);',
-        '    public static void PressKey(ushort vk) {',
-        '        ushort sc = (ushort)MapVirtualKey(vk, 0);',
-        '        INPUT[] a = new INPUT[2];',
-        '        a[0].type=1; a[0].u.ki.wVk=vk; a[0].u.ki.wScan=sc; a[0].u.ki.dwFlags=0x0008;',
-        '        a[1].type=1; a[1].u.ki.wVk=vk; a[1].u.ki.wScan=sc; a[1].u.ki.dwFlags=0x000A;',
-        '        SendInput(2,a,Marshal.SizeOf(typeof(INPUT)));',
-        '    }',
-        '    public static void TypeText(string t) {',
-        '        foreach(char c in t) {',
-        '            INPUT[] a = new INPUT[2];',
-        '            a[0].type=1; a[0].u.ki.wScan=(ushort)c; a[0].u.ki.dwFlags=0x0004;',
-        '            a[1].type=1; a[1].u.ki.wScan=(ushort)c; a[1].u.ki.dwFlags=0x0006;',
-        '            SendInput(2,a,Marshal.SizeOf(typeof(INPUT)));',
-        '            Thread.Sleep(12);',
-        '        }',
-        '    }',
-        '}',
-        '"@',
-        '    Add-Type -TypeDefinition $csCode -Language CSharp',
-        '    $sendInputLoaded = $true',
-        '    Write-Host "SendInput (Hardware-Level) geladen"',
-        '} catch {',
-        '    Write-Host "WARNUNG: SendInput fehlgeschlagen: $($_.Exception.Message)"',
-        '    Write-Host "Fallback auf SendKeys"',
-        '}',
-        '',
-        '# Roblox fokussieren',
-        '[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)',
-        'Start-Sleep -Milliseconds 800',
-        '',
-        'if ($sendInputLoaded) {',
-        '    Write-Host "Sende mit SendInput..."',
-        '    [HWInput]::TypeText("-")',
-        '    Start-Sleep -Milliseconds 500',
-        '    [HWInput]::TypeText("/tp ' + safeUsername + '")',
-        '    Start-Sleep -Milliseconds 200',
-        '    [HWInput]::PressKey(0x0D)',
-        '} else {',
-        '    Write-Host "Sende mit SendKeys..."',
-        '    [System.Windows.Forms.SendKeys]::SendWait("-")',
-        '    Start-Sleep -Milliseconds 500',
-        '    [System.Windows.Forms.SendKeys]::SendWait("/tp ' + safeUsername + '")',
-        '    Start-Sleep -Milliseconds 200',
-        '    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")',
-        '}',
-        '',
-        'Write-Host "FERTIG: -/tp ' + safeUsername + '"',
-    ];
-    const psContent = lines.join('\r\n');
+    // VBScript — WshShell.SendKeys ist die zuverlaessigste Methode auf Windows
+    const safeUsername = robloxUsername.replace(/"/g, '""');
+    const vbsContent = [
+        'Set WshShell = CreateObject("WScript.Shell")',
+        'WshShell.AppActivate "Roblox"',
+        'WScript.Sleep 800',
+        'WshShell.SendKeys "-"',
+        'WScript.Sleep 500',
+        'WshShell.SendKeys "/tp ' + safeUsername + '"',
+        'WScript.Sleep 200',
+        'WshShell.SendKeys "{ENTER}"',
+    ].join('\r\n');
 
-    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
-    fs.writeFileSync(tmpFile, psContent, 'utf-8');
+    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.vbs`);
+    fs.writeFileSync(tmpFile, vbsContent, 'utf-8');
 
-    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile], (err, stdout, stderr) => {
-        console.log(`[Teleport] stdout: ${stdout.trim()}`);
+    exec(`cscript //nologo "${tmpFile}"`, { timeout: 10000 }, (err, stdout, stderr) => {
+        if (stdout.trim()) console.log(`[Teleport] stdout: ${stdout.trim()}`);
         if (err) console.error('[Teleport] Fehler:', err.message, stderr);
-        // Temp-Datei aufräumen
+        else console.log(`[Teleport] -/tp ${robloxUsername} gesendet!`);
         fs.unlink(tmpFile, () => {});
     });
 });

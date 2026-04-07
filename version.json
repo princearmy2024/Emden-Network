@@ -1,6 +1,6 @@
 {
-    "version": "4.48.4",
+    "version": "4.48.5",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.4: App startet als Administrator — SendInput kann jetzt an Roblox senden (UIPI Fix).",
+    "notes": "v4.48.5: Teleport komplett auf VBScript umgestellt — WshShell.SendKeys statt PowerShell.",
     "forceUpdate": true
 }
