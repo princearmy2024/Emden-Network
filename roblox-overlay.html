@@ -1210,6 +1210,19 @@ body.no-fade .glow-line-left, body.no-fade .glow-line-bottom { opacity: 0 !impor
 body.no-grid .grid-pattern { display: none !important; }
 body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { display: none !important; }
 
+/* ── Overlay Shift Buttons ── */
+.ov-shift-btn {
+  flex: 1; padding: 6px 0; border-radius: 6px; border: none;
+  font-size: 10px; font-weight: 700; color: #fff; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+.ov-shift-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.ov-shift-btn:hover:not(:disabled) { filter: brightness(1.2); }
+.ov-shift-start { background: linear-gradient(135deg, #059669, #10b981); }
+.ov-shift-pause { background: linear-gradient(135deg, #d97706, #f59e0b); }
+.ov-shift-end { background: linear-gradient(135deg, #dc2626, #ef4444); }
+
 /* ================================================================
    BACKGROUND WATERMARK — grosses Logo, immer sichtbar, blass
    ================================================================ */
@@ -1315,6 +1328,20 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <div class="panel-info-card">
       <div class="panel-info-icon orange"><i data-lucide="clock"></i></div>
       <div><div class="panel-info-label">Uhrzeit</div><div class="panel-info-value" id="clock">--:--</div></div>
+    </div>
+  </div>
+  <div class="panel-sep"></div>
+  <!-- SHIFT CONTROL -->
+  <div class="panel-section" id="panelShift">
+    <div class="panel-section-title">Shift</div>
+    <div class="panel-info-card">
+      <div class="panel-info-icon accent"><i data-lucide="clock"></i></div>
+      <div><div class="panel-info-label" id="ovShiftState">Off Duty</div><div class="panel-info-value accent" id="ovShiftTimer">0:00:00</div></div>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;">
+      <button class="ov-shift-btn ov-shift-start" id="ovBtnStart" onclick="OverlayShift.start()" style="pointer-events:auto;">Start</button>
+      <button class="ov-shift-btn ov-shift-pause" id="ovBtnPause" onclick="OverlayShift.pause()" disabled style="pointer-events:auto;">Pause</button>
+      <button class="ov-shift-btn ov-shift-end" id="ovBtnEnd" onclick="OverlayShift.end()" disabled style="pointer-events:auto;">End</button>
     </div>
   </div>
   <div class="panel-sep"></div>

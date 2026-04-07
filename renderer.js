@@ -226,6 +226,25 @@ const WebSocketService = {
                 if (window.App) App.renderFullUserList(users);
             });
 
+            // Live Mod-Eintrag: Log aktualisieren + Notification
+            this.socket.on('mod_new_entry', (entry) => {
+                if (window.App) {
+                    App.showNotification('Moderation', `${entry.action} für ${entry.displayName || entry.username} von @${entry.moderator}`, 'info');
+                    // Wenn auf Moderation-View, Log neu laden
+                    if (window.ModPanel && App.currentView === 'moderation') {
+                        ModPanel.loadLog();
+                    }
+                }
+            });
+
+            // Live Shift-Updates
+            this.socket.on('shift_update', (data) => {
+                if (window.ModPanel && App.currentView === 'moderation') {
+                    ModPanel.loadShifts();
+                    ModPanel.loadStaff();
+                }
+            });
+
             // Eingehende Nachrichten
             this.socket.on('receive_message', (msg) => {
                 console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);

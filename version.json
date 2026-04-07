@@ -1,6 +1,6 @@
 {
-    "version": "4.37.2",
+    "version": "4.38.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.37.0: Live-Updates (5s Polling), Live-Suche beim Tippen, Staff Status (LIVE/PAUSE), Custom Zeit-Modal für Leads, Roblox Avatars im Log, Rangliste unter Moderation.",
+    "notes": "v4.38.0: Live Mod-Log (Socket), Benachrichtigung bei Eintrag, Shift Control im Roblox Overlay (synced mit Dashboard).",
     "forceUpdate": true
 }

@@ -989,6 +989,15 @@ const apiServer = http.createServer(async (req, res) => {
                 });
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
+
+                // Live broadcast: neuer Eintrag an alle Clients
+                io.emit('mod_new_entry', {
+                    userId, username, displayName: displayName || username,
+                    avatar: avatar || '', action, reason: reason || 'Kein Grund',
+                    moderator, moderatorAvatar: modAvatarUrl || '',
+                    date: new Date().toISOString(), entryNum,
+                });
+
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch (e) {
@@ -1101,6 +1110,8 @@ const apiServer = http.createServer(async (req, res) => {
                 s.state = 'active';
                 s.startedAt = Date.now();
                 saveShifts();
+                const known = allKnownUsers.get(discordId);
+                io.emit('shift_update', { discordId, state: 'active', username: known?.username || '?' });
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
@@ -1115,11 +1126,12 @@ const apiServer = http.createServer(async (req, res) => {
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
                 const s = getShift(discordId);
                 if (s.state !== 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Nicht aktiv" })); }
-                // Save elapsed time
                 if (s.startedAt) s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
                 s.state = 'break';
                 s.startedAt = null;
                 saveShifts();
+                const known = allKnownUsers.get(discordId);
+                io.emit('shift_update', { discordId, state: 'break', username: known?.username || '?' });
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
@@ -1149,6 +1161,7 @@ const apiServer = http.createServer(async (req, res) => {
                 s.startedAt = null;
                 // savedMs bleibt erhalten — User kann weiter machen
                 saveShifts();
+                io.emit('shift_update', { discordId, state: 'off', username: known?.username || '?' });
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }

@@ -721,6 +721,11 @@ const Overlay = (() => {
         socket.on(`overlay_game_start_${discordId}`, ({ startTime }) => setGameRunning(true, startTime));
         socket.on(`overlay_game_end_${discordId}`,   ()               => setGameRunning(false));
 
+        // Shift sync: wenn jemand anderes (oder Dashboard) shift ändert
+        socket.on('shift_update', (data) => {
+            if (data.discordId === discordId) OverlayShift._syncFromServer(data.state);
+        });
+
         if (window.electronAPI) {
             socket.on('overlay_game_start_test', (data) => setGameRunning(true, data.startTime));
         }
@@ -1264,4 +1269,114 @@ const Overlay = (() => {
     return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings };
 })();
 
-window.addEventListener('DOMContentLoaded', () => Overlay.init());
+// ══════════════════════════════════════════════
+// OVERLAY SHIFT CONTROL
+// ══════════════════════════════════════════════
+const OverlayShift = {
+    _state: 'off',
+    _savedMs: 0,
+    _startedAt: null,
+    _tickInterval: null,
+
+    async _apiCall(endpoint) {
+        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+        const discordId = session?.user?.discordId;
+        if (!discordId) return;
+        try {
+            await fetch(`${OVL_CONFIG.API_URL}/api/shift/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ discordId }),
+            });
+        } catch(e) {}
+    },
+
+    async start() {
+        await this._apiCall('start');
+        this._state = 'active';
+        this._startedAt = Date.now();
+        this._updateUI();
+        this._startTick();
+    },
+
+    async pause() {
+        await this._apiCall('pause');
+        if (this._startedAt) this._savedMs += Date.now() - this._startedAt;
+        this._state = 'break';
+        this._startedAt = null;
+        this._updateUI();
+        this._stopTick();
+    },
+
+    async end() {
+        await this._apiCall('end');
+        if (this._state === 'active' && this._startedAt) this._savedMs += Date.now() - this._startedAt;
+        this._state = 'off';
+        this._startedAt = null;
+        this._updateUI();
+        this._stopTick();
+    },
+
+    _syncFromServer(state) {
+        this._state = state;
+        if (state === 'active') { this._startedAt = Date.now(); this._startTick(); }
+        else { this._startedAt = null; this._stopTick(); }
+        this._updateUI();
+    },
+
+    _startTick() {
+        this._stopTick();
+        this._tickInterval = setInterval(() => this._updateUI(), 1000);
+    },
+    _stopTick() { if (this._tickInterval) { clearInterval(this._tickInterval); this._tickInterval = null; } },
+
+    _updateUI() {
+        let total = this._savedMs;
+        if (this._state === 'active' && this._startedAt) total += Date.now() - this._startedAt;
+
+        const h = Math.floor(total / 3600000);
+        const m = Math.floor((total % 3600000) / 60000);
+        const s = Math.floor((total % 60000) / 1000);
+        const timeStr = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+        const timer = document.getElementById('ovShiftTimer');
+        const label = document.getElementById('ovShiftState');
+        const btnStart = document.getElementById('ovBtnStart');
+        const btnPause = document.getElementById('ovBtnPause');
+        const btnEnd = document.getElementById('ovBtnEnd');
+
+        if (timer) timer.textContent = timeStr;
+        if (label) label.textContent = this._state === 'active' ? 'On Duty' : this._state === 'break' ? 'Pause' : 'Off Duty';
+        if (btnStart) btnStart.disabled = this._state === 'active';
+        if (btnPause) btnPause.disabled = this._state !== 'active';
+        if (btnEnd) btnEnd.disabled = this._state === 'off';
+    },
+
+    async loadFromServer() {
+        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+        const discordId = session?.user?.discordId;
+        if (!discordId) return;
+        try {
+            const res = await fetch(`${OVL_CONFIG.API_URL}/api/shifts`, {
+                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
+            });
+            const data = await res.json();
+            if (data.success && data.shifts[discordId]) {
+                const s = data.shifts[discordId];
+                this._state = s.state || 'off';
+                this._savedMs = s.savedMs || 0;
+                this._startedAt = s.state === 'active' && s.startedAt ? s.startedAt : null;
+                if (this._state === 'active') this._startTick();
+                this._updateUI();
+            }
+        } catch(e) {}
+    },
+};
+
+window.OverlayShift = OverlayShift;
+
+window.addEventListener('DOMContentLoaded', () => {
+    Overlay.init();
+    // Load shift state after a short delay (socket needs to connect first)
+    setTimeout(() => OverlayShift.loadFromServer(), 2000);
+});
