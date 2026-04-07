@@ -1,6 +1,6 @@
 {
-    "version": "4.47.9",
+    "version": "4.48.0",
     "releaseDate": "2026-04-08",
-    "notes": "v4.47.9: Fix Teleport — Roblox-Fenster wird per WinAPI fokussiert bevor SendKeys losgeht.",
+    "notes": "v4.48.0: Fix Teleport — PS1 temp file + AppActivate + / oeffnet Roblox Chat direkt.",
     "forceUpdate": true
 }

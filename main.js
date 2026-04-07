@@ -98,50 +98,54 @@ function createWindow() {
 ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
     if (!robloxUsername) return;
     console.log(`[Teleport] Starte /tp ${robloxUsername}...`);
-    const { exec } = require('child_process');
+    const { execFile } = require('child_process');
+    const fs = require('fs');
+    const os = require('os');
 
-    // Overlay kurz verstecken damit Roblox Focus bekommt
+    // Overlay: Mouse-Events ignorieren damit Roblox klickbar ist
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
         robloxOverlayWin.blur();
     }
 
-    // PowerShell: Roblox-Fenster finden, fokussieren, dann Tasten senden
-    // SendKeys braucht escaped chars: / muss nicht escaped werden
-    // Roblox Chat: "-" oeffnet Command-Bar, dann "/tp username" + Enter
+    // PowerShell-Script als temp-Datei schreiben (vermeidet Escaping-Probleme)
     const safeUsername = robloxUsername.replace(/'/g, "''");
-    const psScript = [
-        'Add-Type -AssemblyName System.Windows.Forms',
-        'Add-Type -AssemblyName Microsoft.VisualBasic',
-        // Roblox-Fenster finden und in den Vordergrund bringen
-        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
-        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
-        'if (-not $roblox) { Write-Error "Roblox nicht gefunden"; exit 1 }',
-        // Fenster aktivieren
-        'Add-Type @"',
-        'using System; using System.Runtime.InteropServices;',
-        'public class WinAPI {',
-        '    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);',
-        '    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);',
-        '}',
-        '"@',
-        '$hwnd = $roblox.MainWindowHandle',
-        '[WinAPI]::ShowWindow($hwnd, 9)',  // SW_RESTORE
-        '[WinAPI]::SetForegroundWindow($hwnd)',
-        'Start-Sleep -Milliseconds 500',
-        // Chat oeffnen mit "-"
-        '[System.Windows.Forms.SendKeys]::SendWait("-")',
-        'Start-Sleep -Milliseconds 500',
-        // Command tippen
-        `[System.Windows.Forms.SendKeys]::SendWait("/tp ${safeUsername}")`,
-        'Start-Sleep -Milliseconds 200',
-        // Enter
-        '[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")',
-    ].join('; ');
+    const psContent = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName Microsoft.VisualBasic
 
-    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err, stdout, stderr) => {
+# Roblox finden
+$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }
+if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }
+
+Write-Host "Roblox PID: $($roblox.Id)"
+
+# Roblox in den Vordergrund
+[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)
+Start-Sleep -Milliseconds 600
+
+# Chat oeffnen mit /
+[System.Windows.Forms.SendKeys]::SendWait("/")
+Start-Sleep -Milliseconds 400
+
+# Command tippen: tp username (ohne / weil / schon den Chat oeffnet)
+[System.Windows.Forms.SendKeys]::SendWait("tp ${safeUsername}")
+Start-Sleep -Milliseconds 200
+
+# Enter
+[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+Write-Host "OK: /tp ${safeUsername} gesendet"
+`;
+
+    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
+    fs.writeFileSync(tmpFile, psContent, 'utf-8');
+
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile], (err, stdout, stderr) => {
+        console.log(`[Teleport] stdout: ${stdout.trim()}`);
         if (err) console.error('[Teleport] Fehler:', err.message, stderr);
-        else console.log(`[Teleport] /tp ${robloxUsername} gesendet!`);
+        // Temp-Datei aufräumen
+        fs.unlink(tmpFile, () => {});
     });
 });
 
