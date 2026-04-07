@@ -166,6 +166,13 @@
                     </svg>
                 </a>
 
+                <a class="nav-item" data-view="moderation" data-label="Moderation" onclick="App.navigate('moderation')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
+                    </svg>
+                </a>
+
                 <div class="sidebar-divider"></div>
 
                 <a class="nav-item" data-view="servers" data-label="Server" onclick="App.navigate('servers')">
@@ -1013,6 +1020,120 @@
 
                             <button class="btn btn-danger" onclick="App.logout()">Abmelden</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ======================== MODERATION ======================== -->
+                <div class="view" id="view-moderation">
+                    <div class="mod-layout">
+
+                        <!-- ── LEFT COLUMN ── -->
+                        <div class="mod-left">
+                            <!-- Shift Control -->
+                            <div class="mod-card">
+                                <h3 class="mod-card-title">Shift Control</h3>
+                                <div class="mod-shift-row">
+                                    <select id="modDutyType" class="mod-select">
+                                        <option value="on_duty">On Duty</option>
+                                        <option value="trial_mod">Trial Mod Duty type</option>
+                                        <option value="training">Training</option>
+                                    </select>
+                                    <span class="mod-shift-timer" id="modShiftTimer">00:00:00</span>
+                                </div>
+                                <button class="mod-btn mod-btn-green" id="modStartShift" onclick="ModPanel.startShift()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    Start Shift
+                                </button>
+                                <button class="mod-btn mod-btn-orange" id="modStartBreak" onclick="ModPanel.startBreak()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+                                    Start Break
+                                </button>
+                                <button class="mod-btn mod-btn-red" id="modEndShift" onclick="ModPanel.endShift()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><rect x="9" y="9" width="6" height="6"/></svg>
+                                    End Shift
+                                </button>
+                            </div>
+
+                            <!-- Active Staff -->
+                            <div class="mod-card">
+                                <h3 class="mod-card-title">Active Staff</h3>
+                                <div class="mod-staff-list" id="modStaffList">
+                                    <div class="mod-staff-empty">Keine Moderatoren online</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── CENTER COLUMN ── -->
+                        <div class="mod-center">
+                            <h2 class="mod-page-title">Moderation</h2>
+
+                            <!-- Moderation Form -->
+                            <div class="mod-card mod-form-card">
+                                <div class="mod-input-wrap">
+                                    <input type="text" id="modUsername" class="mod-input" placeholder="Username" autocomplete="off">
+                                    <button class="mod-input-icon" onclick="ModPanel.searchUser()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    </button>
+                                </div>
+                                <!-- User Preview (hidden by default) -->
+                                <div class="mod-user-preview hidden" id="modUserPreview">
+                                    <img id="modUserAvatar" class="mod-user-avatar" src="" alt="">
+                                    <div class="mod-user-info">
+                                        <span class="mod-user-displayname" id="modUserDisplay">—</span>
+                                        <span class="mod-user-id" id="modUserId">—</span>
+                                    </div>
+                                </div>
+                                <div class="mod-input-wrap">
+                                    <select id="modPunishment" class="mod-select mod-select-full">
+                                        <option value="" disabled selected>Punishment</option>
+                                        <option value="Warn">Warn</option>
+                                        <option value="Kick">Kick</option>
+                                        <option value="Ban">Ban</option>
+                                    </select>
+                                    <span class="mod-select-arrow">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </span>
+                                </div>
+                                <textarea id="modReason" class="mod-textarea" placeholder="Reason" rows="3"></textarea>
+                                <button class="mod-btn mod-btn-primary" onclick="ModPanel.createModeration()">Create Moderation</button>
+                            </div>
+
+                            <!-- Bottom row -->
+                            <div class="mod-bottom-row">
+                                <div class="mod-card mod-toolbox">
+                                    <h3 class="mod-card-title" style="text-align:center;">Toolbox</h3>
+                                    <button class="mod-tool-btn mod-tool-blue" onclick="ModPanel.gameInfo()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        Game Info
+                                    </button>
+                                    <button class="mod-tool-btn mod-tool-gray" onclick="ModPanel.vehicleCheck()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                        Vehicle Check
+                                    </button>
+                                </div>
+                                <div class="mod-card mod-manage">
+                                    <h3 class="mod-card-title">Manage Players</h3>
+                                    <div class="mod-manage-search">
+                                        <input type="text" id="modManageSearch" class="mod-input" placeholder="Spieler suchen..." autocomplete="off">
+                                        <span class="mod-manage-slash">/</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── RIGHT COLUMN ── -->
+                        <div class="mod-right">
+                            <div class="mod-log-search-wrap">
+                                <input type="text" id="modLogSearch" class="mod-input" placeholder="Search" autocomplete="off" oninput="ModPanel.filterLog()">
+                                <button class="mod-input-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                </button>
+                            </div>
+                            <div class="mod-log-list" id="modLogList">
+                                <!-- Filled by JS -->
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 

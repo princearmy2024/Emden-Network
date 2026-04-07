@@ -1,6 +1,6 @@
 {
-    "version": "4.33.3",
-    "releaseDate": "2026-04-06",
-    "notes": "v4.27.0: Mod Panel — Full-Body Skin, Discord-Info Lookup, Dropdown-Suche.",
+    "version": "4.34.0",
+    "releaseDate": "2026-04-07",
+    "notes": "v4.34.0: Moderation Dashboard — Shift Control, Mod-Form, Log, Active Staff.",
     "forceUpdate": true
 }

@@ -890,6 +890,7 @@ const App = window.App = {
             walkie: ['Walkie-Talkie', 'Sprachkommunikation'],
             servers: ['Server', 'System-Übersicht'],
             settings: ['Einstellungen', 'Konfiguration'],
+            moderation: ['Moderation', 'Moderations-Verwaltung'],
             admin: ['Admin Panel', 'Eingeschränkter Bereich'],
         };
         const [title, sub] = labels[view] || ['Dashboard', ''];
@@ -906,6 +907,12 @@ const App = window.App = {
         // Chat laden wenn man zur Messages-View navigiert
         if (view === 'messages') {
             this._loadChatHistory(this.currentChat || 'general');
+        }
+
+        // Mod-Daten laden
+        if (view === 'moderation') {
+            ModPanel.loadLog();
+            ModPanel.loadStaff();
         }
     },
 
@@ -1341,7 +1348,7 @@ const App = window.App = {
             return;
         }
         // Views suchen
-        const views = { dashboard: 'overview', nachrichten: 'messages', chat: 'messages', einstellungen: 'settings', settings: 'settings', walkie: 'walkie', funk: 'walkie', server: 'servers', benachrichtigungen: 'notifications' };
+        const views = { dashboard: 'overview', nachrichten: 'messages', chat: 'messages', einstellungen: 'settings', settings: 'settings', walkie: 'walkie', funk: 'walkie', server: 'servers', benachrichtigungen: 'notifications', moderation: 'moderation', mod: 'moderation' };
         for (const [key, view] of Object.entries(views)) {
             if (key.includes(q)) {
                 this.navigate(view);
@@ -4017,6 +4024,311 @@ Object.assign(App, {
         `;
     },
 });
+
+
+// =============================================================
+// MODERATION PANEL
+// =============================================================
+const ModPanel = {
+    _shiftState: 'off',   // off | active | break
+    _shiftStart: null,
+    _shiftTimerInterval: null,
+    _selectedUser: null,
+    _logData: [],
+
+    // ── Shift Control ──
+    startShift() {
+        if (this._shiftState === 'active') return;
+        this._shiftState = 'active';
+        this._shiftStart = Date.now();
+        this._startTimer();
+        document.getElementById('modStartShift').style.opacity = '0.5';
+        document.getElementById('modStartBreak').style.opacity = '1';
+        App.showNotification('Shift', 'Dein Shift hat begonnen!', 'success');
+    },
+
+    startBreak() {
+        if (this._shiftState !== 'active') return;
+        this._shiftState = 'break';
+        this._stopTimer();
+        document.getElementById('modStartBreak').style.opacity = '0.5';
+        App.showNotification('Shift', 'Pause gestartet.', 'info');
+    },
+
+    endShift() {
+        if (this._shiftState === 'off') return;
+        this._shiftState = 'off';
+        this._shiftStart = null;
+        this._stopTimer();
+        document.getElementById('modShiftTimer').textContent = '00:00:00';
+        document.getElementById('modStartShift').style.opacity = '1';
+        document.getElementById('modStartBreak').style.opacity = '1';
+        App.showNotification('Shift', 'Shift beendet.', 'info');
+    },
+
+    _startTimer() {
+        this._stopTimer();
+        this._shiftTimerInterval = setInterval(() => {
+            if (!this._shiftStart) return;
+            const diff = Date.now() - this._shiftStart;
+            const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+            const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+            const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+            document.getElementById('modShiftTimer').textContent = `${h}:${m}:${s}`;
+        }, 1000);
+    },
+
+    _stopTimer() {
+        if (this._shiftTimerInterval) {
+            clearInterval(this._shiftTimerInterval);
+            this._shiftTimerInterval = null;
+        }
+    },
+
+    // ── User Search (Roblox API) ──
+    async searchUser() {
+        const input = document.getElementById('modUsername');
+        const name = input?.value.trim();
+        if (!name) return;
+
+        try {
+            const res = await fetch('https://users.roblox.com/v1/usernames/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: [name], excludeBannedUsers: false }),
+            });
+            const data = await res.json();
+            const user = data?.data?.[0];
+            if (!user) {
+                document.getElementById('modUserPreview').classList.add('hidden');
+                App.showNotification('Moderation', 'User nicht gefunden.', 'error');
+                return;
+            }
+
+            this._selectedUser = user;
+
+            // Avatar laden
+            const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png`);
+            const thumbData = await thumbRes.json();
+            const avatarUrl = thumbData?.data?.[0]?.imageUrl || '';
+
+            this._selectedUser.avatar = avatarUrl;
+
+            const preview = document.getElementById('modUserPreview');
+            document.getElementById('modUserAvatar').src = avatarUrl;
+            document.getElementById('modUserDisplay').textContent = user.displayName || user.name;
+            document.getElementById('modUserId').textContent = 'ID: ' + user.id;
+            preview.classList.remove('hidden');
+        } catch (err) {
+            console.error('[ModPanel] Search error:', err);
+            App.showNotification('Moderation', 'Roblox API Fehler.', 'error');
+        }
+    },
+
+    // ── Create Moderation ──
+    async createModeration() {
+        const user = this._selectedUser;
+        if (!user) {
+            App.showNotification('Moderation', 'Bitte zuerst einen User suchen.', 'error');
+            return;
+        }
+        const punishment = document.getElementById('modPunishment').value;
+        if (!punishment) {
+            App.showNotification('Moderation', 'Bitte eine Strafe wählen.', 'error');
+            return;
+        }
+        const reason = document.getElementById('modReason').value.trim();
+        if (!reason) {
+            App.showNotification('Moderation', 'Bitte einen Grund angeben.', 'error');
+            return;
+        }
+
+        const session = AuthService.session?.user;
+
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-action`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': CONFIG.API_KEY,
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    username: user.name,
+                    displayName: user.displayName || user.name,
+                    avatar: user.avatar || '',
+                    created: user.created || '',
+                    reason,
+                    action: punishment,
+                    moderator: session?.username || 'Unbekannt',
+                    moderatorAvatar: session?.avatar || '',
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                App.showNotification('Moderation', `${punishment} für ${user.name} erstellt!`, 'success');
+                // Reset form
+                document.getElementById('modUsername').value = '';
+                document.getElementById('modPunishment').value = '';
+                document.getElementById('modReason').value = '';
+                document.getElementById('modUserPreview').classList.add('hidden');
+                this._selectedUser = null;
+                // Reload log
+                this.loadLog();
+            } else {
+                App.showNotification('Moderation', data.error || 'Fehler beim Erstellen.', 'error');
+            }
+        } catch (err) {
+            console.error('[ModPanel] Create error:', err);
+            App.showNotification('Moderation', 'Server nicht erreichbar.', 'error');
+        }
+    },
+
+    // ── Load Mod Log ──
+    async loadLog() {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-log`, {
+                headers: { 'x-api-key': CONFIG.API_KEY },
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.log)) {
+                this._logData = data.log;
+                this.renderLog(data.log);
+            }
+        } catch (err) {
+            console.error('[ModPanel] Log load error:', err);
+            document.getElementById('modLogList').innerHTML = '<div class="mod-log-empty">Log konnte nicht geladen werden</div>';
+        }
+    },
+
+    renderLog(entries) {
+        const list = document.getElementById('modLogList');
+        if (!list) return;
+        if (!entries.length) {
+            list.innerHTML = '<div class="mod-log-empty">Keine Einträge</div>';
+            return;
+        }
+        list.innerHTML = entries.map(e => {
+            const punishClass = (e.action || '').toLowerCase();
+            const timeAgo = this._timeAgo(e.timestamp || e.date);
+            const discordPfp = e.moderatorAvatar
+                ? `<img class="mod-log-discord-pfp" src="${this._escHtml(e.moderatorAvatar)}" onerror="this.style.display='none'">`
+                : '';
+            const robloxPfp = e.avatar
+                ? `<img class="mod-log-roblox-pfp" src="${this._escHtml(e.avatar)}" onerror="this.style.display='none'">`
+                : '';
+
+            return `<div class="mod-log-card" data-search="${this._escHtml((e.username || '') + ' ' + (e.moderator || '') + ' ' + (e.reason || ''))}">
+                <div class="mod-log-left">
+                    <div class="mod-log-header">
+                        ${discordPfp}
+                        <span class="mod-log-moderator">@${this._escHtml(e.moderator || '?')}</span>
+                    </div>
+                    <div class="mod-log-field"><strong>Username:</strong> ${this._escHtml(e.displayName || e.username || '?')}</div>
+                    <div class="mod-log-field"><strong>ID:</strong> ${this._escHtml(String(e.userId || '?'))}</div>
+                    <div class="mod-log-field"><strong>Punishment:</strong> <span class="mod-log-punishment ${punishClass}">${this._escHtml(e.action || '?')}</span></div>
+                    <div class="mod-log-field mod-log-reason"><strong>Reason:</strong> ${this._escHtml(e.reason || '—')}</div>
+                    <div class="mod-log-time">${timeAgo}</div>
+                </div>
+                ${robloxPfp}
+                <button class="mod-log-menu">⋮</button>
+            </div>`;
+        }).join('');
+    },
+
+    filterLog() {
+        const q = (document.getElementById('modLogSearch')?.value || '').toLowerCase();
+        document.querySelectorAll('.mod-log-card').forEach(card => {
+            const text = (card.dataset.search || '').toLowerCase();
+            card.style.display = text.includes(q) ? '' : 'none';
+        });
+    },
+
+    // ── Load Active Staff ──
+    async loadStaff() {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-staff`, {
+                headers: { 'x-api-key': CONFIG.API_KEY },
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.staff)) {
+                this.renderStaff(data.staff);
+            }
+        } catch (err) {
+            console.error('[ModPanel] Staff load error:', err);
+        }
+    },
+
+    renderStaff(staff) {
+        const list = document.getElementById('modStaffList');
+        if (!list) return;
+        if (!staff.length) {
+            list.innerHTML = '<div class="mod-staff-empty">Keine Moderatoren online</div>';
+            return;
+        }
+        list.innerHTML = staff.map(s => {
+            const avatar = s.avatar
+                ? `<img class="mod-staff-avatar" src="${this._escHtml(s.avatar)}" onerror="this.textContent='${(s.username || '?')[0].toUpperCase()}';">`
+                : `<div class="mod-staff-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text-muted);">${(s.username || '?')[0].toUpperCase()}</div>`;
+            const time = s.shiftStart ? this._durationSince(s.shiftStart) : '';
+            return `<div class="mod-staff-item">
+                ${avatar}
+                <div class="mod-staff-info">
+                    <span class="mod-staff-name"><span class="mod-staff-dot"></span>${this._escHtml(s.username || '?')}</span>
+                    <span class="mod-staff-role">${this._escHtml(s.dutyType || 'On Duty')}</span>
+                    ${time ? `<span class="mod-staff-time">${time}</span>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    },
+
+    // ── Toolbox ──
+    gameInfo() {
+        App.showNotification('Toolbox', 'Game Info wird geladen...', 'info');
+    },
+    vehicleCheck() {
+        App.showNotification('Toolbox', 'Vehicle Check wird geladen...', 'info');
+    },
+
+    // ── Helpers ──
+    _escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    },
+
+    _timeAgo(ts) {
+        if (!ts) return '';
+        const diff = Date.now() - new Date(ts).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + ' minutes ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + ' hours ago';
+        const days = Math.floor(hrs / 24);
+        return days + ' days ago';
+    },
+
+    _durationSince(ts) {
+        const diff = Date.now() - new Date(ts).getTime();
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        if (h > 0) return `${h} hour${h > 1 ? 's' : ''}, ${m} minute${m !== 1 ? 's' : ''}`;
+        return `${m} minute${m !== 1 ? 's' : ''}`;
+    },
+};
+
+// Enter-Key in Username-Feld löst Suche aus
+document.addEventListener('DOMContentLoaded', () => {
+    const modInput = document.getElementById('modUsername');
+    if (modInput) {
+        modInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') ModPanel.searchUser();
+        });
+    }
+});
+
+window.ModPanel = ModPanel;
 
 
 document.addEventListener('DOMContentLoaded', () => {
