@@ -94,6 +94,20 @@ function createWindow() {
 
 // === IPC HANDLER (Hauptprozess-Seite) ===
 
+// Sound abspielen (delegiert an Main Window weil Overlay keinen Audio-Focus hat)
+ipcMain.on('play-notification-sound', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(`
+            (function() {
+                try {
+                    const s = document.getElementById('modNotifSound') || new Audio('notif.mp3');
+                    s.currentTime = 0; s.volume = 0.5; s.play().catch(() => {});
+                } catch(e) {}
+            })();
+        `).catch(() => {});
+    }
+});
+
 // Fensterkontrolle (Custom Titlebar)
 ipcMain.on('window-minimize', () => mainWindow?.minimize());
 ipcMain.on('window-maximize', () => {
@@ -424,6 +438,11 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
     });
     robloxOverlayWin.setAlwaysOnTop(true, 'screen-saver', 1);
     robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
+    // Audio erlauben im Overlay
+    robloxOverlayWin.webContents.setAudioMuted(false);
+    robloxOverlayWin.webContents.on('did-finish-load', () => {
+        robloxOverlayWin.webContents.setAudioMuted(false);
+    });
     const adminFlag = isAdmin ? '1' : '0';
     robloxOverlayWin.loadFile('roblox-overlay.html', {
         query: { discordId, robloxId, admin: adminFlag }

@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Overlay Focus (für Mod-Panel Klicks)
     requestOverlayFocus: (focus) => ipcRenderer.send('overlay-request-focus', focus),
 
+    // Notification Sound (delegiert an Main Window)
+    playNotificationSound: () => ipcRenderer.send('play-notification-sound'),
+
     // Mod-Button erstellen (für Admins)
     createModButton: () => ipcRenderer.send('create-mod-button'),
     toggleModPanel: () => ipcRenderer.send('toggle-mod-panel'),

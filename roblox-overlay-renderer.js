@@ -1316,8 +1316,10 @@ function showOverlayModNotif(entry) {
 
     el.classList.add('show');
 
-    // Sound
-    if (sound) {
+    // Sound via IPC (Main Window hat Audio-Focus)
+    if (window.electronAPI?.playNotificationSound) {
+        window.electronAPI.playNotificationSound();
+    } else if (sound) {
         sound.currentTime = 0;
         sound.volume = 0.5;
         sound.play().catch(() => {});
