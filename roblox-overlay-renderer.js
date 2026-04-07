@@ -750,9 +750,13 @@ const Overlay = (() => {
             showOverlayModNotif(entry);
         });
 
-        // Panic Alert empfangen
+        // Panic Alert empfangen (nicht eigenen Alert anzeigen)
         socket.on('panic_alert', (data) => {
             console.log('[PANIC] Alert empfangen:', data.username, data.robloxUsername);
+            if (data.discordId === discordId) {
+                console.log('[PANIC] Eigener Alert — ignoriert');
+                return;
+            }
             PanicSystem.showAlert(data);
         });
 
@@ -1304,8 +1308,17 @@ const Overlay = (() => {
 // ══════════════════════════════════════════════
 const PanicSystem = {
     _targetUsername: null,
+    _lastTrigger: 0,
 
     trigger() {
+        // Debounce: max 1x pro 5 Sekunden
+        const now = Date.now();
+        if (now - this._lastTrigger < 5000) {
+            console.log('[PANIC] Debounce — ignoriert (zu schnell)');
+            return;
+        }
+        this._lastTrigger = now;
+
         const session = JSON.parse(localStorage.getItem('en_session') || 'null');
         const user = session?.user;
         if (!user?.discordId) { console.log('[PANIC] Kein User eingeloggt'); return; }

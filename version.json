@@ -1,6 +1,6 @@
 {
-    "version": "4.47.0",
+    "version": "4.47.4",
     "releaseDate": "2026-04-07",
-    "notes": "v4.47.0: PANIC BUTTON — Alarm-System fuer Mods, roter Alert-Screen, Auto-Teleport via Roblox Chat.",
+    "notes": "v4.47.4: Fix Panic Button Spam-Loop (Debounce) + eigener Alert wird ignoriert.",
     "forceUpdate": true
 }
