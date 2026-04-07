@@ -1325,6 +1325,10 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 #panelPanic { pointer-events: none; }
 body.overlay-active #panelPanic { pointer-events: auto; }
 
+/* Panic Alert Buttons immer klickbar */
+.panic-alert.active { pointer-events: auto; }
+.panic-alert.active .panic-alert-content { pointer-events: auto; }
+
 /* ── Panic Alert Overlay ── */
 .panic-alert {
     position: fixed;

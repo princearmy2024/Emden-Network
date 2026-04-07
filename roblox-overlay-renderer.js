@@ -1343,10 +1343,9 @@ const PanicSystem = {
             }
         } catch(e) {}
 
-        // Focus anfordern damit man die Buttons drücken kann
-        if (window.electronAPI?.requestOverlayFocus) {
-            window.electronAPI.requestOverlayFocus(true);
-        }
+        // Focus anfordern damit Overlay klickbar wird
+        const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
+        if (reqFocus) reqFocus(true);
     },
 
     teleport() {
@@ -1367,9 +1366,8 @@ const PanicSystem = {
         this._targetUsername = null;
 
         // Focus zurückgeben
-        if (window.electronAPI?.requestOverlayFocus) {
-            window.electronAPI.requestOverlayFocus(false);
-        }
+        const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
+        if (reqFocus) reqFocus(false);
     },
 };
 
