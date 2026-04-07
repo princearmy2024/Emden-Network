@@ -1,6 +1,6 @@
 {
-    "version": "4.48.8",
+    "version": "4.48.9",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.8: Teleport — Maus-Klick in Bildschirmmitte vor Chat-Command (gibt Roblox Input-Focus).",
+    "notes": "v4.48.9: Teleport — Rechtsklick gehalten fuer Roblox Camera-Mode Input-Focus.",
     "forceUpdate": true
 }
