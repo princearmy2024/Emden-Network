@@ -765,9 +765,14 @@ const App = window.App = {
         if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
             document.querySelectorAll('.staff-only').forEach(el => {
                 el.classList.remove('hidden');
-                el.style.display = '';
+                el.style.removeProperty('display');
                 console.log(`[App] Staff sichtbar:`, el.tagName, el.dataset?.view || el.id);
             });
+            // Bulletproof: Nav-Button direkt per ID
+            const modBtn = document.getElementById('modNavBtn');
+            const modDiv = document.getElementById('modDivider');
+            if (modBtn) { modBtn.style.cssText = ''; modBtn.classList.remove('hidden'); }
+            if (modDiv) { modDiv.style.cssText = ''; modDiv.classList.remove('hidden'); }
         }
         if (user.role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
