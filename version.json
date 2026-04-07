@@ -1,6 +1,6 @@
 {
-    "version": "4.48.7",
+    "version": "4.48.8",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.7: Teleport Hybrid — PowerShell AppActivate + WScript.Shell SendKeys.",
+    "notes": "v4.48.8: Teleport — Maus-Klick in Bildschirmmitte vor Chat-Command (gibt Roblox Input-Focus).",
     "forceUpdate": true
 }
