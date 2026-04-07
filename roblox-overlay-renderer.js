@@ -750,13 +750,9 @@ const Overlay = (() => {
             showOverlayModNotif(entry);
         });
 
-        // Panic Alert empfangen (nicht eigenen Alert anzeigen)
+        // Panic Alert empfangen
         socket.on('panic_alert', (data) => {
-            console.log('[PANIC] Alert empfangen:', data.username, data.robloxUsername);
-            if (data.discordId === discordId) {
-                console.log('[PANIC] Eigener Alert — ignoriert');
-                return;
-            }
+            console.log('[PANIC] Alert empfangen:', data.username, data.robloxUsername, '| panicAlert element:', !!document.getElementById('panicAlert'));
             PanicSystem.showAlert(data);
         });
 
@@ -1351,10 +1347,16 @@ const PanicSystem = {
         this._targetUsername = data.robloxUsername || data.username || '?';
         const el = document.getElementById('panicAlert');
         const userEl = document.getElementById('panicAlertUser');
-        if (!el) return;
+        console.log('[PANIC] showAlert called — el:', !!el, 'userEl:', !!userEl, 'target:', this._targetUsername);
+        if (!el) {
+            console.error('[PANIC] panicAlert Element NICHT gefunden!');
+            return;
+        }
 
-        userEl.textContent = this._targetUsername;
+        if (userEl) userEl.textContent = this._targetUsername;
+        el.style.display = 'flex';
         el.classList.add('active');
+        console.log('[PANIC] Alert angezeigt! classList:', el.className, 'display:', el.style.display);
 
         // Sound
         try {
@@ -1365,6 +1367,7 @@ const PanicSystem = {
 
         // Focus anfordern damit Overlay klickbar wird
         const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
+        console.log('[PANIC] requestFocus verfuegbar:', !!reqFocus);
         if (reqFocus) reqFocus(true);
     },
 
@@ -1382,7 +1385,10 @@ const PanicSystem = {
 
     dismiss() {
         const el = document.getElementById('panicAlert');
-        if (el) el.classList.remove('active');
+        if (el) {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        }
         this._targetUsername = null;
 
         // Focus zurückgeben

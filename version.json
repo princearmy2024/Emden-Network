@@ -1,6 +1,6 @@
 {
-    "version": "4.47.4",
+    "version": "4.47.5",
     "releaseDate": "2026-04-07",
-    "notes": "v4.47.4: Fix Panic Button Spam-Loop (Debounce) + eigener Alert wird ignoriert.",
+    "notes": "v4.47.5: Fix Panic Alert — display:flex erzwingen + Debug Logs, Debounce bleibt.",
     "forceUpdate": true
 }
