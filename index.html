@@ -1069,26 +1069,22 @@
                                     <div class="mod-staff-empty">Lade...</div>
                                 </div>
                             </div>
-
-                            <!-- Rangliste -->
-                            <div class="mod-glass-card">
-                                <h3 class="mod-card-title">Rangliste</h3>
-                                <div class="mod-leaderboard" id="modLeaderboard">
-                                    <div class="mod-staff-empty">Lade...</div>
-                                </div>
-                            </div>
                         </div>
 
-                        <!-- ── CENTER: Moderation Form ── -->
+                        <!-- ── CENTER: Moderation Form + Rangliste ── -->
                         <div class="mod-center">
                             <h2 class="mod-page-title">Moderation</h2>
 
                             <div class="mod-glass-card mod-form-card">
-                                <div class="mod-input-wrap">
-                                    <input type="text" id="modUsername" class="mod-input" placeholder="Roblox Username suchen..." autocomplete="off">
-                                    <button class="mod-input-icon" onclick="ModPanel.searchUser()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                    </button>
+                                <!-- Live Search -->
+                                <div class="mod-search-wrap">
+                                    <div class="mod-input-wrap">
+                                        <input type="text" id="modUsername" class="mod-input" placeholder="Roblox Username oder Anzeigename..." autocomplete="off" oninput="ModPanel.liveSearch()">
+                                        <button class="mod-input-icon" onclick="ModPanel.searchUser()">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                        </button>
+                                    </div>
+                                    <div class="mod-search-results hidden" id="modSearchResults"></div>
                                 </div>
                                 <!-- User Preview -->
                                 <div class="mod-user-preview hidden" id="modUserPreview">
@@ -1114,6 +1110,14 @@
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                     Create Moderation
                                 </button>
+                            </div>
+
+                            <!-- Rangliste (unter Moderation) -->
+                            <div class="mod-glass-card" style="margin-top:16px;">
+                                <h3 class="mod-card-title">Rangliste — Mitarbeiter des Monats</h3>
+                                <div class="mod-leaderboard" id="modLeaderboard">
+                                    <div class="mod-staff-empty">Lade...</div>
+                                </div>
                             </div>
                         </div>
 

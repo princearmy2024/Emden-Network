@@ -4033,26 +4033,25 @@ const ModPanel = {
     _logData: [],
     _isLead: false,
     _shiftInterval: null,
+    _pollInterval: null,
+    _searchTimer: null,
     _shifts: {},
     _leaderboard: {},
     _robloxAvatarCache: {},
 
-    // ── Init (called when navigating to moderation) ──
+    // ── Init ──
     async init() {
-        // Check lead permissions
         const me = AuthService.session?.user;
         if (me?.discordId) {
             try {
                 const res = await fetch(`${CONFIG.API_URL}/api/check-lead`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
                     body: JSON.stringify({ discordId: me.discordId }),
                 });
                 const data = await res.json();
                 this._isLead = data.isLead === true;
             } catch(e) { this._isLead = false; }
         }
-        // Show lead UI
         const leadActions = document.getElementById('modLeadShiftActions');
         if (leadActions) leadActions.classList.toggle('hidden', !this._isLead);
 
@@ -4060,6 +4059,17 @@ const ModPanel = {
         this.loadStaff();
         this.loadLog();
         this._startShiftTicker();
+        this._startPolling();
+    },
+
+    // ── Live Polling (every 5s) ──
+    _startPolling() {
+        if (this._pollInterval) clearInterval(this._pollInterval);
+        this._pollInterval = setInterval(() => {
+            if (App.currentView !== 'moderation') { clearInterval(this._pollInterval); this._pollInterval = null; return; }
+            this.loadShifts();
+            this.loadStaff();
+        }, 5000);
     },
 
     // ══════════════════════════════════════════════
@@ -4076,7 +4086,7 @@ const ModPanel = {
                 this._updateShiftUI();
                 this.renderLeaderboard();
             }
-        } catch(e) { console.error('[ModPanel] Shifts load error:', e); }
+        } catch(e) {}
     },
 
     _getMyShift() {
@@ -4091,16 +4101,17 @@ const ModPanel = {
         const goalMs = 8 * 3600000;
         const pct = Math.min(100, (totalMs / goalMs) * 100);
 
-        document.getElementById('modShiftTimer').textContent = this._formatMs(totalMs);
-        document.getElementById('modShiftBar').style.width = pct + '%';
+        const timerEl = document.getElementById('modShiftTimer');
+        const barEl = document.getElementById('modShiftBar');
+        if (timerEl) timerEl.textContent = this._formatMs(totalMs);
+        if (barEl) barEl.style.width = pct + '%';
 
         const btnStart = document.getElementById('modBtnStart');
         const btnPause = document.getElementById('modBtnPause');
         const btnEnd = document.getElementById('modBtnEnd');
-
-        btnStart.disabled = state === 'active';
-        btnPause.disabled = state !== 'active';
-        btnEnd.disabled = state === 'off';
+        if (btnStart) btnStart.disabled = state === 'active';
+        if (btnPause) btnPause.disabled = state !== 'active';
+        if (btnEnd) btnEnd.disabled = state === 'off';
     },
 
     _startShiftTicker() {
@@ -4108,7 +4119,6 @@ const ModPanel = {
         this._shiftInterval = setInterval(() => {
             const s = this._getMyShift();
             if (!s || s.state !== 'active') return;
-            // Recalculate totalMs live
             let total = s.savedMs || 0;
             if (s.startedAt) total += Date.now() - s.startedAt;
             s.totalMs = total;
@@ -4119,93 +4129,100 @@ const ModPanel = {
     async shiftStart() {
         const me = AuthService.session?.user?.discordId;
         if (!me) return;
-        try {
-            await fetch(`${CONFIG.API_URL}/api/shift/start`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: me }),
-            });
-            // Update local state immediately
-            if (!this._shifts[me]) this._shifts[me] = { state: 'off', savedMs: 0, startedAt: null, totalMs: 0 };
-            this._shifts[me].state = 'active';
-            this._shifts[me].startedAt = Date.now();
-            this._updateShiftUI();
-            App.showNotification('Shift', 'On Duty gestartet!', 'success');
-        } catch(e) { App.showNotification('Shift', 'Fehler', 'error'); }
+        await fetch(`${CONFIG.API_URL}/api/shift/start`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
+        if (!this._shifts[me]) this._shifts[me] = { state: 'off', savedMs: 0, startedAt: null, totalMs: 0 };
+        this._shifts[me].state = 'active';
+        this._shifts[me].startedAt = Date.now();
+        this._updateShiftUI();
+        App.showNotification('Shift', 'On Duty gestartet!', 'success');
     },
 
     async shiftPause() {
         const me = AuthService.session?.user?.discordId;
         if (!me) return;
-        try {
-            await fetch(`${CONFIG.API_URL}/api/shift/pause`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: me }),
-            });
-            const s = this._shifts[me];
-            if (s && s.startedAt) {
-                s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
-                s.totalMs = s.savedMs;
-            }
-            if (s) { s.state = 'break'; s.startedAt = null; }
-            this._updateShiftUI();
-            App.showNotification('Shift', 'Pause gestartet.', 'info');
-        } catch(e) { App.showNotification('Shift', 'Fehler', 'error'); }
+        await fetch(`${CONFIG.API_URL}/api/shift/pause`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
+        const s = this._shifts[me];
+        if (s?.startedAt) { s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt); s.totalMs = s.savedMs; }
+        if (s) { s.state = 'break'; s.startedAt = null; }
+        this._updateShiftUI();
+        App.showNotification('Shift', 'Pause gestartet.', 'info');
     },
 
     async shiftEnd() {
         const me = AuthService.session?.user?.discordId;
         if (!me) return;
-        try {
-            await fetch(`${CONFIG.API_URL}/api/shift/end`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: me }),
-            });
-            const s = this._shifts[me];
-            if (s) { s.state = 'off'; s.startedAt = null; }
-            this._updateShiftUI();
-            App.showNotification('Shift', 'Shift beendet. Zeit gespeichert.', 'info');
-            this.loadShifts(); // Refresh leaderboard
-        } catch(e) { App.showNotification('Shift', 'Fehler', 'error'); }
+        await fetch(`${CONFIG.API_URL}/api/shift/end`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
+        const s = this._shifts[me];
+        if (s) { s.state = 'off'; s.startedAt = null; }
+        this._updateShiftUI();
+        App.showNotification('Shift', 'Shift beendet. Zeit gespeichert.', 'info');
+        this.loadShifts();
     },
 
-    // ── Lead: Reset All ──
     async resetAll() {
-        if (!this._isLead) return;
-        if (!confirm('Alle Shift-Zeiten auf 0 zurücksetzen? (Rangliste bleibt erhalten)')) return;
-        try {
-            await fetch(`${CONFIG.API_URL}/api/shift/manage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, action: 'reset-all' }),
-            });
-            App.showNotification('Shift', 'Alle Zeiten zurückgesetzt!', 'success');
-            this.loadShifts();
-        } catch(e) { App.showNotification('Shift', 'Fehler', 'error'); }
+        if (!this._isLead || !confirm('Alle Shift-Zeiten auf 0 zurücksetzen? (Rangliste bleibt erhalten)')) return;
+        await fetch(`${CONFIG.API_URL}/api/shift/manage`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, action: 'reset-all' }) }).catch(() => {});
+        App.showNotification('Shift', 'Alle Zeiten zurückgesetzt!', 'success');
+        this.loadShifts();
     },
 
-    // ── Lead: Time management per user ──
-    async manageTime(targetId, action, amountMs) {
+    // ── Lead: Custom Time Modal ──
+    openTimeModal(targetId, targetName) {
         if (!this._isLead) return;
-        try {
-            await fetch(`${CONFIG.API_URL}/api/shift/manage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, targetDiscordId: targetId, action, amountMs }),
-            });
-            this.loadShifts();
-            this.loadStaff();
-        } catch(e) { App.showNotification('Shift', 'Fehler', 'error'); }
+        // Remove existing modal
+        document.getElementById('modLeadTimeModal')?.remove();
+        const html = `<div class="mod-lead-modal" id="modLeadTimeModal" onclick="if(event.target===this)ModPanel.closeTimeModal()">
+            <div class="mod-lead-modal-box">
+                <div class="mod-lead-modal-title">Shift-Zeit: ${this._escHtml(targetName)}</div>
+                <div class="mod-lead-modal-row">
+                    <input type="number" class="mod-input" id="modLeadTimeHours" placeholder="Stunden" min="0" max="24" value="0" style="width:50%">
+                    <input type="number" class="mod-input" id="modLeadTimeMinutes" placeholder="Minuten" min="0" max="59" value="30" style="width:50%">
+                </div>
+                <div class="mod-lead-modal-btns">
+                    <button class="mod-lead-add" onclick="ModPanel._doManageTime('${targetId}','add')">+ Geben</button>
+                    <button class="mod-lead-remove" onclick="ModPanel._doManageTime('${targetId}','remove')">− Nehmen</button>
+                    <button class="mod-lead-cancel" onclick="ModPanel.closeTimeModal()">Abbrechen</button>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:6px;">
+                    <button class="mod-lead-cancel" style="flex:1" onclick="ModPanel._doManageTime('${targetId}','reset')">Reset auf 0</button>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    },
+
+    closeTimeModal() { document.getElementById('modLeadTimeModal')?.remove(); },
+
+    async _doManageTime(targetId, action) {
+        const h = parseInt(document.getElementById('modLeadTimeHours')?.value || '0');
+        const m = parseInt(document.getElementById('modLeadTimeMinutes')?.value || '0');
+        const amountMs = (h * 3600000) + (m * 60000);
+        await fetch(`${CONFIG.API_URL}/api/shift/manage`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+            body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, targetDiscordId: targetId, action, amountMs }),
+        }).catch(() => {});
+        this.closeTimeModal();
+        App.showNotification('Shift', action === 'reset' ? 'Zeit zurückgesetzt' : 'Zeit angepasst', 'success');
+        this.loadShifts(); this.loadStaff();
     },
 
     // ── Leaderboard ──
     renderLeaderboard() {
         const el = document.getElementById('modLeaderboard');
         if (!el) return;
-        const entries = Object.entries(this._leaderboard)
-            .map(([id, lb]) => ({ id, ...lb }))
+        // Merge live shifts into leaderboard for real-time display
+        const merged = { ...this._leaderboard };
+        for (const [id, s] of Object.entries(this._shifts)) {
+            if (!merged[id]) merged[id] = { totalMs: 0, username: s.username || '?', avatar: s.avatar || '' };
+            // Add current shift time on top of leaderboard
+            const liveMs = s.totalMs || s.savedMs || 0;
+            merged[id].liveMs = liveMs;
+            if (s.username) merged[id].username = s.username;
+            if (s.avatar) merged[id].avatar = s.avatar;
+        }
+        const entries = Object.entries(merged)
+            .map(([id, lb]) => ({ id, totalMs: (lb.totalMs || 0) + (lb.liveMs || 0), username: lb.username, avatar: lb.avatar }))
+            .filter(e => e.totalMs > 0)
             .sort((a, b) => b.totalMs - a.totalMs)
             .slice(0, 15);
         if (!entries.length) { el.innerHTML = '<div class="mod-staff-empty">Noch keine Daten</div>'; return; }
@@ -4223,46 +4240,74 @@ const ModPanel = {
     },
 
     // ══════════════════════════════════════════════
-    // USER SEARCH (Roblox API)
+    // LIVE SEARCH (Roblox API — while typing)
     // ══════════════════════════════════════════════
 
-    async searchUser() {
-        const input = document.getElementById('modUsername');
-        const name = input?.value.trim();
-        if (!name) return;
+    liveSearch() {
+        clearTimeout(this._searchTimer);
+        const q = document.getElementById('modUsername')?.value.trim();
+        const results = document.getElementById('modSearchResults');
+        if (!q || q.length < 2) { results?.classList.add('hidden'); return; }
+        results.innerHTML = '<div class="mod-search-loading">Suche...</div>';
+        results.classList.remove('hidden');
+        this._searchTimer = setTimeout(() => this._doLiveSearch(q), 350);
+    },
+
+    async _doLiveSearch(q) {
+        const results = document.getElementById('modSearchResults');
         try {
             const res = await fetch('https://users.roblox.com/v1/usernames/users', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usernames: [name], excludeBannedUsers: false }),
+                body: JSON.stringify({ usernames: [q], excludeBannedUsers: false }),
             });
             const data = await res.json();
-            const user = data?.data?.[0];
-            if (!user) { document.getElementById('modUserPreview').classList.add('hidden'); App.showNotification('Moderation', 'User nicht gefunden.', 'error'); return; }
+            const users = data?.data || [];
+            if (!users.length) { results.innerHTML = '<div class="mod-search-loading">Nicht gefunden</div>'; return; }
 
-            // Profile + Avatar parallel laden
-            const [profileRes, thumbRes] = await Promise.all([
-                fetch(`https://users.roblox.com/v1/users/${user.id}`),
-                fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png`),
+            // Fetch avatars
+            const ids = users.map(u => u.id).join(',');
+            const [thumbRes, profilesRes] = await Promise.all([
+                fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids}&size=150x150&format=Png`),
+                Promise.all(users.map(u => fetch(`https://users.roblox.com/v1/users/${u.id}`).then(r => r.json()).catch(() => ({})))),
             ]);
-            const profileData = await profileRes.json();
             const thumbData = await thumbRes.json();
-            const avatarUrl = thumbData?.data?.[0]?.imageUrl || '';
+            const avatarMap = {};
+            for (const t of (thumbData?.data || [])) { avatarMap[t.targetId] = t.imageUrl; }
 
-            this._selectedUser = {
-                ...user,
-                displayName: profileData.displayName || user.displayName || user.name,
-                avatar: avatarUrl,
-                created: profileData.created ? new Date(profileData.created).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
-            };
+            results.innerHTML = users.map((u, i) => {
+                const avatar = avatarMap[u.id] || '';
+                const profile = profilesRes[i] || {};
+                const displayName = profile.displayName || u.displayName || u.name;
+                return `<div class="mod-search-item" onclick="ModPanel.selectSearchResult(${u.id},'${this._escHtml(u.name)}','${this._escHtml(displayName)}','${this._escHtml(avatar)}','${this._escHtml(profile.created ? new Date(profile.created).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"}) : "")}')">
+                    ${avatar ? `<img src="${this._escHtml(avatar)}" onerror="this.style.display='none'">` : ''}
+                    <div class="mod-search-item-info">
+                        <span class="mod-search-item-name">${this._escHtml(displayName)}</span>
+                        <span class="mod-search-item-sub">@${this._escHtml(u.name)} · ${u.id}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) { results.innerHTML = '<div class="mod-search-loading">Fehler</div>'; }
+    },
 
-            document.getElementById('modUserAvatar').src = avatarUrl;
-            document.getElementById('modUserDisplay').textContent = this._selectedUser.displayName;
-            document.getElementById('modUserId').textContent = `@${user.name} · ID: ${user.id}`;
-            document.getElementById('modUserPreview').classList.remove('hidden');
-        } catch (err) {
-            console.error('[ModPanel] Search error:', err);
-            App.showNotification('Moderation', 'Roblox API Fehler.', 'error');
-        }
+    selectSearchResult(id, name, displayName, avatar, created) {
+        this._selectedUser = { id, name, displayName, avatar, created };
+        document.getElementById('modUsername').value = name;
+        document.getElementById('modSearchResults')?.classList.add('hidden');
+        document.getElementById('modUserAvatar').src = avatar;
+        document.getElementById('modUserDisplay').textContent = displayName;
+        document.getElementById('modUserId').textContent = `@${name} · ID: ${id}`;
+        document.getElementById('modUserPreview').classList.remove('hidden');
+    },
+
+    async searchUser() {
+        const q = document.getElementById('modUsername')?.value.trim();
+        if (!q) return;
+        document.getElementById('modSearchResults')?.classList.add('hidden');
+        await this._doLiveSearch(q);
+        // Auto-select first result if only one
+        const items = document.querySelectorAll('.mod-search-item');
+        if (items.length === 1) items[0].click();
+        else document.getElementById('modSearchResults')?.classList.remove('hidden');
     },
 
     // ══════════════════════════════════════════════
@@ -4276,20 +4321,11 @@ const ModPanel = {
         if (!punishment) { App.showNotification('Moderation', 'Bitte eine Strafe wählen.', 'error'); return; }
         const reason = document.getElementById('modReason').value.trim();
         if (!reason) { App.showNotification('Moderation', 'Bitte einen Grund angeben.', 'error'); return; }
-
         const session = AuthService.session?.user;
         try {
             const res = await fetch(`${CONFIG.API_URL}/api/mod-action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({
-                    userId: user.id, username: user.name,
-                    displayName: user.displayName || user.name,
-                    avatar: user.avatar || '', created: user.created || '',
-                    reason, action: punishment,
-                    moderator: session?.username || 'Unbekannt',
-                    moderatorAvatar: session?.avatar || '',
-                }),
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ userId: user.id, username: user.name, displayName: user.displayName || user.name, avatar: user.avatar || '', created: user.created || '', reason, action: punishment, moderator: session?.username || 'Unbekannt', moderatorAvatar: session?.avatar || '' }),
             });
             const data = await res.json();
             if (data.success) {
@@ -4300,9 +4336,7 @@ const ModPanel = {
                 document.getElementById('modUserPreview').classList.add('hidden');
                 this._selectedUser = null;
                 this.loadLog();
-            } else {
-                App.showNotification('Moderation', data.error || 'Fehler.', 'error');
-            }
+            } else { App.showNotification('Moderation', data.error || 'Fehler.', 'error'); }
         } catch (err) { App.showNotification('Moderation', 'Server nicht erreichbar.', 'error'); }
     },
 
@@ -4316,26 +4350,19 @@ const ModPanel = {
             const data = await res.json();
             if (data.success && Array.isArray(data.log)) {
                 this._logData = data.log;
-                // Fetch Roblox avatars for log entries that have userId but no avatar
                 this._enrichLogAvatars(data.log);
                 this.renderLog(data.log);
             }
-        } catch (err) {
-            document.getElementById('modLogList').innerHTML = '<div class="mod-log-empty">Log konnte nicht geladen werden</div>';
-        }
+        } catch (err) { document.getElementById('modLogList').innerHTML = '<div class="mod-log-empty">Log konnte nicht geladen werden</div>'; }
     },
 
     async _enrichLogAvatars(entries) {
-        const needAvatars = entries.filter(e => e.userId && !e.avatar && !this._robloxAvatarCache[e.userId]);
-        if (!needAvatars.length) return;
-        const ids = [...new Set(needAvatars.map(e => e.userId))].slice(0, 30);
+        const ids = [...new Set(entries.filter(e => e.userId && !e.avatar && !this._robloxAvatarCache[e.userId]).map(e => e.userId))].slice(0, 50);
+        if (!ids.length) return;
         try {
             const res = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids.join(',')}&size=150x150&format=Png`);
             const data = await res.json();
-            for (const t of (data.data || [])) {
-                if (t.imageUrl) this._robloxAvatarCache[t.targetId] = t.imageUrl;
-            }
-            // Re-render with avatars
+            for (const t of (data.data || [])) { if (t.imageUrl) this._robloxAvatarCache[t.targetId] = t.imageUrl; }
             this.renderLog(entries);
         } catch(e) {}
     },
@@ -4344,27 +4371,16 @@ const ModPanel = {
         const list = document.getElementById('modLogList');
         if (!list) return;
         if (!entries.length) { list.innerHTML = '<div class="mod-log-empty">Keine Einträge</div>'; return; }
-
         list.innerHTML = entries.map((e, idx) => {
             const punishClass = (e.action || '').toLowerCase();
             const timeAgo = this._timeAgo(e.date);
-            const discordPfp = e.moderatorAvatar
-                ? `<img class="mod-log-discord-pfp" src="${this._escHtml(e.moderatorAvatar)}" onerror="this.style.display='none'">`
-                : '';
+            const discordPfp = e.moderatorAvatar ? `<img class="mod-log-discord-pfp" src="${this._escHtml(e.moderatorAvatar)}" onerror="this.style.display='none'">` : '';
             const robloxAvatar = e.avatar || this._robloxAvatarCache[e.userId] || '';
-            const robloxPfp = robloxAvatar
-                ? `<img class="mod-log-roblox-pfp" src="${this._escHtml(robloxAvatar)}" onerror="this.style.display='none'">`
-                : '';
-            const deleteBtn = this._isLead
-                ? `<button class="mod-log-delete visible" onclick="ModPanel.deleteEntry('${this._escHtml(String(e.userId))}', ${idx})" title="Löschen">✕</button>`
-                : '';
-
-            return `<div class="mod-log-card" data-search="${this._escHtml((e.username || '') + ' ' + (e.moderator || '') + ' ' + (e.reason || ''))}">
+            const robloxPfp = robloxAvatar ? `<img class="mod-log-roblox-pfp" src="${this._escHtml(robloxAvatar)}" onerror="this.style.display='none'">` : '';
+            const deleteBtn = this._isLead ? `<button class="mod-log-delete visible" onclick="ModPanel.deleteEntry('${this._escHtml(String(e.userId))}',${idx})" title="Löschen">✕</button>` : '';
+            return `<div class="mod-log-card" data-search="${this._escHtml((e.username || '') + ' ' + (e.moderator || '') + ' ' + (e.reason || '') + ' ' + (e.displayName || ''))}">
                 <div class="mod-log-left">
-                    <div class="mod-log-header">
-                        ${discordPfp}
-                        <span class="mod-log-moderator">@${this._escHtml(e.moderator || '?')}</span>
-                    </div>
+                    <div class="mod-log-header">${discordPfp}<span class="mod-log-moderator">@${this._escHtml(e.moderator || '?')}</span></div>
                     <div class="mod-log-field"><strong>Username:</strong> ${this._escHtml(e.displayName || e.username || '?')}</div>
                     <div class="mod-log-field"><strong>ID:</strong> ${this._escHtml(String(e.userId || '?'))}</div>
                     <div class="mod-log-field"><strong>Punishment:</strong> <span class="mod-log-punishment ${punishClass}">${this._escHtml(e.action || '?')}</span></div>
@@ -4378,50 +4394,30 @@ const ModPanel = {
     },
 
     async deleteEntry(userId, globalIdx) {
-        if (!this._isLead) return;
-        if (!confirm('Eintrag wirklich löschen?')) return;
-
-        // Find actual index within that user's history
-        const userEntries = this._logData.filter(e => String(e.userId) === String(userId));
+        if (!this._isLead || !confirm('Eintrag wirklich löschen?')) return;
         const globalEntry = this._logData[globalIdx];
-        // Match by date to find index in user-specific array
         let entryIndex = -1;
         try {
             const histRes = await fetch(`${CONFIG.API_URL}/api/mod-history?userId=${userId}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
             const histData = await histRes.json();
-            if (histData.success) {
-                // Find matching entry by date
-                entryIndex = histData.entries.findIndex(h => h.date === globalEntry?.date && h.action === globalEntry?.action);
-            }
+            if (histData.success) entryIndex = histData.entries.findIndex(h => h.date === globalEntry?.date && h.action === globalEntry?.action);
         } catch(e) {}
-
         if (entryIndex < 0) { App.showNotification('Moderation', 'Eintrag nicht gefunden.', 'error'); return; }
-
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mod-log/delete`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, userId, entryIndex }),
-            });
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-log/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, userId, entryIndex }) });
             const data = await res.json();
-            if (data.success) {
-                App.showNotification('Moderation', 'Eintrag gelöscht.', 'success');
-                this.loadLog();
-            } else {
-                App.showNotification('Moderation', data.error || 'Fehler', 'error');
-            }
+            if (data.success) { App.showNotification('Moderation', 'Eintrag gelöscht.', 'success'); this.loadLog(); }
+            else App.showNotification('Moderation', data.error || 'Fehler', 'error');
         } catch(e) { App.showNotification('Moderation', 'Fehler', 'error'); }
     },
 
     filterLog() {
         const q = (document.getElementById('modLogSearch')?.value || '').toLowerCase();
-        document.querySelectorAll('.mod-log-card').forEach(card => {
-            card.style.display = (card.dataset.search || '').toLowerCase().includes(q) ? '' : 'none';
-        });
+        document.querySelectorAll('.mod-log-card').forEach(card => { card.style.display = (card.dataset.search || '').toLowerCase().includes(q) ? '' : 'none'; });
     },
 
     // ══════════════════════════════════════════════
-    // ACTIVE STAFF (On Duty Role + Shift Times)
+    // ACTIVE STAFF (Live + Shift Status)
     // ══════════════════════════════════════════════
 
     async loadStaff() {
@@ -4429,10 +4425,7 @@ const ModPanel = {
             const res = await fetch(`${CONFIG.API_URL}/api/on-duty`, { headers: { 'x-api-key': CONFIG.API_KEY } });
             const data = await res.json();
             if (data.success && Array.isArray(data.staff)) this.renderStaff(data.staff);
-        } catch (err) {
-            const list = document.getElementById('modStaffList');
-            if (list) list.innerHTML = '<div class="mod-staff-empty">Konnte nicht geladen werden</div>';
-        }
+        } catch (err) {}
     },
 
     renderStaff(staff) {
@@ -4447,22 +4440,24 @@ const ModPanel = {
                 : initial;
             const topRole = s.roles?.[0] || 'On Duty';
 
-            // Shift time for this user
+            // Shift data
             const shift = this._shifts[s.discordId];
+            const state = shift?.state || 'off';
             const shiftMs = shift?.totalMs || shift?.savedMs || 0;
-            const shiftBadge = shiftMs > 0 ? `<span class="mod-staff-shift">${this._formatMs(shiftMs)}</span>` : '';
+            const dotClass = state === 'active' ? 'on-duty' : state === 'break' ? 'on-break' : 'on-duty';
+            const statusBadge = state === 'active' ? '<span class="mod-staff-badge active">LIVE</span>'
+                : state === 'break' ? '<span class="mod-staff-badge paused">PAUSE</span>' : '';
+            const shiftTime = shiftMs > 0 ? `<span class="mod-staff-shift">${this._formatMs(shiftMs)}</span>` : '';
 
-            // Lead buttons
+            // Lead: click to manage time
             const leadBtns = this._isLead ? `<div class="mod-staff-lead-btns">
-                <button class="mod-staff-micro-btn add" onclick="ModPanel.manageTime('${s.discordId}','add',1800000)" title="+30min">+</button>
-                <button class="mod-staff-micro-btn remove" onclick="ModPanel.manageTime('${s.discordId}','remove',1800000)" title="-30min">−</button>
-                <button class="mod-staff-micro-btn" onclick="ModPanel.manageTime('${s.discordId}','reset',0)" title="Reset">↺</button>
+                <button class="mod-staff-micro-btn" onclick="ModPanel.openTimeModal('${s.discordId}','${this._escHtml(s.displayName || s.username)}')" title="Zeit verwalten">⏱</button>
             </div>` : '';
 
             return `<div class="mod-staff-item">
                 <div class="mod-staff-avatar">${avatarInner}</div>
                 <div class="mod-staff-info">
-                    <span class="mod-staff-name"><span class="mod-staff-dot"></span>${this._escHtml(s.displayName || s.username || '?')} ${shiftBadge}</span>
+                    <span class="mod-staff-name"><span class="mod-staff-dot ${dotClass}"></span>${this._escHtml(s.displayName || s.username || '?')} ${statusBadge} ${shiftTime}</span>
                     <span class="mod-staff-role">${this._escHtml(topRole)}</span>
                 </div>
                 ${leadBtns}
@@ -4475,7 +4470,6 @@ const ModPanel = {
     // ══════════════════════════════════════════════
 
     _escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; },
-
     _timeAgo(ts) {
         if (!ts) return '';
         const diff = Date.now() - new Date(ts).getTime();
@@ -4486,7 +4480,6 @@ const ModPanel = {
         if (hrs < 24) return hrs + ' hours ago';
         return Math.floor(hrs / 24) + ' days ago';
     },
-
     _formatMs(ms) {
         if (!ms || ms < 0) ms = 0;
         const h = Math.floor(ms / 3600000);
@@ -4496,10 +4489,13 @@ const ModPanel = {
     },
 };
 
-// Enter-Key in Username-Feld löst Suche aus
+// Close search results on click outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.mod-search-wrap')) document.getElementById('modSearchResults')?.classList.add('hidden');
+});
 document.addEventListener('DOMContentLoaded', () => {
     const modInput = document.getElementById('modUsername');
-    if (modInput) modInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') ModPanel.searchUser(); });
+    if (modInput) modInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ModPanel.searchUser(); } });
 });
 
 window.ModPanel = ModPanel;

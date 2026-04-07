@@ -1,6 +1,6 @@
 {
-    "version": "4.36.0",
+    "version": "4.37.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.36.0: Shift-System (8H Ziel, Rangliste, Mitarbeiter des Monats), Roblox Avatars im Log, Lead-Management (Zeit geben/nehmen/reset), Einträge löschen.",
+    "notes": "v4.37.0: Live-Updates (5s Polling), Live-Suche beim Tippen, Staff Status (LIVE/PAUSE), Custom Zeit-Modal für Leads, Roblox Avatars im Log, Rangliste unter Moderation.",
     "forceUpdate": true
 }
