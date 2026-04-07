@@ -1764,6 +1764,30 @@ client.once("ready", async () => {
     setInterval(() => updateBotStatus(client), STATUS_UPDATE_INTERVAL);
     startOverlayDataLoop();
 
+    // Auto-Start: Alle mit On Duty Rolle bekommen aktiven Shift
+    try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (guild) {
+            await guild.members.fetch().catch(() => {});
+            const role = guild.roles.cache.get(ON_DUTY_ROLE_ID);
+            if (role) {
+                let autoStarted = 0;
+                for (const [, member] of role.members) {
+                    const s = getShift(member.id);
+                    if (s.state !== 'active') {
+                        s.state = 'active';
+                        s.startedAt = Date.now();
+                        autoStarted++;
+                    }
+                }
+                if (autoStarted > 0) {
+                    saveShifts();
+                    console.log(`[Shift] ${autoStarted} On-Duty Member automatisch gestartet.`);
+                }
+            }
+        }
+    } catch(e) { console.error('[Shift] Auto-Start Fehler:', e.message); }
+
     await checkGithubRelease();
     setInterval(checkGithubRelease, 5 * 60 * 1000);
 });
