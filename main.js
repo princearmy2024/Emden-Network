@@ -97,71 +97,19 @@ function createWindow() {
 // Roblox Chat Teleport: Simuliert Tasteneingabe im Spiel
 ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
     if (!robloxUsername) return;
-    console.log(`[Teleport] Starte -/tp ${robloxUsername}...`);
-    const { exec } = require('child_process');
+    console.log(`[Teleport] /tp ${robloxUsername} — kopiere in Zwischenablage`);
 
-    // Overlay: Mouse-Events ignorieren damit Roblox klickbar ist
+    // Roblox Anti-Cheat blockiert allen simulierten Input (SendKeys, SendInput, mouse_event)
+    // Loesung: Command in Zwischenablage kopieren, User drueckt "-" und Strg+V
+    const { clipboard } = require('electron');
+    const command = `/tp ${robloxUsername}`;
+    clipboard.writeText(command);
+    console.log(`[Teleport] "${command}" in Zwischenablage kopiert`);
+
+    // Overlay benachrichtigen: zeige Hinweis
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-        robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
-        robloxOverlayWin.blur();
+        robloxOverlayWin.webContents.send('teleport-clipboard', { command, username: robloxUsername });
     }
-
-    // Hybrid: PowerShell AppActivate (funktioniert!) + WScript.Shell SendKeys (funktioniert!)
-    const safeUsername = robloxUsername.replace(/'/g, "''");
-    const lines = [
-        'Add-Type -AssemblyName System.Windows.Forms',
-        'Add-Type -AssemblyName Microsoft.VisualBasic',
-        '',
-        '# Mouse-Klick Funktionen',
-        'Add-Type -MemberDefinition @"',
-        '    [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);',
-        '    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);',
-        '"@ -Name "Mouse" -Namespace "Win32"',
-        '',
-        '# Roblox finden',
-        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
-        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
-        'if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }',
-        'Write-Host "Roblox PID: $($roblox.Id)"',
-        '',
-        '# Roblox in den Vordergrund',
-        '[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)',
-        'Start-Sleep -Milliseconds 500',
-        '',
-        '# Maus in Bildschirmmitte + Rechtsklick HALTEN (Roblox Camera-Mode = Input-Focus)',
-        '$screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds',
-        '$cx = [int]($screen.Width / 2)',
-        '$cy = [int]($screen.Height / 2)',
-        '[Win32.Mouse]::SetCursorPos($cx, $cy)',
-        'Start-Sleep -Milliseconds 100',
-        '[Win32.Mouse]::mouse_event(0x0008, 0, 0, 0, 0)',
-        'Start-Sleep -Milliseconds 600',
-        '',
-        '# Chat oeffnen + Command senden (Rechtsklick noch gehalten)',
-        '$wsh = New-Object -ComObject WScript.Shell',
-        '$wsh.SendKeys("-")',
-        'Start-Sleep -Milliseconds 300',
-        '',
-        '# Rechtsklick loslassen (Chat ist jetzt offen)',
-        '[Win32.Mouse]::mouse_event(0x0010, 0, 0, 0, 0)',
-        'Start-Sleep -Milliseconds 300',
-        '',
-        '$wsh.SendKeys("/tp ' + safeUsername + '")',
-        'Start-Sleep -Milliseconds 200',
-        '$wsh.SendKeys("{ENTER}")',
-        'Write-Host "OK: -/tp ' + safeUsername + '"',
-    ];
-    const psContent = lines.join('\r\n');
-
-    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
-    fs.writeFileSync(tmpFile, psContent, 'utf-8');
-
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`, { timeout: 10000 }, (err, stdout, stderr) => {
-        if (stdout.trim()) console.log(`[Teleport] stdout: ${stdout.trim()}`);
-        if (err) console.error('[Teleport] Fehler:', err.message, stderr);
-        else console.log(`[Teleport] -/tp ${robloxUsername} gesendet!`);
-        fs.unlink(tmpFile, () => {});
-    });
 });
 
 // Sound abspielen (delegiert an Main Window weil Overlay keinen Audio-Focus hat)

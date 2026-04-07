@@ -257,6 +257,18 @@ const Overlay = (() => {
             window.electronAPI.onToggleRobloxCmd(() => toggleCmd());
         }
 
+        // Teleport: Command wurde in Zwischenablage kopiert
+        if (window.electronAPI?.onTeleportClipboard) {
+            window.electronAPI.onTeleportClipboard((data) => {
+                notify({
+                    title: `TP: ${data.username}`,
+                    text: `"${data.command}" kopiert — Drueck "-" dann Strg+V und Enter`,
+                    type: 'admin',
+                    duration: 12000,
+                });
+            });
+        }
+
         // F4: Overlay komplett an/aus (Panels + alles)
         if (window.electronAPI?.onToggleModPanel) {
             window.electronAPI.onToggleModPanel(() => {

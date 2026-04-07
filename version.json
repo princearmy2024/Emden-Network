@@ -1,6 +1,6 @@
 {
-    "version": "4.48.9",
+    "version": "4.49.0",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.9: Teleport — Rechtsklick gehalten fuer Roblox Camera-Mode Input-Focus.",
+    "notes": "v4.49.0: Teleport — Clipboard-Ansatz (Roblox Anti-Cheat blockiert simulierten Input). /tp wird kopiert, User drueckt - dann Strg+V.",
     "forceUpdate": true
 }

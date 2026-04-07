@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateOverlayState: (state) => ipcRenderer.send('update-overlay-state', state),
     onUpdateOverlayState: (callback) => ipcRenderer.on('update-overlay-state', (event, state) => callback(state)),
 
+    // Teleport Clipboard Notification
+    onTeleportClipboard: (cb) => ipcRenderer.on('teleport-clipboard', (event, data) => cb(data)),
+
     // ── GLOBALES PTT SYSTEM ───────────────────────────────────────
     // Main-Prozess sendet diese Events wenn die globale V-Taste gedrückt wird
     onOverlayPTTStart: (cb) => ipcRenderer.on('overlay-ptt-start', () => cb()),
