@@ -748,7 +748,7 @@ const App = window.App = {
         const user = AuthService.getUser();
         if (!user?.discordId) return;
         const oldRole = user.role;
-        // Check staff status direkt vom Server
+        console.log(`[App] Rollen-Check für ${user.username} (${user.discordId}), aktuelle Rolle: ${oldRole}`);
         try {
             const res = await fetch(`${CONFIG.API_URL}/api/check-staff`, {
                 method: 'POST',
@@ -756,12 +756,22 @@ const App = window.App = {
                 body: JSON.stringify({ discordId: user.discordId }),
             });
             const data = await res.json();
+            console.log(`[App] Server sagt: isStaff=${data.isStaff}, isAdmin=${data.isAdmin}`);
             if (data.isAdmin) { user.role = 'admin'; user.isStaff = true; }
             else if (data.isStaff) { user.role = 'staff'; user.isStaff = true; }
         } catch(e) { console.log('[App] check-staff fehlgeschlagen:', e.message); }
+        console.log(`[App] Rolle nach Check: ${user.role} (war: ${oldRole})`);
+        // IMMER Staff-UI aktualisieren (nicht nur bei Aenderung)
+        if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
+            document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
+            console.log(`[App] Staff-UI aktiviert (${document.querySelectorAll('.staff-only').length} Elemente)`);
+        }
+        if (user.role === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+        }
         if (user.role !== oldRole) {
             AuthService.saveSession();
-            console.log(`[App] Rolle aktualisiert: ${oldRole} -> ${user.role}`);
+            console.log(`[App] Session gespeichert: ${oldRole} -> ${user.role}`);
         }
     },
 
