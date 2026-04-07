@@ -1212,6 +1212,85 @@ body.no-fade .glow-line-left, body.no-fade .glow-line-bottom { opacity: 0 !impor
 body.no-grid .grid-pattern { display: none !important; }
 body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { display: none !important; }
 
+/* ── Mod Notification (top center, glass) ── */
+.ov-mod-notif {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    z-index: 9999;
+    width: 440px;
+    max-width: 90vw;
+    background: rgba(8,12,28,0.65);
+    backdrop-filter: blur(40px) saturate(1.6);
+    -webkit-backdrop-filter: blur(40px) saturate(1.6);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(0,136,255,0.06);
+    opacity: 0;
+    pointer-events: none;
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 70%, transparent 100%);
+}
+.ov-mod-notif.show {
+    opacity: 1;
+    pointer-events: auto;
+    animation: ovModNotifIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.ov-mod-notif.hide {
+    animation: ovModNotifOut 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+@keyframes ovModNotifIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-50px) scale(0.96); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes ovModNotifOut {
+    from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.97); }
+}
+.ov-mod-notif-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px 24px;
+}
+.ov-mod-notif-icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+}
+.ov-mod-notif-icon.warn { background: rgba(0,136,255,0.12); }
+.ov-mod-notif-icon.kick { background: rgba(245,158,11,0.12); }
+.ov-mod-notif-icon.ban  { background: rgba(239,68,68,0.12); }
+.ov-mod-notif-body { flex: 1; min-width: 0; }
+.ov-mod-notif-action {
+    font-size: 18px; font-weight: 800; color: #fff;
+    margin-bottom: 2px;
+}
+.ov-mod-notif-text {
+    font-size: 12px; color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+}
+.ov-mod-notif-badge {
+    padding: 4px 12px; border-radius: 8px; font-size: 10px;
+    font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    flex-shrink: 0;
+}
+.ov-mod-notif-badge.warn { background: rgba(0,136,255,0.15); color: #0088FF; }
+.ov-mod-notif-badge.kick { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.ov-mod-notif-badge.ban  { background: rgba(239,68,68,0.15); color: #ef4444; }
+.ov-mod-notif-bar {
+    height: 3px;
+    background: linear-gradient(90deg, #0088FF, #00D1A7);
+    width: 100%; transform-origin: left;
+}
+.ov-mod-notif-bar.animate { animation: ovModNotifBar 6s linear forwards; }
+@keyframes ovModNotifBar {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
 /* ── Overlay Shift Buttons ── */
 .ov-shift-btn {
   flex: 1; padding: 6px 0; border-radius: 6px; border: none;
@@ -1595,6 +1674,20 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <!-- Hidden compat -->
 <div id="info-bar"></div>
 <div id="mod-panel"></div>
+
+<!-- MOD NOTIFICATION (top, glass blur, fade) -->
+<div id="ovModNotif" class="ov-mod-notif">
+    <div class="ov-mod-notif-inner">
+        <div class="ov-mod-notif-icon" id="ovModNotifIcon"></div>
+        <div class="ov-mod-notif-body">
+            <div class="ov-mod-notif-action" id="ovModNotifAction">Warn</div>
+            <div class="ov-mod-notif-text" id="ovModNotifText"></div>
+        </div>
+        <div class="ov-mod-notif-badge" id="ovModNotifBadge">WARN</div>
+    </div>
+    <div class="ov-mod-notif-bar" id="ovModNotifBar"></div>
+</div>
+<audio id="ovModNotifSound" preload="auto" src="soynoviembre-short-digital-notification-alert-440353.mp3"></audio>
 
 <!-- BIG ANNOUNCEMENT -->
 <div id="big-ann">

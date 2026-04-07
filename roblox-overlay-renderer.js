@@ -733,22 +733,9 @@ const Overlay = (() => {
             if (data.discordId === discordId) OverlayShift._syncFromServer(data.state);
         });
 
-        // Mod-Eintrag: Notification im Overlay
+        // Mod-Eintrag: Custom Notification (top, glass, sound)
         socket.on('mod_new_entry', (entry) => {
-            const emoji = entry.action === 'Ban' ? '🔨' : entry.action === 'Kick' ? '👢' : '⚠️';
-            const userName = entry.displayName || entry.username || '?';
-            const modName = entry.moderator || '?';
-            bigAnnounce({
-                title: `${emoji} ${entry.action || 'Moderation'}`,
-                text: `${userName} wurde von @${modName} eingetragen`,
-                duration: 6000,
-            });
-            // Sound
-            try {
-                const snd = new Audio('soynoviembre-short-digital-notification-alert-440353.mp3');
-                snd.volume = 0.4;
-                snd.play().catch(() => {});
-            } catch(e) {}
+            showOverlayModNotif(entry);
         });
 
         if (window.electronAPI) {
@@ -1293,6 +1280,55 @@ const Overlay = (() => {
 
     return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings };
 })();
+
+// ══════════════════════════════════════════════
+// OVERLAY MOD NOTIFICATION (top, glass, fade, sound)
+// ══════════════════════════════════════════════
+let _ovModNotifTimer = null;
+function showOverlayModNotif(entry) {
+    const el = document.getElementById('ovModNotif');
+    const icon = document.getElementById('ovModNotifIcon');
+    const action = document.getElementById('ovModNotifAction');
+    const text = document.getElementById('ovModNotifText');
+    const badge = document.getElementById('ovModNotifBadge');
+    const bar = document.getElementById('ovModNotifBar');
+    const sound = document.getElementById('ovModNotifSound');
+    if (!el) return;
+
+    clearTimeout(_ovModNotifTimer);
+    el.classList.remove('show', 'hide');
+
+    const type = (entry.action || 'Warn').toLowerCase();
+    const emoji = type === 'ban' ? '🔨' : type === 'kick' ? '👢' : '⚠️';
+    const userName = entry.displayName || entry.username || '?';
+    const modName = entry.moderator || '?';
+
+    icon.className = 'ov-mod-notif-icon ' + type;
+    icon.textContent = emoji;
+    action.textContent = `${emoji} ${entry.action || 'Warn'}`;
+    text.textContent = `${userName} wurde von @${modName} eingetragen`;
+    badge.className = 'ov-mod-notif-badge ' + type;
+    badge.textContent = entry.action || 'Warn';
+
+    bar.classList.remove('animate');
+    void bar.offsetWidth;
+    bar.classList.add('animate');
+
+    el.classList.add('show');
+
+    // Sound
+    if (sound) {
+        sound.currentTime = 0;
+        sound.volume = 0.5;
+        sound.play().catch(() => {});
+    }
+
+    _ovModNotifTimer = setTimeout(() => {
+        el.classList.remove('show');
+        el.classList.add('hide');
+        setTimeout(() => el.classList.remove('hide'), 600);
+    }, 6000);
+}
 
 // ══════════════════════════════════════════════
 // OVERLAY SHIFT CONTROL
