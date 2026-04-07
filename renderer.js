@@ -767,12 +767,8 @@ const App = window.App = {
                 el.classList.remove('hidden');
                 el.style.removeProperty('display');
             });
-            // Moderation Nav-Button dynamisch einfügen
-            const slot = document.getElementById('modNavSlot');
-            if (slot && !document.getElementById('modNavBtn')) {
-                slot.innerHTML = `<div class="sidebar-divider"></div><a class="nav-item" id="modNavBtn" data-view="moderation" data-label="Moderation" onclick="App.navigate('moderation')"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></a>`;
-                console.log('[App] Moderation Nav-Button eingefuegt');
-            }
+            // Moderation Nav-Button IMMER einfuegen
+            this._injectModButton();
         }
         if (user.role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
@@ -780,6 +776,28 @@ const App = window.App = {
         if (user.role !== oldRole) {
             AuthService.saveSession();
             console.log(`[App] Session gespeichert: ${oldRole} -> ${user.role}`);
+        }
+    },
+
+    _injectModButton() {
+        // Alle moeglichen Slots probieren
+        const slot = document.getElementById('modNavSlot');
+        const existing = document.getElementById('modNavBtn');
+        console.log(`[App] _injectModButton: slot=${!!slot}, existing=${!!existing}`);
+        if (existing) return; // Schon da
+        if (slot) {
+            slot.innerHTML = `<div class="sidebar-divider"></div><a class="nav-item" id="modNavBtn" data-view="moderation" data-label="Moderation" onclick="App.navigate('moderation')"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></a>`;
+            console.log('[App] Moderation Nav-Button in Slot eingefuegt');
+            return;
+        }
+        // Fallback: Vor dem Server-Nav-Item einfuegen
+        const serverNav = document.querySelector('[data-view="servers"]');
+        if (serverNav) {
+            const div = document.createElement('div');
+            div.id = 'modNavSlot';
+            div.innerHTML = `<div class="sidebar-divider"></div><a class="nav-item" id="modNavBtn" data-view="moderation" data-label="Moderation" onclick="App.navigate('moderation')"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></a>`;
+            serverNav.parentNode.insertBefore(div, serverNav);
+            console.log('[App] Moderation Nav-Button vor Server eingefuegt (Fallback)');
         }
     },
 
@@ -935,11 +953,7 @@ const App = window.App = {
         // Staff-Elemente (EN Team Rolle + Admins)
         if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
             document.querySelectorAll('.staff-only').forEach(el => { el.classList.remove('hidden'); el.style.removeProperty('display'); });
-            // Moderation Nav-Button dynamisch einfügen
-            const slot = document.getElementById('modNavSlot');
-            if (slot && !document.getElementById('modNavBtn')) {
-                slot.innerHTML = `<div class="sidebar-divider"></div><a class="nav-item" id="modNavBtn" data-view="moderation" data-label="Moderation" onclick="App.navigate('moderation')"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></a>`;
-            }
+            this._injectModButton();
         }
     },
 
