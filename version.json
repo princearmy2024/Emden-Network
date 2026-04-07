@@ -1,6 +1,6 @@
 {
-    "version": "4.38.0",
+    "version": "4.39.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.38.0: Live Mod-Log (Socket), Benachrichtigung bei Eintrag, Shift Control im Roblox Overlay (synced mit Dashboard).",
+    "notes": "v4.39.0: Mod-Notification Banner (Animation + Sound), Live Log-Update sofort bei neuem Eintrag.",
     "forceUpdate": true
 }

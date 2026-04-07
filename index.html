@@ -1205,6 +1205,20 @@
         </div><!-- /main-content -->
     </div><!-- /dashboardScreen -->
 
+    <!-- ======================== MOD NOTIFICATION BANNER ======================== -->
+    <div class="mod-notif-banner hidden" id="modNotifBanner">
+        <div class="mod-notif-inner">
+            <div class="mod-notif-icon" id="modNotifIcon"></div>
+            <div class="mod-notif-content">
+                <div class="mod-notif-title" id="modNotifTitle">Moderation</div>
+                <div class="mod-notif-text" id="modNotifText"></div>
+            </div>
+            <div class="mod-notif-badge" id="modNotifBadge">WARN</div>
+        </div>
+        <div class="mod-notif-progress" id="modNotifProgress"></div>
+    </div>
+    <audio id="modNotifSound" preload="auto" src="soynoviembre-short-digital-notification-alert-440353.mp3"></audio>
+
     <!-- ======================== MODAL ======================== -->
     <div class="modal-overlay hidden" id="modalOverlay" onclick="App.closeModal()">
         <div class="modal-box" onclick="event.stopPropagation()">

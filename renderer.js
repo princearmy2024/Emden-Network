@@ -226,15 +226,13 @@ const WebSocketService = {
                 if (window.App) App.renderFullUserList(users);
             });
 
-            // Live Mod-Eintrag: Log aktualisieren + Notification
+            // Live Mod-Eintrag: Log aktualisieren + Banner + Sound
             this.socket.on('mod_new_entry', (entry) => {
-                if (window.App) {
-                    App.showNotification('Moderation', `${entry.action} für ${entry.displayName || entry.username} von @${entry.moderator}`, 'info');
-                    // Wenn auf Moderation-View, Log neu laden
-                    if (window.ModPanel && App.currentView === 'moderation') {
-                        ModPanel.loadLog();
-                    }
-                }
+                if (!window.App) return;
+                // Immer Log neu laden (egal welche View)
+                if (window.ModPanel) ModPanel.loadLog();
+                // Professionelles Banner anzeigen
+                showModNotifBanner(entry);
             });
 
             // Live Shift-Updates
@@ -4043,6 +4041,64 @@ Object.assign(App, {
     },
 });
 
+
+// =============================================================
+// MOD NOTIFICATION BANNER
+// =============================================================
+let _modNotifTimer = null;
+function showModNotifBanner(entry) {
+    const banner = document.getElementById('modNotifBanner');
+    const icon = document.getElementById('modNotifIcon');
+    const title = document.getElementById('modNotifTitle');
+    const text = document.getElementById('modNotifText');
+    const badge = document.getElementById('modNotifBadge');
+    const progress = document.getElementById('modNotifProgress');
+    const sound = document.getElementById('modNotifSound');
+    if (!banner) return;
+
+    // Clear previous
+    clearTimeout(_modNotifTimer);
+    banner.classList.remove('show', 'hide', 'hidden');
+
+    const action = (entry.action || 'Warn').toLowerCase();
+    const emoji = action === 'ban' ? '🔨' : action === 'kick' ? '👢' : '⚠️';
+    const actionLabel = entry.action || 'Warn';
+    const userName = entry.displayName || entry.username || '?';
+    const modName = entry.moderator || '?';
+
+    // Set content
+    icon.className = 'mod-notif-icon ' + action;
+    icon.textContent = emoji;
+    title.textContent = 'MODERATION';
+    text.innerHTML = `<strong>${escHtml(userName)}</strong> wurde mit <strong>${escHtml(actionLabel)}</strong> eingetragen von <strong>@${escHtml(modName)}</strong>`;
+    badge.className = 'mod-notif-badge ' + action;
+    badge.textContent = actionLabel;
+
+    // Reset + animate progress bar
+    progress.classList.remove('animate');
+    void progress.offsetWidth; // force reflow
+    progress.classList.add('animate');
+
+    // Show
+    banner.classList.add('show');
+
+    // Play sound
+    if (sound) {
+        sound.currentTime = 0;
+        sound.volume = 0.5;
+        sound.play().catch(() => {});
+    }
+
+    // Hide after 6s
+    _modNotifTimer = setTimeout(() => {
+        banner.classList.remove('show');
+        banner.classList.add('hide');
+        setTimeout(() => {
+            banner.classList.remove('hide');
+            banner.classList.add('hidden');
+        }, 500);
+    }, 6000);
+}
 
 // =============================================================
 // MODERATION PANEL
