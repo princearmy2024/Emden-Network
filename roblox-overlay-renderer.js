@@ -1401,8 +1401,12 @@ const PanicSystem = {
 
     teleport() {
         if (!this._targetUsername) return;
+        if (this._teleporting) return; // Guard gegen Mehrfach-Klick
+        this._teleporting = true;
+
         const target = this._targetUsername;
         console.log(`[PANIC] Teleportiere zu: ${target}`);
+        console.log(`[PANIC] electronAPI vorhanden: ${!!window.electronAPI}, robloxTeleport: ${!!window.electronAPI?.robloxTeleport}`);
 
         // ERST Focus-Loop + Timer stoppen, damit Roblox Focus behalten kann
         if (this._focusInterval) { clearInterval(this._focusInterval); this._focusInterval = null; }
@@ -1415,11 +1419,20 @@ const PanicSystem = {
         const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
         if (reqFocus) reqFocus(false);
 
-        // Kurz warten damit Roblox Focus hat, dann Teleport senden
+        // Kurz warten damit Roblox Focus hat, dann Teleport IPC senden
         setTimeout(() => {
-            if (window.electronAPI?.robloxTeleport) {
-                window.electronAPI.robloxTeleport(target);
+            try {
+                if (window.electronAPI && window.electronAPI.robloxTeleport) {
+                    window.electronAPI.robloxTeleport(target);
+                    console.log(`[PANIC] IPC roblox-teleport gesendet fuer: ${target}`);
+                } else {
+                    console.error('[PANIC] electronAPI.robloxTeleport NICHT verfuegbar!');
+                }
+            } catch (e) {
+                console.error('[PANIC] Teleport IPC Fehler:', e);
             }
+            // Guard nach 3s resetten
+            setTimeout(() => { this._teleporting = false; }, 3000);
         }, 300);
     },
 
