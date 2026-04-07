@@ -415,10 +415,11 @@ function createRobloxOverlay(discordId, robloxId, isAdmin) {
         backgroundColor: '#00000000',
         alwaysOnTop: true, skipTaskbar: true,
         focusable: true, resizable: false, fullscreenable: false,
-        webPreferences: { 
-            nodeIntegration: false, 
+        webPreferences: {
+            nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js') 
+            preload: path.join(__dirname, 'preload.js'),
+            backgroundThrottling: false, // Erlaubt Audio ohne Focus
         },
     });
     robloxOverlayWin.setAlwaysOnTop(true, 'screen-saver', 1);
