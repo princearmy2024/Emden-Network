@@ -4069,14 +4069,18 @@ function showModNotifBanner(entry) {
     banner.classList.remove('show', 'hide', 'hidden');
 
     const action = (entry.action || 'Warn').toLowerCase();
-    const emoji = action === 'ban' ? '🔨' : action === 'kick' ? '👢' : '⚠️';
+    const iconSvg = action === 'ban'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+        : action === 'kick'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
     const actionLabel = entry.action || 'Warn';
     const userName = entry.displayName || entry.username || '?';
     const modName = entry.moderator || '?';
 
     // Set content
     icon.className = 'mod-notif-icon ' + action;
-    icon.textContent = emoji;
+    icon.innerHTML = iconSvg;
     title.textContent = 'MODERATION';
     text.innerHTML = `<strong>${escHtml(userName)}</strong> wurde mit <strong>${escHtml(actionLabel)}</strong> eingetragen von <strong>@${escHtml(modName)}</strong>`;
     badge.className = 'mod-notif-badge ' + action;
@@ -4353,7 +4357,7 @@ const ModPanel = {
             .slice(0, 15);
         if (!entries.length) { el.innerHTML = '<div class="mod-staff-empty">Noch keine Daten</div>'; return; }
         el.innerHTML = entries.map((e, i) => {
-            const crown = i === 0 ? '<span class="mod-lb-crown">👑</span>' : '';
+            const crown = i === 0 ? '<span class="mod-lb-crown"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M2.5 7.5l4 4 5.5-6 5.5 6 4-4-2 12h-15z"/></svg></span>' : '';
             const avatar = e.avatar ? `<img class="mod-lb-avatar" src="${this._escHtml(e.avatar)}" onerror="this.style.display='none'">` : '';
             return `<div class="mod-lb-item">
                 <span class="mod-lb-rank">#${i + 1}</span>

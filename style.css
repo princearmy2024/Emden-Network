@@ -3327,8 +3327,10 @@ body.has-custom-bg .gif-picker-panel {
     flex-shrink: 0;
 }
 .mod-lb-crown {
-    font-size: 12px;
     flex-shrink: 0;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
 }
 
 /* ── Live Search Dropdown ── */

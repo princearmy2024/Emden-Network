@@ -1299,13 +1299,17 @@ function showOverlayModNotif(entry) {
     el.classList.remove('show', 'hide');
 
     const type = (entry.action || 'Warn').toLowerCase();
-    const emoji = type === 'ban' ? '🔨' : type === 'kick' ? '👢' : '⚠️';
+    const iconSvg = type === 'ban'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+        : type === 'kick'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
     const userName = entry.displayName || entry.username || '?';
     const modName = entry.moderator || '?';
 
     icon.className = 'ov-mod-notif-icon ' + type;
-    icon.textContent = emoji;
-    action.textContent = `${emoji} ${entry.action || 'Warn'}`;
+    icon.innerHTML = iconSvg;
+    action.textContent = entry.action || 'Warn';
     text.textContent = `${userName} wurde von @${modName} eingetragen`;
     badge.className = 'ov-mod-notif-badge ' + type;
     badge.textContent = entry.action || 'Warn';

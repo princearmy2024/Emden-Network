@@ -1107,7 +1107,7 @@ const apiServer = http.createServer(async (req, res) => {
 
     // POST /api/shift/start — On Duty starten
     if (req.method === "POST" && url.pathname === "/api/shift/start") {
-        let body = ""; req.on("data", c => (body += c)); req.on("end", () => {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
@@ -1123,6 +1123,16 @@ const apiServer = http.createServer(async (req, res) => {
                 saveShifts();
                 const known = allKnownUsers.get(discordId);
                 io.emit('shift_update', { discordId, state: 'active', username: known?.username || '?' });
+                // On Duty Rolle geben
+                try {
+                    const guild = client.guilds.cache.get(GUILD_ID);
+                    if (guild) {
+                        const member = await guild.members.fetch(discordId).catch(() => null);
+                        if (member && !member.roles.cache.has(ON_DUTY_ROLE_ID)) {
+                            await member.roles.add(ON_DUTY_ROLE_ID).catch(() => {});
+                        }
+                    }
+                } catch(e) {}
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
@@ -1152,7 +1162,7 @@ const apiServer = http.createServer(async (req, res) => {
 
     // POST /api/shift/end — Shift beenden (Zeit gespeichert, State = off)
     if (req.method === "POST" && url.pathname === "/api/shift/end") {
-        let body = ""; req.on("data", c => (body += c)); req.on("end", () => {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
@@ -1174,6 +1184,16 @@ const apiServer = http.createServer(async (req, res) => {
                 // savedMs bleibt erhalten — User kann weiter machen
                 saveShifts();
                 io.emit('shift_update', { discordId, state: 'off', username: known?.username || '?' });
+                // On Duty Rolle entfernen
+                try {
+                    const guild = client.guilds.cache.get(GUILD_ID);
+                    if (guild) {
+                        const member = await guild.members.fetch(discordId).catch(() => null);
+                        if (member && member.roles.cache.has(ON_DUTY_ROLE_ID)) {
+                            await member.roles.remove(ON_DUTY_ROLE_ID).catch(() => {});
+                        }
+                    }
+                } catch(e) {}
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
