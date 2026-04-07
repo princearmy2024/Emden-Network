@@ -67,8 +67,8 @@ html, body {
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 8%, rgba(0,0,0,1) 18%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 8%, rgba(0,0,0,1) 18%);
   z-index: 50; display: flex; flex-direction: column;
-  pointer-events: none; opacity: 0;
-  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none; opacity: 0; visibility: hidden;
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s 1s;
 }
 
 /* BOTTOM BAR */
@@ -1230,8 +1230,6 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
     box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(0,136,255,0.06);
     opacity: 0;
     pointer-events: none;
-    mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 70%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 70%, transparent 100%);
 }
 .ov-mod-notif.show {
     opacity: 1;
@@ -1382,6 +1380,7 @@ body.overlay-active #corner-br,
 body.overlay-active .glow-line-left,
 body.overlay-active .glow-line-bottom,
 body.overlay-active #logo-container { opacity: 1; }
+body.overlay-active #panel-left { visibility: visible; transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s 0s; }
 
 /* Hide logo when mod panel open */
 body.mod-open #logo-container { opacity: 0 !important; }
