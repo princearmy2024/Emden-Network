@@ -1,6 +1,6 @@
 {
     "name": "emden-network",
-    "version": "4.47.5",
+    "version": "4.47.6",
     "description": "Emden Network - Control Center",
     "main": "main.js",
     "scripts": {

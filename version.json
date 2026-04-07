@@ -1,6 +1,6 @@
 {
-    "version": "4.47.5",
+    "version": "4.47.6",
     "releaseDate": "2026-04-07",
-    "notes": "v4.47.5: Fix Panic Alert — display:flex erzwingen + Debug Logs, Debounce bleibt.",
+    "notes": "v4.47.6: Fix Bot — index.js fehlte, COMPLETE-index.js als index.js kopiert. Panic Alert funktioniert jetzt.",
     "forceUpdate": true
 }
