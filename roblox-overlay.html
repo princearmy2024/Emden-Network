@@ -168,8 +168,9 @@ html, body {
   display: flex; align-items: center; gap: clamp(6px, 0.5vw, 10px);
   padding: clamp(5px, 0.4vw, 8px) clamp(6px, 0.5vw, 10px);
   border-radius: 8px; margin-bottom: 2px;
-  pointer-events: auto; cursor: default; transition: background 0.2s;
+  pointer-events: none; cursor: default; transition: background 0.2s;
 }
+body.overlay-active .panel-info-card { pointer-events: auto; }
 .panel-info-card:hover { background: rgba(255,255,255,0.03); }
 .panel-info-icon {
   width: clamp(24px, 1.6vw, 30px); height: clamp(24px, 1.6vw, 30px);
@@ -230,8 +231,9 @@ html, body {
 .panel-pin-wrap {
   padding: 6px clamp(10px, 1vw, 16px) 2px;
   display: flex; justify-content: flex-end;
-  pointer-events: auto;
+  pointer-events: none;
 }
+body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 .panel-pin-btn {
   width: 24px; height: 24px; border-radius: 6px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);

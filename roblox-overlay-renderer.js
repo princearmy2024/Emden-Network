@@ -733,6 +733,24 @@ const Overlay = (() => {
             if (data.discordId === discordId) OverlayShift._syncFromServer(data.state);
         });
 
+        // Mod-Eintrag: Notification im Overlay
+        socket.on('mod_new_entry', (entry) => {
+            const emoji = entry.action === 'Ban' ? '🔨' : entry.action === 'Kick' ? '👢' : '⚠️';
+            const userName = entry.displayName || entry.username || '?';
+            const modName = entry.moderator || '?';
+            bigAnnounce({
+                title: `${emoji} ${entry.action || 'Moderation'}`,
+                text: `${userName} wurde von @${modName} eingetragen`,
+                duration: 6000,
+            });
+            // Sound
+            try {
+                const snd = new Audio('soynoviembre-short-digital-notification-alert-440353.mp3');
+                snd.volume = 0.4;
+                snd.play().catch(() => {});
+            } catch(e) {}
+        });
+
         if (window.electronAPI) {
             socket.on('overlay_game_start_test', (data) => setGameRunning(true, data.startTime));
         }
