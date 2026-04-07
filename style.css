@@ -3176,6 +3176,216 @@ body.has-custom-bg .gif-picker-panel {
     box-shadow: 0 6px 24px rgba(0,136,255,0.3);
 }
 
+/* ── Shift Control ── */
+.mod-shift-progress {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.mod-shift-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #0088FF, #00D1A7);
+    transition: width 1s linear;
+}
+.mod-shift-time-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.mod-shift-timer {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+}
+.mod-shift-goal {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.mod-shift-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.mod-shift-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 0;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+}
+.mod-shift-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
+.mod-shift-btn:active:not(:disabled) { transform: scale(0.98); }
+.mod-shift-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.mod-shift-start {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 4px 12px rgba(16,185,129,0.2);
+}
+.mod-shift-pause {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    box-shadow: 0 4px 12px rgba(245,158,11,0.2);
+}
+.mod-shift-end {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    box-shadow: 0 4px 12px rgba(239,68,68,0.2);
+}
+
+/* ── Lead Actions ── */
+.mod-lead-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.mod-lead-actions.hidden { display: none; }
+.mod-lead-btn {
+    flex: 1;
+    padding: 7px 0;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-sub);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.mod-lead-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.mod-lead-btn.danger:hover { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.2); }
+
+/* ── Leaderboard ── */
+.mod-leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+.mod-leaderboard::-webkit-scrollbar { display: none; }
+.mod-lb-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.mod-lb-item:hover { background: rgba(255,255,255,0.04); }
+.mod-lb-rank {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.mod-lb-item:first-child .mod-lb-rank { color: #fbbf24; }
+.mod-lb-item:nth-child(2) .mod-lb-rank { color: #94a3b8; }
+.mod-lb-item:nth-child(3) .mod-lb-rank { color: #cd7c2f; }
+.mod-lb-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.mod-lb-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mod-lb-time {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--brand-blue);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+}
+.mod-lb-crown {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* Staff shift time badge */
+.mod-staff-shift {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--brand-blue);
+    background: rgba(0,136,255,0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+/* Lead time manage buttons on staff items */
+.mod-staff-lead-btns {
+    display: flex;
+    gap: 3px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.mod-staff-lead-btns.hidden { display: none; }
+.mod-staff-micro-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.mod-staff-micro-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.mod-staff-micro-btn.remove:hover { color: #ef4444; }
+.mod-staff-micro-btn.add:hover { color: #10b981; }
+
+/* Log delete button for leads */
+.mod-log-delete {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.15);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    display: none;
+}
+.mod-log-delete.visible { display: block; }
+.mod-log-delete:hover { background: rgba(239,68,68,0.15); color: #ef4444; }
+
 /* ── RIGHT: Mod Log ── */
 .mod-right {
     display: flex;

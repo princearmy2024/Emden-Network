@@ -1,6 +1,6 @@
 {
-    "version": "4.35.0",
+    "version": "4.36.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.35.0: Moderation Dashboard — Glassmorphism UI, On-Duty Staff, Mod-Log History.",
+    "notes": "v4.36.0: Shift-System (8H Ziel, Rangliste, Mitarbeiter des Monats), Roblox Avatars im Log, Lead-Management (Zeit geben/nehmen/reset), Einträge löschen.",
     "forceUpdate": true
 }

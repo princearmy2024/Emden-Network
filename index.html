@@ -1027,15 +1027,54 @@
                 <div class="view" id="view-moderation">
                     <div class="mod-layout">
 
-                        <!-- ── LEFT: Active Staff (On Duty) ── -->
+                        <!-- ── LEFT: Shift Control + Active Staff ── -->
                         <div class="mod-left">
+                            <!-- Shift Control -->
+                            <div class="mod-glass-card">
+                                <h3 class="mod-card-title">Shift Control</h3>
+                                <div class="mod-shift-progress">
+                                    <div class="mod-shift-progress-bar" id="modShiftBar" style="width:0%"></div>
+                                </div>
+                                <div class="mod-shift-time-row">
+                                    <span class="mod-shift-timer" id="modShiftTimer">0:00:00</span>
+                                    <span class="mod-shift-goal">/ 8:00:00</span>
+                                </div>
+                                <div class="mod-shift-buttons">
+                                    <button class="mod-shift-btn mod-shift-start" id="modBtnStart" onclick="ModPanel.shiftStart()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                        Start On Duty
+                                    </button>
+                                    <button class="mod-shift-btn mod-shift-pause" id="modBtnPause" onclick="ModPanel.shiftPause()" disabled>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                                        Pause On Duty
+                                    </button>
+                                    <button class="mod-shift-btn mod-shift-end" id="modBtnEnd" onclick="ModPanel.shiftEnd()" disabled>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                                        Beenden
+                                    </button>
+                                </div>
+                                <!-- Lead: Reset All -->
+                                <div class="mod-lead-actions hidden" id="modLeadShiftActions">
+                                    <button class="mod-lead-btn" onclick="ModPanel.resetAll()">Reset All</button>
+                                </div>
+                            </div>
+
+                            <!-- Active Staff -->
                             <div class="mod-glass-card">
                                 <h3 class="mod-card-title">
                                     <span class="mod-title-dot"></span>
                                     Active Staff
                                 </h3>
                                 <div class="mod-staff-list" id="modStaffList">
-                                    <div class="mod-staff-empty">Lade On-Duty Moderatoren...</div>
+                                    <div class="mod-staff-empty">Lade...</div>
+                                </div>
+                            </div>
+
+                            <!-- Rangliste -->
+                            <div class="mod-glass-card">
+                                <h3 class="mod-card-title">Rangliste</h3>
+                                <div class="mod-leaderboard" id="modLeaderboard">
+                                    <div class="mod-staff-empty">Lade...</div>
                                 </div>
                             </div>
                         </div>

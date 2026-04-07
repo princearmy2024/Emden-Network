@@ -77,6 +77,49 @@ function getModHistory(robloxUserId) {
     return modHistory[robloxUserId] || [];
 }
 
+// === Shift System ===
+const SHIFT_FILE = path.join(path.resolve(), "data", "shifts.json");
+const SHIFT_LEADERBOARD_FILE = path.join(path.resolve(), "data", "shiftLeaderboard.json");
+let shiftData = {};       // { discordId: { state: 'off'|'active'|'break', savedMs: 0, startedAt: null } }
+let shiftLeaderboard = {}; // { discordId: { totalMs: 0, username: '', avatar: '' } }  — survives reset-all
+
+if (fs.existsSync(SHIFT_FILE)) {
+    try { shiftData = JSON.parse(fs.readFileSync(SHIFT_FILE, "utf-8")); } catch(e) {}
+}
+if (fs.existsSync(SHIFT_LEADERBOARD_FILE)) {
+    try { shiftLeaderboard = JSON.parse(fs.readFileSync(SHIFT_LEADERBOARD_FILE, "utf-8")); } catch(e) {}
+}
+function saveShifts() {
+    try {
+        if (!fs.existsSync(path.dirname(SHIFT_FILE))) fs.mkdirSync(path.dirname(SHIFT_FILE), { recursive: true });
+        fs.writeFileSync(SHIFT_FILE, JSON.stringify(shiftData, null, 2));
+    } catch(e) {}
+}
+function saveLeaderboard() {
+    try {
+        if (!fs.existsSync(path.dirname(SHIFT_LEADERBOARD_FILE))) fs.mkdirSync(path.dirname(SHIFT_LEADERBOARD_FILE), { recursive: true });
+        fs.writeFileSync(SHIFT_LEADERBOARD_FILE, JSON.stringify(shiftLeaderboard, null, 2));
+    } catch(e) {}
+}
+function getShift(discordId) {
+    if (!shiftData[discordId]) shiftData[discordId] = { state: 'off', savedMs: 0, startedAt: null };
+    return shiftData[discordId];
+}
+function getShiftTotalMs(discordId) {
+    const s = getShift(discordId);
+    let total = s.savedMs || 0;
+    if (s.state === 'active' && s.startedAt) total += Date.now() - s.startedAt;
+    return total;
+}
+
+// Lead role IDs that can manage shifts + delete mod entries
+const LEAD_ROLE_IDS = [
+    "1365085407381028864",  // Projektleitung
+    "1365086249592815637",  // Manager
+    "1365087911308951572",  // Teamleitung
+    "1365088012517642343",  // Stv. Teamleitung
+];
+
 const robloxPresenceState = new Map();
 const overlayClients = new Map();
 
@@ -1039,6 +1082,184 @@ const apiServer = http.createServer(async (req, res) => {
             res.writeHead(500);
             return res.end(JSON.stringify({ success: false, error: "Server error" }));
         }
+    }
+
+    // ================================================================
+    // SHIFT SYSTEM ENDPOINTS
+    // ================================================================
+
+    // Helper: Check if user has lead role
+    async function isLead(discordId) {
+        try {
+            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            if (!member) return false;
+            return LEAD_ROLE_IDS.some(id => member.roles.cache.has(id));
+        } catch(e) { return false; }
+    }
+
+    // GET /api/shifts — Alle Shifts + Leaderboard
+    if (req.method === "GET" && url.pathname === "/api/shifts") {
+        const shifts = {};
+        for (const [id, s] of Object.entries(shiftData)) {
+            let totalMs = s.savedMs || 0;
+            if (s.state === 'active' && s.startedAt) totalMs += Date.now() - s.startedAt;
+            const known = allKnownUsers.get(id);
+            shifts[id] = { ...s, totalMs, username: known?.username || '?', avatar: known?.avatar || '' };
+        }
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, shifts, leaderboard: shiftLeaderboard }));
+    }
+
+    // POST /api/shift/start — On Duty starten
+    if (req.method === "POST" && url.pathname === "/api/shift/start") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", () => {
+            try {
+                const { discordId } = JSON.parse(body || "{}");
+                if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
+                const s = getShift(discordId);
+                if (s.state === 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Bereits aktiv" })); }
+                s.state = 'active';
+                s.startedAt = Date.now();
+                saveShifts();
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
+    // POST /api/shift/pause — Pause (Zeit wird gespeichert, Timer stoppt)
+    if (req.method === "POST" && url.pathname === "/api/shift/pause") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", () => {
+            try {
+                const { discordId } = JSON.parse(body || "{}");
+                if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
+                const s = getShift(discordId);
+                if (s.state !== 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Nicht aktiv" })); }
+                // Save elapsed time
+                if (s.startedAt) s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
+                s.state = 'break';
+                s.startedAt = null;
+                saveShifts();
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
+    // POST /api/shift/end — Shift beenden (Zeit gespeichert, State = off)
+    if (req.method === "POST" && url.pathname === "/api/shift/end") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", () => {
+            try {
+                const { discordId } = JSON.parse(body || "{}");
+                if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
+                const s = getShift(discordId);
+                // Save any remaining active time
+                if (s.state === 'active' && s.startedAt) {
+                    s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
+                }
+                // Update leaderboard (permanent, survives reset-all)
+                const known = allKnownUsers.get(discordId);
+                if (!shiftLeaderboard[discordId]) shiftLeaderboard[discordId] = { totalMs: 0, username: '', avatar: '' };
+                shiftLeaderboard[discordId].totalMs += s.savedMs || 0;
+                shiftLeaderboard[discordId].username = known?.username || shiftLeaderboard[discordId].username || '?';
+                shiftLeaderboard[discordId].avatar = known?.avatar || shiftLeaderboard[discordId].avatar || '';
+                saveLeaderboard();
+
+                s.state = 'off';
+                s.startedAt = null;
+                // savedMs bleibt erhalten — User kann weiter machen
+                saveShifts();
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
+    // POST /api/shift/manage — Zeit geben/nehmen/reset (nur Leads)
+    if (req.method === "POST" && url.pathname === "/api/shift/manage") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
+            try {
+                const { leadDiscordId, targetDiscordId, action, amountMs } = JSON.parse(body || "{}");
+                if (!leadDiscordId || !action) { res.writeHead(400); return res.end(JSON.stringify({ error: "leadDiscordId und action required" })); }
+
+                const hasPermission = await isLead(leadDiscordId);
+                if (!hasPermission) { res.writeHead(403); return res.end(JSON.stringify({ error: "Keine Berechtigung" })); }
+
+                if (action === 'reset-all') {
+                    // Reset ALL shifts to 0 (leaderboard stays!)
+                    for (const id of Object.keys(shiftData)) {
+                        shiftData[id].savedMs = 0;
+                        shiftData[id].startedAt = shiftData[id].state === 'active' ? Date.now() : null;
+                    }
+                    saveShifts();
+                    res.writeHead(200);
+                    return res.end(JSON.stringify({ success: true, message: "Alle Shifts zurückgesetzt" }));
+                }
+
+                if (!targetDiscordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "targetDiscordId required" })); }
+                const s = getShift(targetDiscordId);
+
+                if (action === 'add') {
+                    s.savedMs = (s.savedMs || 0) + (amountMs || 0);
+                    saveShifts();
+                } else if (action === 'remove') {
+                    s.savedMs = Math.max(0, (s.savedMs || 0) - (amountMs || 0));
+                    saveShifts();
+                } else if (action === 'reset') {
+                    s.savedMs = 0;
+                    if (s.state === 'active') s.startedAt = Date.now(); // restart timer from 0
+                    saveShifts();
+                }
+
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
+    // ================================================================
+    // MOD-LOG DELETE (nur Leads)
+    // ================================================================
+
+    // POST /api/mod-log/delete — Einzelnen Eintrag löschen
+    if (req.method === "POST" && url.pathname === "/api/mod-log/delete") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
+            try {
+                const { leadDiscordId, userId, entryIndex } = JSON.parse(body || "{}");
+                if (!leadDiscordId || !userId || entryIndex === undefined) {
+                    res.writeHead(400); return res.end(JSON.stringify({ error: "leadDiscordId, userId, entryIndex required" }));
+                }
+
+                const hasPermission = await isLead(leadDiscordId);
+                if (!hasPermission) { res.writeHead(403); return res.end(JSON.stringify({ error: "Keine Berechtigung" })); }
+
+                const history = modHistory[userId];
+                if (!history || entryIndex < 0 || entryIndex >= history.length) {
+                    res.writeHead(404); return res.end(JSON.stringify({ error: "Eintrag nicht gefunden" }));
+                }
+
+                history.splice(entryIndex, 1);
+                if (history.length === 0) delete modHistory[userId];
+                saveModHistory();
+
+                console.log(`[Mod] Lead ${leadDiscordId} hat Eintrag #${entryIndex} von User ${userId} gelöscht`);
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+    }
+
+    // POST /api/check-lead — Prüft ob ein User Lead-Rechte hat
+    if (req.method === "POST" && url.pathname === "/api/check-lead") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
+            try {
+                const { discordId } = JSON.parse(body || "{}");
+                const hasPermission = await isLead(discordId);
+                res.writeHead(200);
+                return res.end(JSON.stringify({ success: true, isLead: hasPermission }));
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+        }); return;
     }
 
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
