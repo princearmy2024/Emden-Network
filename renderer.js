@@ -747,42 +747,22 @@ const App = window.App = {
     async _refreshUserRole() {
         const user = AuthService.getUser();
         if (!user?.discordId) return;
+        const oldRole = user.role;
+        // Check staff status direkt vom Server
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/check-lead`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+            const res = await fetch(`${CONFIG.API_URL}/api/check-staff`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
                 body: JSON.stringify({ discordId: user.discordId }),
             });
             const data = await res.json();
-            // Update role in session if changed
-            const oldRole = user.role;
-            if (data.isLead && oldRole !== 'admin') {
-                user.role = user.role === 'admin' ? 'admin' : 'staff';
-                user.isStaff = true;
-            }
-            // Also check staff via allKnownUsers on server
-            const statusRes = await fetch(`${CONFIG.API_URL}/api/check-staff`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: user.discordId }),
-            }).catch(() => null);
-            if (statusRes) {
-                const staffData = await statusRes.json().catch(() => ({}));
-                if (staffData.isStaff && user.role === 'user') {
-                    user.role = 'staff';
-                    user.isStaff = true;
-                }
-                if (staffData.isAdmin) user.role = 'admin';
-            }
-            if (user.role !== oldRole) {
-                AuthService.saveSession();
-                if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
-                    document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
-                }
-                if (user.role === 'admin') {
-                    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
-                }
-                console.log(`[App] Rolle aktualisiert: ${oldRole} -> ${user.role}`);
-            }
-        } catch(e) {}
+            if (data.isAdmin) { user.role = 'admin'; user.isStaff = true; }
+            else if (data.isStaff) { user.role = 'staff'; user.isStaff = true; }
+        } catch(e) { console.log('[App] check-staff fehlgeschlagen:', e.message); }
+        if (user.role !== oldRole) {
+            AuthService.saveSession();
+            console.log(`[App] Rolle aktualisiert: ${oldRole} -> ${user.role}`);
+        }
     },
 
     initLoginHandlers() {
