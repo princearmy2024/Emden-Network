@@ -531,13 +531,18 @@ const Overlay = (() => {
     function toggleOverlayVisibility() {
         const isActive = document.body.classList.contains('overlay-active');
         if (isActive) {
-            // Overlay aus → zurück zum Watermark
             document.body.classList.remove('overlay-active');
             document.body.classList.add('watermark-visible');
             if (modSlideOpen) toggleModSlide();
             overlayHidden = true;
         } else {
-            // Erstes Mal: Intro abspielen, dann Overlay
+            // F4 Sound abspielen
+            try {
+                const snd = document.getElementById('ovStartSound');
+                if (snd) { snd.currentTime = 0; snd.volume = 0.4; snd.play().catch(() => {}); }
+                else if (window.electronAPI?.playNotificationSound) window.electronAPI.playNotificationSound();
+            } catch(e) {}
+
             if (!introPlayed) {
                 introPlayed = true;
                 document.body.classList.remove('watermark-visible');
@@ -546,7 +551,6 @@ const Overlay = (() => {
                     overlayHidden = false;
                 });
             } else {
-                // Ab dem 2. Mal: direkt Overlay an
                 document.body.classList.add('overlay-active');
                 document.body.classList.remove('watermark-visible');
                 overlayHidden = false;

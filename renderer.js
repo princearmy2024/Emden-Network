@@ -4340,18 +4340,24 @@ const ModPanel = {
     renderLeaderboard() {
         const el = document.getElementById('modLeaderboard');
         if (!el) return;
-        // Merge live shifts into leaderboard for real-time display
-        const merged = { ...this._leaderboard };
+        // Merge: Leaderboard (beendete Shifts) + aktive Shifts (live)
+        const merged = {};
+        // Leaderboard: beendete Shifts
+        for (const [id, lb] of Object.entries(this._leaderboard)) {
+            merged[id] = { totalMs: lb.totalMs || 0, username: lb.username || '?', avatar: lb.avatar || '' };
+        }
+        // Live Shifts: aktuelle savedMs dazurechnen (nicht totalMs da das live berechnet wird)
         for (const [id, s] of Object.entries(this._shifts)) {
-            if (!merged[id]) merged[id] = { totalMs: 0, username: s.username || '?', avatar: s.avatar || '' };
-            // Add current shift time on top of leaderboard
-            const liveMs = s.totalMs || s.savedMs || 0;
-            merged[id].liveMs = liveMs;
-            if (s.username) merged[id].username = s.username;
+            if (!merged[id]) merged[id] = { totalMs: 0, username: '?', avatar: '' };
+            // savedMs = aktuelle Session-Zeit, addiere zum Leaderboard
+            let currentMs = s.savedMs || 0;
+            if (s.state === 'active' && s.startedAt) currentMs += Date.now() - s.startedAt;
+            merged[id].currentMs = currentMs;
+            if (s.username && s.username !== '?') merged[id].username = s.username;
             if (s.avatar) merged[id].avatar = s.avatar;
         }
         const entries = Object.entries(merged)
-            .map(([id, lb]) => ({ id, totalMs: (lb.totalMs || 0) + (lb.liveMs || 0), username: lb.username, avatar: lb.avatar }))
+            .map(([id, lb]) => ({ id, totalMs: (lb.totalMs || 0) + (lb.currentMs || 0), username: lb.username, avatar: lb.avatar }))
             .filter(e => e.totalMs > 0)
             .sort((a, b) => b.totalMs - a.totalMs)
             .slice(0, 15);
@@ -4511,7 +4517,7 @@ const ModPanel = {
             return `<div class="mod-log-card" data-search="${this._escHtml((e.username || '') + ' ' + (e.moderator || '') + ' ' + (e.reason || '') + ' ' + (e.displayName || ''))}">
                 <div class="mod-log-left">
                     <div class="mod-log-header">${discordPfp}<span class="mod-log-moderator">@${this._escHtml(e.moderator || '?')}</span></div>
-                    <div class="mod-log-field"><strong>Username:</strong> ${this._escHtml(e.displayName || e.username || '?')}</div>
+                    <div class="mod-log-field"><strong>Username:</strong> ${this._escHtml(e.displayName || e.username || '?')}${e.username ? ' <span style="color:var(--text-muted)">@' + this._escHtml(e.username) + '</span>' : ''}</div>
                     <div class="mod-log-field"><strong>ID:</strong> ${this._escHtml(String(e.userId || '?'))}</div>
                     <div class="mod-log-field"><strong>Punishment:</strong> <span class="mod-log-punishment ${punishClass}">${this._escHtml(e.action || '?')}</span></div>
                     <div class="mod-log-field mod-log-reason"><strong>Reason:</strong> ${this._escHtml(e.reason || '—')}</div>
