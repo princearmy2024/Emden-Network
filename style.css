@@ -3396,57 +3396,72 @@ body.has-custom-bg .gif-picker-panel {
 
 /* Lead time modal */
 .mod-lead-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    animation: modFadeIn 0.2s ease-out;
 }
 .mod-lead-modal.hidden { display: none; }
 .mod-lead-modal-box {
-    background: rgba(13,15,28,0.95);
-    backdrop-filter: blur(40px);
+    background: rgba(10,12,24,0.92);
+    backdrop-filter: blur(40px) saturate(1.5);
+    -webkit-backdrop-filter: blur(40px) saturate(1.5);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
-    padding: 24px;
-    width: 320px;
+    border-radius: 20px;
+    padding: 0;
+    width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 40px rgba(0,136,255,0.06);
+    animation: modNotifIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.mod-lead-modal-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 16px;
+@keyframes modNotifIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
-.mod-lead-modal-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+.mod-lead-modal-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 22px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.mod-lead-modal-row .mod-input { padding: 8px 12px; font-size: 13px; }
-.mod-lead-modal-btns {
-    display: flex;
-    gap: 8px;
-}
-.mod-lead-modal-btns button {
-    flex: 1;
-    padding: 8px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    color: #fff;
+.mod-lead-modal-title { font-size: 16px; font-weight: 700; color: #fff; flex: 1; }
+.mod-lead-modal-status { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.mod-lead-modal-close {
+    width: 28px; height: 28px; border-radius: 8px; border: none;
+    background: rgba(255,255,255,0.05); color: var(--text-muted); cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
     transition: all 0.15s;
 }
-.mod-lead-modal-btns .mod-lead-add { background: rgba(34,197,94,0.2); color: #22c55e; }
-.mod-lead-modal-btns .mod-lead-add:hover { background: rgba(34,197,94,0.3); }
-.mod-lead-modal-btns .mod-lead-remove { background: rgba(239,68,68,0.2); color: #ef4444; }
-.mod-lead-modal-btns .mod-lead-remove:hover { background: rgba(239,68,68,0.3); }
-.mod-lead-modal-btns .mod-lead-cancel { background: rgba(255,255,255,0.05); color: var(--text-sub); }
-.mod-lead-modal-btns .mod-lead-cancel:hover { background: rgba(255,255,255,0.1); }
+.mod-lead-modal-close:hover { background: rgba(239,68,68,0.15); color: #ef4444; }
+.mod-lead-modal-stats {
+    display: flex; gap: 12px; padding: 16px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mod-lead-modal-stat {
+    flex: 1; background: rgba(255,255,255,0.03); border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.mod-lead-modal-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.mod-lead-modal-stat-value { font-size: 18px; font-weight: 800; color: #fff; font-family: var(--font-mono); }
+.mod-lead-modal-section { padding: 14px 22px; }
+.mod-lead-modal-section + .mod-lead-modal-section { padding-top: 0; }
+.mod-lead-modal-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;
+    font-family: var(--font-mono);
+}
+.mod-lead-modal-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+}
+.mod-lead-modal-row .mod-input { padding: 8px 10px; font-size: 14px; text-align: center; flex: 1; }
+.mod-lead-modal-sep { font-size: 11px; color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.mod-lead-modal-btns { display: flex; gap: 6px; padding-bottom: 4px; }
+.mod-lead-modal-btns button {
+    flex: 1; padding: 8px; border-radius: 10px; font-size: 12px;
+    font-weight: 700; border: none; cursor: pointer; transition: all 0.15s;
+}
+.mod-lead-modal-btns button:hover { filter: brightness(1.2); }
+.mod-lead-modal-btns .mod-lead-add { background: rgba(34,197,94,0.15); color: #22c55e; }
+.mod-lead-modal-btns .mod-lead-remove { background: rgba(239,68,68,0.15); color: #ef4444; }
+.mod-lead-modal-btns .mod-lead-reset { background: rgba(255,255,255,0.05); color: var(--text-sub); }
 
 /* Staff shift time badge */
 .mod-staff-shift {

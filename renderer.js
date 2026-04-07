@@ -4252,22 +4252,62 @@ const ModPanel = {
     // ── Lead: Custom Time Modal ──
     openTimeModal(targetId, targetName) {
         if (!this._isLead) return;
-        // Remove existing modal
         document.getElementById('modLeadTimeModal')?.remove();
+
+        const shift = this._shifts[targetId] || {};
+        const shiftMs = shift.totalMs || shift.savedMs || 0;
+        const breakMs = shift.totalBreakMs || shift.breakMs || 0;
+        const state = shift.state || 'off';
+        const stateLabel = state === 'active' ? 'On Duty' : state === 'break' ? 'Pause' : 'Offline';
+        const stateColor = state === 'active' ? '#22c55e' : state === 'break' ? '#3b82f6' : '#64748b';
+
         const html = `<div class="mod-lead-modal" id="modLeadTimeModal" onclick="if(event.target===this)ModPanel.closeTimeModal()">
             <div class="mod-lead-modal-box">
-                <div class="mod-lead-modal-title">Shift-Zeit: ${this._escHtml(targetName)}</div>
-                <div class="mod-lead-modal-row">
-                    <input type="number" class="mod-input" id="modLeadTimeHours" placeholder="Stunden" min="0" max="24" value="0" style="width:50%">
-                    <input type="number" class="mod-input" id="modLeadTimeMinutes" placeholder="Minuten" min="0" max="59" value="30" style="width:50%">
+                <div class="mod-lead-modal-header">
+                    <div class="mod-lead-modal-title">${this._escHtml(targetName)}</div>
+                    <span class="mod-lead-modal-status" style="color:${stateColor}">${stateLabel}</span>
+                    <button class="mod-lead-modal-close" onclick="ModPanel.closeTimeModal()">&times;</button>
                 </div>
-                <div class="mod-lead-modal-btns">
-                    <button class="mod-lead-add" onclick="ModPanel._doManageTime('${targetId}','add')">+ Geben</button>
-                    <button class="mod-lead-remove" onclick="ModPanel._doManageTime('${targetId}','remove')">− Nehmen</button>
-                    <button class="mod-lead-cancel" onclick="ModPanel.closeTimeModal()">Abbrechen</button>
+
+                <div class="mod-lead-modal-stats">
+                    <div class="mod-lead-modal-stat">
+                        <span class="mod-lead-modal-stat-label">Shift-Zeit</span>
+                        <span class="mod-lead-modal-stat-value">${this._formatMs(shiftMs)}</span>
+                    </div>
+                    <div class="mod-lead-modal-stat">
+                        <span class="mod-lead-modal-stat-label">Pause-Zeit</span>
+                        <span class="mod-lead-modal-stat-value">${this._formatMs(breakMs)}</span>
+                    </div>
                 </div>
-                <div style="margin-top:10px;display:flex;gap:6px;">
-                    <button class="mod-lead-cancel" style="flex:1" onclick="ModPanel._doManageTime('${targetId}','reset')">Reset auf 0</button>
+
+                <div class="mod-lead-modal-section">
+                    <div class="mod-lead-modal-section-title">Shift-Zeit anpassen</div>
+                    <div class="mod-lead-modal-row">
+                        <input type="number" class="mod-input" id="modLeadShiftH" placeholder="H" min="0" max="24" value="0">
+                        <span class="mod-lead-modal-sep">h</span>
+                        <input type="number" class="mod-input" id="modLeadShiftM" placeholder="M" min="0" max="59" value="30">
+                        <span class="mod-lead-modal-sep">min</span>
+                    </div>
+                    <div class="mod-lead-modal-btns">
+                        <button class="mod-lead-add" onclick="ModPanel._doManage('${targetId}','add','shift')">+ Geben</button>
+                        <button class="mod-lead-remove" onclick="ModPanel._doManage('${targetId}','remove','shift')">− Nehmen</button>
+                        <button class="mod-lead-reset" onclick="ModPanel._doManage('${targetId}','reset','shift')">Reset</button>
+                    </div>
+                </div>
+
+                <div class="mod-lead-modal-section">
+                    <div class="mod-lead-modal-section-title">Pause-Zeit anpassen</div>
+                    <div class="mod-lead-modal-row">
+                        <input type="number" class="mod-input" id="modLeadBreakH" placeholder="H" min="0" max="24" value="0">
+                        <span class="mod-lead-modal-sep">h</span>
+                        <input type="number" class="mod-input" id="modLeadBreakM" placeholder="M" min="0" max="59" value="30">
+                        <span class="mod-lead-modal-sep">min</span>
+                    </div>
+                    <div class="mod-lead-modal-btns">
+                        <button class="mod-lead-add" onclick="ModPanel._doManage('${targetId}','add-break','break')">+ Geben</button>
+                        <button class="mod-lead-remove" onclick="ModPanel._doManage('${targetId}','remove-break','break')">− Nehmen</button>
+                        <button class="mod-lead-reset" onclick="ModPanel._doManage('${targetId}','reset-break','break')">Reset</button>
+                    </div>
                 </div>
             </div>
         </div>`;
@@ -4276,16 +4316,19 @@ const ModPanel = {
 
     closeTimeModal() { document.getElementById('modLeadTimeModal')?.remove(); },
 
-    async _doManageTime(targetId, action) {
-        const h = parseInt(document.getElementById('modLeadTimeHours')?.value || '0');
-        const m = parseInt(document.getElementById('modLeadTimeMinutes')?.value || '0');
+    async _doManage(targetId, action, type) {
+        const hId = type === 'break' ? 'modLeadBreakH' : 'modLeadShiftH';
+        const mId = type === 'break' ? 'modLeadBreakM' : 'modLeadShiftM';
+        const h = parseInt(document.getElementById(hId)?.value || '0');
+        const m = parseInt(document.getElementById(mId)?.value || '0');
         const amountMs = (h * 3600000) + (m * 60000);
         await fetch(`${CONFIG.API_URL}/api/shift/manage`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
             body: JSON.stringify({ leadDiscordId: AuthService.session?.user?.discordId, targetDiscordId: targetId, action, amountMs }),
         }).catch(() => {});
         this.closeTimeModal();
-        App.showNotification('Shift', action === 'reset' ? 'Zeit zurückgesetzt' : 'Zeit angepasst', 'success');
+        const label = action.includes('reset') ? 'zurückgesetzt' : 'angepasst';
+        App.showNotification('Shift', `${type === 'break' ? 'Pause' : 'Shift'}-Zeit ${label}`, 'success');
         this.loadShifts(); this.loadStaff();
     },
 

@@ -1096,8 +1096,10 @@ const apiServer = http.createServer(async (req, res) => {
         for (const [id, s] of Object.entries(shiftData)) {
             let totalMs = s.savedMs || 0;
             if (s.state === 'active' && s.startedAt) totalMs += Date.now() - s.startedAt;
+            let totalBreakMs = s.breakMs || 0;
+            if (s.state === 'break' && s.breakStartedAt) totalBreakMs += Date.now() - s.breakStartedAt;
             const known = allKnownUsers.get(id);
-            shifts[id] = { ...s, totalMs, username: known?.username || '?', avatar: known?.avatar || '' };
+            shifts[id] = { ...s, totalMs, totalBreakMs, username: known?.username || '?', avatar: known?.avatar || '' };
         }
         res.writeHead(200);
         return res.end(JSON.stringify({ success: true, shifts, leaderboard: shiftLeaderboard }));
@@ -1111,8 +1113,13 @@ const apiServer = http.createServer(async (req, res) => {
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
                 const s = getShift(discordId);
                 if (s.state === 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Bereits aktiv" })); }
+                // Track break time if resuming from break
+                if (s.state === 'break' && s.breakStartedAt) {
+                    s.breakMs = (s.breakMs || 0) + (Date.now() - s.breakStartedAt);
+                }
                 s.state = 'active';
                 s.startedAt = Date.now();
+                s.breakStartedAt = null;
                 saveShifts();
                 const known = allKnownUsers.get(discordId);
                 io.emit('shift_update', { discordId, state: 'active', username: known?.username || '?' });
@@ -1133,6 +1140,7 @@ const apiServer = http.createServer(async (req, res) => {
                 if (s.startedAt) s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
                 s.state = 'break';
                 s.startedAt = null;
+                s.breakStartedAt = Date.now();
                 saveShifts();
                 const known = allKnownUsers.get(discordId);
                 io.emit('shift_update', { discordId, state: 'break', username: known?.username || '?' });
@@ -1198,15 +1206,20 @@ const apiServer = http.createServer(async (req, res) => {
 
                 if (action === 'add') {
                     s.savedMs = (s.savedMs || 0) + (amountMs || 0);
-                    saveShifts();
                 } else if (action === 'remove') {
                     s.savedMs = Math.max(0, (s.savedMs || 0) - (amountMs || 0));
-                    saveShifts();
                 } else if (action === 'reset') {
                     s.savedMs = 0;
-                    if (s.state === 'active') s.startedAt = Date.now(); // restart timer from 0
-                    saveShifts();
+                    if (s.state === 'active') s.startedAt = Date.now();
+                } else if (action === 'add-break') {
+                    s.breakMs = (s.breakMs || 0) + (amountMs || 0);
+                } else if (action === 'remove-break') {
+                    s.breakMs = Math.max(0, (s.breakMs || 0) - (amountMs || 0));
+                } else if (action === 'reset-break') {
+                    s.breakMs = 0;
+                    if (s.state === 'break') s.breakStartedAt = Date.now();
                 }
+                saveShifts();
 
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
