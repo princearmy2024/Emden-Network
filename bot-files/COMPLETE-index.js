@@ -120,6 +120,9 @@ const LEAD_ROLE_IDS = [
     "1365088012517642343",  // Stv. Teamleitung
 ];
 
+// === On-Duty Cache (refreshed every 15s in background) ===
+let cachedOnDutyStaff = [];
+
 const robloxPresenceState = new Map();
 const overlayClients = new Map();
 
@@ -1054,34 +1057,10 @@ const apiServer = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ success: true, log: enriched }));
     }
 
-    // GET /api/on-duty — Gibt alle Member mit der On-Duty Rolle zurück
+    // GET /api/on-duty — Gibt gecachte On-Duty Members zurück (Cache refreshed alle 15s)
     if (req.method === "GET" && url.pathname === "/api/on-duty") {
-        try {
-            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
-            const role = guild.roles.cache.get(ON_DUTY_ROLE_ID);
-            if (!role) {
-                res.writeHead(200);
-                return res.end(JSON.stringify({ success: true, staff: [] }));
-            }
-            await guild.members.fetch().catch(() => {});
-            const staff = role.members.map(m => ({
-                discordId: m.id,
-                username: m.user.username,
-                displayName: m.displayName,
-                avatar: m.user.displayAvatarURL({ size: 128 }),
-                roles: m.roles.cache
-                    .filter(r => r.id !== guild.id)
-                    .sort((a, b) => b.position - a.position)
-                    .map(r => r.name)
-                    .slice(0, 3),
-            }));
-            res.writeHead(200);
-            return res.end(JSON.stringify({ success: true, staff }));
-        } catch (e) {
-            console.error("[API] on-duty error:", e.message);
-            res.writeHead(500);
-            return res.end(JSON.stringify({ success: false, error: "Server error" }));
-        }
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, staff: cachedOnDutyStaff }));
     }
 
     // ================================================================
@@ -1762,6 +1741,18 @@ function startOverlayDataLoop() {
                         lastSupporterCount = count;
                         io.emit("overlay_supporter_count", { count });
                     }
+                    // Update on-duty cache
+                    cachedOnDutyStaff = role.members.map(m => ({
+                        discordId: m.id,
+                        username: m.user.username,
+                        displayName: m.displayName,
+                        avatar: m.user.displayAvatarURL({ size: 128 }),
+                        roles: m.roles.cache
+                            .filter(r => r.id !== guild.id)
+                            .sort((a, b) => b.position - a.position)
+                            .map(r => r.name)
+                            .slice(0, 3),
+                    }));
                 }
             }
         } catch (e) { console.error("[Overlay] Fehler beim Supporter-Count:", e.message); }
