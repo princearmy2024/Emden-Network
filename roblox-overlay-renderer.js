@@ -109,6 +109,13 @@ const Overlay = (() => {
             }, { passive: true });
         }
 
+        // Shift Buttons — Hover Focus
+        const shiftSection = document.getElementById('panelShift');
+        if (shiftSection) {
+            shiftSection.addEventListener('mouseenter', () => requestFocus(true));
+            shiftSection.addEventListener('mouseleave', () => { if (!settingsOpen && !modSlideOpen) requestFocus(false); });
+        }
+
         // Settings Button — Hover Focus
         const settingsBtn = document.querySelector('.panel-settings-btn');
         if (settingsBtn) {
