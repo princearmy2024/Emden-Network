@@ -441,17 +441,21 @@ const apiServer = http.createServer(async (req, res) => {
                 verificationCodes.delete(upperCode);
 
                 let isAdmin = false;
+                let isStaff = false;
+                const EN_TEAM_ROLE_ID = "1365083291044282389";
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                     const member = await guild.members.fetch(entry.discordId).catch(() => null);
                     if (member) {
                         isAdmin = member.permissions.has("Administrator") ||
                             member.roles.cache.some(r => r.name.toLowerCase().includes("admin"));
+                        isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID) || isAdmin;
                     }
                 } catch (_) { }
 
-                console.log(`[API] ✅ ${entry.username} eingeloggt — ${isAdmin ? "ADMIN" : "USER"}`);
-                registerUser(entry.discordId, entry.username, entry.avatar, isAdmin ? 'admin' : 'user');
+                const role = isAdmin ? 'admin' : isStaff ? 'staff' : 'user';
+                console.log(`[API] ✅ ${entry.username} eingeloggt — ${role.toUpperCase()}`);
+                registerUser(entry.discordId, entry.username, entry.avatar, role);
 
                 res.writeHead(200);
                 return res.end(JSON.stringify({
@@ -459,7 +463,7 @@ const apiServer = http.createServer(async (req, res) => {
                     user: {
                         id: entry.discordId, username: entry.username,
                         tag: entry.tag, avatar: entry.avatar,
-                        role: isAdmin ? "admin" : "user", discordId: entry.discordId,
+                        role, isStaff, discordId: entry.discordId,
                     }
                 }));
             } catch (e) {

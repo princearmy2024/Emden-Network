@@ -1,6 +1,6 @@
 {
-    "version": "4.39.0",
+    "version": "4.40.0",
     "releaseDate": "2026-04-07",
-    "notes": "v4.39.0: Mod-Notification Banner (Animation + Sound), Live Log-Update sofort bei neuem Eintrag.",
+    "notes": "v4.40.0: Moderation nur für EN Team sichtbar, Staff-Rollen-System.",
     "forceUpdate": true
 }

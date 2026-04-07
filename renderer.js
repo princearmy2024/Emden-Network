@@ -229,9 +229,12 @@ const WebSocketService = {
             // Live Mod-Eintrag: Log aktualisieren + Banner + Sound
             this.socket.on('mod_new_entry', (entry) => {
                 if (!window.App) return;
-                // Immer Log neu laden (egal welche View)
+                const user = AuthService.getUser();
+                const isStaff = user?.role === 'staff' || user?.role === 'admin' || user?.isStaff;
+                if (!isStaff) return; // Nur Staff sieht Mod-Notifications
+                // Log neu laden
                 if (window.ModPanel) ModPanel.loadLog();
-                // Professionelles Banner anzeigen
+                // Banner anzeigen
                 showModNotifBanner(entry);
             });
 
@@ -879,6 +882,10 @@ const App = window.App = {
         // Admin-Elemente
         if (RoleService.isAdmin()) {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+        }
+        // Staff-Elemente (EN Team Rolle + Admins)
+        if (user.role === 'staff' || user.role === 'admin' || user.isStaff) {
+            document.querySelectorAll('.staff-only').forEach(el => el.classList.remove('hidden'));
         }
     },
 
@@ -1900,8 +1907,9 @@ const App = window.App = {
         await sleep(300);
         bar.style.width = '100%';
         await sleep(600);
-        // Admin-Elemente zurücksetzen
+        // Admin + Staff Elemente zurücksetzen
         document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.staff-only').forEach(el => el.classList.add('hidden'));
         this.showScreen('loginScreen');
     },
 
