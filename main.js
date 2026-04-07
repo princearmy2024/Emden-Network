@@ -106,17 +106,43 @@ ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
         robloxOverlayWin.blur();
     }
 
-    // VBScript — WshShell.SendKeys ist die zuverlaessigste Methode auf Windows
+    // VBScript — WshShell.SendKeys + WMI fuer Roblox PID
     const safeUsername = robloxUsername.replace(/"/g, '""');
     const vbsContent = [
         'Set WshShell = CreateObject("WScript.Shell")',
-        'WshShell.AppActivate "Roblox"',
+        'Set objWMI = GetObject("winmgmts:\\\\.\\root\\cimv2")',
+        '',
+        'Function FindRobloxPID()',
+        '    FindRobloxPID = 0',
+        '    Set colProcs = objWMI.ExecQuery("Select ProcessId from Win32_Process Where Name = \'RobloxPlayerBeta.exe\'")',
+        '    For Each proc In colProcs',
+        '        FindRobloxPID = proc.ProcessId',
+        '        Exit For',
+        '    Next',
+        '    If FindRobloxPID = 0 Then',
+        '        Set colProcs = objWMI.ExecQuery("Select ProcessId from Win32_Process Where Name = \'RobloxPlayer.exe\'")',
+        '        For Each proc In colProcs',
+        '            FindRobloxPID = proc.ProcessId',
+        '            Exit For',
+        '        Next',
+        '    End If',
+        'End Function',
+        '',
+        'pid = FindRobloxPID()',
+        'If pid = 0 Then',
+        '    WScript.Echo "FEHLER: Roblox nicht gefunden"',
+        '    WScript.Quit 1',
+        'End If',
+        '',
+        'WScript.Echo "Roblox PID: " & pid',
+        'WshShell.AppActivate pid',
         'WScript.Sleep 800',
         'WshShell.SendKeys "-"',
         'WScript.Sleep 500',
         'WshShell.SendKeys "/tp ' + safeUsername + '"',
         'WScript.Sleep 200',
         'WshShell.SendKeys "{ENTER}"',
+        'WScript.Echo "OK: -/tp ' + safeUsername + '"',
     ].join('\r\n');
 
     const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.vbs`);

@@ -16,6 +16,7 @@ const Overlay = (() => {
     let socket         = null;
     let discordId      = '';
     let robloxId       = '';
+    let robloxUsername  = ''; // Wird beim Init von API geholt
     let isAdmin        = false;
     let cmdVisible     = false;
     let playtimeStart  = null;
@@ -59,6 +60,19 @@ const Overlay = (() => {
                 voiceAvatar   = session.user.avatar   || '';
             }
         } catch(_) {}
+
+        // Roblox Username von API holen (fuer Panic-Teleport)
+        if (robloxId) {
+            fetch(`https://users.roblox.com/v1/users/${robloxId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.name) {
+                        robloxUsername = data.name;
+                        console.log(`[Overlay] Roblox Username: ${robloxUsername}`);
+                    }
+                })
+                .catch(() => {});
+        }
 
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
@@ -1296,7 +1310,7 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings };
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername };
 })();
 
 // ══════════════════════════════════════════════
@@ -1321,13 +1335,17 @@ const PanicSystem = {
         const user = session?.user;
         if (!user?.discordId) { console.log('[PANIC] Kein User eingeloggt'); return; }
 
-        // Roblox Username holen (verschiedene Keys probieren)
-        let robloxUsername = '';
-        try {
-            const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
-            robloxUsername = rblx?.username || rblx?.displayName || '';
-        } catch(e) {}
+        // Roblox Username aus Overlay holen (wurde beim Init von API geladen)
+        let robloxUsername = Overlay.getRobloxUsername() || '';
+        if (!robloxUsername) {
+            // Fallback: aus localStorage versuchen
+            try {
+                const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
+                robloxUsername = rblx?.username || rblx?.displayName || '';
+            } catch(e) {}
+        }
         if (!robloxUsername) robloxUsername = user.username || '?';
+        console.log(`[PANIC] Roblox Username resolved: ${robloxUsername}`);
 
         const socket = window._overlaySocket;
         console.log(`[PANIC] Button gedrückt! Socket connected: ${!!socket?.connected}, User: ${user.username}, Roblox: ${robloxUsername}`);

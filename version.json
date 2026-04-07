@@ -1,6 +1,6 @@
 {
-    "version": "4.48.5",
+    "version": "4.48.6",
     "releaseDate": "2026-04-08",
-    "notes": "v4.48.5: Teleport komplett auf VBScript umgestellt — WshShell.SendKeys statt PowerShell.",
+    "notes": "v4.48.6: Fix Teleport — VBScript mit WMI PID-Suche, Roblox Username von API statt Discord-Name.",
     "forceUpdate": true
 }
