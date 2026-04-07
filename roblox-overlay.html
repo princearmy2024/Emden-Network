@@ -1223,6 +1223,10 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 .ov-shift-pause { background: linear-gradient(135deg, #d97706, #f59e0b); }
 .ov-shift-end { background: linear-gradient(135deg, #dc2626, #ef4444); }
 
+/* Shift + Settings nur klickbar wenn Overlay aktiv */
+#panelShift, .panel-settings-btn { pointer-events: none; }
+body.overlay-active #panelShift, body.overlay-active .panel-settings-btn { pointer-events: auto; }
+
 /* ================================================================
    BACKGROUND WATERMARK — grosses Logo, immer sichtbar, blass
    ================================================================ */
