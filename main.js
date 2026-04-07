@@ -97,30 +97,51 @@ function createWindow() {
 // Roblox Chat Teleport: Simuliert Tasteneingabe im Spiel
 ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
     if (!robloxUsername) return;
-    // PowerShell: Simuliert Tastatureingabe für Roblox Chat
-    // 1. Drückt "-" (öffnet Chat in Roblox)
-    // 2. Wartet kurz
-    // 3. Tippt "/tp username"
-    // 4. Drückt Enter
-    const cmd = `/tp ${robloxUsername}`;
-    const psScript = `
-        Add-Type -AssemblyName System.Windows.Forms
-        Start-Sleep -Milliseconds 200
-        [System.Windows.Forms.SendKeys]::SendWait('-')
-        Start-Sleep -Milliseconds 400
-        [System.Windows.Forms.SendKeys]::SendWait('${cmd.replace(/'/g, "''")}')
-        Start-Sleep -Milliseconds 100
-        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-    `.trim();
+    console.log(`[Teleport] Starte /tp ${robloxUsername}...`);
     const { exec } = require('child_process');
+
     // Overlay kurz verstecken damit Roblox Focus bekommt
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.setIgnoreMouseEvents(true, { forward: true });
         robloxOverlayWin.blur();
     }
-    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, '; ')}"`, (err) => {
-        if (err) console.error('[Teleport] Fehler:', err.message);
-        else console.log(`[Teleport] /tp ${robloxUsername} gesendet`);
+
+    // PowerShell: Roblox-Fenster finden, fokussieren, dann Tasten senden
+    // SendKeys braucht escaped chars: / muss nicht escaped werden
+    // Roblox Chat: "-" oeffnet Command-Bar, dann "/tp username" + Enter
+    const safeUsername = robloxUsername.replace(/'/g, "''");
+    const psScript = [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        'Add-Type -AssemblyName Microsoft.VisualBasic',
+        // Roblox-Fenster finden und in den Vordergrund bringen
+        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
+        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
+        'if (-not $roblox) { Write-Error "Roblox nicht gefunden"; exit 1 }',
+        // Fenster aktivieren
+        'Add-Type @"',
+        'using System; using System.Runtime.InteropServices;',
+        'public class WinAPI {',
+        '    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);',
+        '    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);',
+        '}',
+        '"@',
+        '$hwnd = $roblox.MainWindowHandle',
+        '[WinAPI]::ShowWindow($hwnd, 9)',  // SW_RESTORE
+        '[WinAPI]::SetForegroundWindow($hwnd)',
+        'Start-Sleep -Milliseconds 500',
+        // Chat oeffnen mit "-"
+        '[System.Windows.Forms.SendKeys]::SendWait("-")',
+        'Start-Sleep -Milliseconds 500',
+        // Command tippen
+        `[System.Windows.Forms.SendKeys]::SendWait("/tp ${safeUsername}")`,
+        'Start-Sleep -Milliseconds 200',
+        // Enter
+        '[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")',
+    ].join('; ');
+
+    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err, stdout, stderr) => {
+        if (err) console.error('[Teleport] Fehler:', err.message, stderr);
+        else console.log(`[Teleport] /tp ${robloxUsername} gesendet!`);
     });
 });
 

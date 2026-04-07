@@ -1,6 +1,6 @@
 {
-    "version": "4.47.8",
-    "releaseDate": "2026-04-07",
-    "notes": "v4.47.8: Fix Teleport — Focus-Loop wird vor /tp gestoppt, 300ms Delay damit Roblox Focus hat.",
+    "version": "4.47.9",
+    "releaseDate": "2026-04-08",
+    "notes": "v4.47.9: Fix Teleport — Roblox-Fenster wird per WinAPI fokussiert bevor SendKeys losgeht.",
     "forceUpdate": true
 }
