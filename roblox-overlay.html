@@ -1326,8 +1326,10 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 body.overlay-active #panelPanic { pointer-events: auto; }
 
 /* Panic Alert Buttons immer klickbar */
-.panic-alert.active { pointer-events: auto; }
-.panic-alert.active .panic-alert-content { pointer-events: auto; }
+.panic-alert.active { pointer-events: auto !important; }
+.panic-alert.active .panic-alert-content { pointer-events: auto !important; }
+.panic-alert.active .panic-alert-btn { pointer-events: auto !important; cursor: pointer !important; z-index: 10001; position: relative; }
+.panic-alert.active .panic-alert-buttons { pointer-events: auto !important; position: relative; z-index: 10001; }
 
 /* ── Panic Alert Overlay ── */
 .panic-alert {
@@ -1384,7 +1386,13 @@ body.overlay-active #panelPanic { pointer-events: auto; }
 }
 .panic-alert-sub {
     font-size: 13px; color: rgba(255,255,255,0.45);
-    margin-bottom: 28px;
+    margin-bottom: 12px;
+}
+.panic-alert-timer {
+    font-size: 28px; font-weight: 900; color: rgba(239,68,68,0.7);
+    font-family: var(--font-mono);
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
 }
 .panic-alert-buttons {
     display: flex; flex-direction: column; gap: 10px;
@@ -1672,7 +1680,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <div class="grid-pattern"></div>
   <div class="bottom-bar-content">
     <div class="bottom-hint"><kbd>F2</kbd> Dashboard <kbd>F3</kbd> Commands <kbd>F4</kbd> Mod <kbd>V</kbd> Talk</div>
-    <div class="bottom-version">Emden Network v4.47.6</div>
+    <div class="bottom-version">Emden Network v4.47.7</div>
   </div>
 </div>
 
@@ -1827,6 +1835,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
         <div class="panic-alert-title">PANIC ALERT</div>
         <div class="panic-alert-user" id="panicAlertUser">—</div>
         <div class="panic-alert-sub">braucht sofort Hilfe!</div>
+        <div class="panic-alert-timer" id="panicTimer">60s</div>
         <div class="panic-alert-buttons">
             <button class="panic-alert-btn panic-tp" onclick="PanicSystem.teleport()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 3L3 10.5l7.5 3 3 7.5z"/></svg>

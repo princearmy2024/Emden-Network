@@ -1,6 +1,6 @@
 {
-    "version": "4.47.6",
+    "version": "4.47.7",
     "releaseDate": "2026-04-07",
-    "notes": "v4.47.6: Fix Bot — index.js fehlte, COMPLETE-index.js als index.js kopiert. Panic Alert funktioniert jetzt.",
+    "notes": "v4.47.7: Panic Alert — 60s Auto-Close Timer, Focus-Loop fuer klickbare Buttons, Timer-Anzeige.",
     "forceUpdate": true
 }

@@ -1305,6 +1305,8 @@ const Overlay = (() => {
 const PanicSystem = {
     _targetUsername: null,
     _lastTrigger: 0,
+    _autoCloseTimer: null,
+    _focusInterval: null,
 
     trigger() {
         // Debounce: max 1x pro 5 Sekunden
@@ -1356,7 +1358,7 @@ const PanicSystem = {
         if (userEl) userEl.textContent = this._targetUsername;
         el.style.display = 'flex';
         el.classList.add('active');
-        console.log('[PANIC] Alert angezeigt! classList:', el.className, 'display:', el.style.display);
+        console.log('[PANIC] Alert angezeigt!');
 
         // Sound
         try {
@@ -1365,10 +1367,36 @@ const PanicSystem = {
             }
         } catch(e) {}
 
-        // Focus anfordern damit Overlay klickbar wird
+        // Focus anfordern + wiederholt halten damit Buttons klickbar bleiben
         const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
-        console.log('[PANIC] requestFocus verfuegbar:', !!reqFocus);
-        if (reqFocus) reqFocus(true);
+        if (reqFocus) {
+            reqFocus(true);
+            // Focus alle 500ms erneut anfordern (Electron gibt ihn sonst ab)
+            if (this._focusInterval) clearInterval(this._focusInterval);
+            this._focusInterval = setInterval(() => {
+                const still = document.getElementById('panicAlert');
+                if (still?.classList.contains('active')) {
+                    reqFocus(true);
+                } else {
+                    clearInterval(this._focusInterval);
+                    this._focusInterval = null;
+                }
+            }, 500);
+        }
+
+        // Timer-Anzeige starten (60 Sekunden)
+        const timerEl = document.getElementById('panicTimer');
+        let remaining = 60;
+        if (timerEl) timerEl.textContent = `${remaining}s`;
+
+        if (this._autoCloseTimer) clearInterval(this._autoCloseTimer);
+        this._autoCloseTimer = setInterval(() => {
+            remaining--;
+            if (timerEl) timerEl.textContent = `${remaining}s`;
+            if (remaining <= 0) {
+                this.dismiss();
+            }
+        }, 1000);
     },
 
     teleport() {
@@ -1384,6 +1412,10 @@ const PanicSystem = {
     },
 
     dismiss() {
+        // Timer + Focus-Interval stoppen
+        if (this._autoCloseTimer) { clearInterval(this._autoCloseTimer); this._autoCloseTimer = null; }
+        if (this._focusInterval) { clearInterval(this._focusInterval); this._focusInterval = null; }
+
         const el = document.getElementById('panicAlert');
         if (el) {
             el.classList.remove('active');
