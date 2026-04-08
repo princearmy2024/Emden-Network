@@ -1051,22 +1051,8 @@ const apiServer = http.createServer(async (req, res) => {
                     );
                 }
 
-                container.addSeparatorComponents(
-                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
-                    )
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
-                    );
-
-                // Select-Menü für alle Einträge (wenn mehr als 1)
-                // Wird SEPARAT gesendet, da Components V2 Container kein SelectMenu erlaubt
+                // Select-Menü direkt im Container (wenn mehr als 1 Eintrag)
                 const allEntries = getModHistory(userId);
-
-                await channel.send({
-                    components: [container],
-                    flags: MessageFlags.IsComponentsV2
-                });
-
                 if (allEntries.length > 1) {
                     try {
                         const offset = Math.max(0, allEntries.length - 25);
@@ -1082,13 +1068,28 @@ const apiServer = http.createServer(async (req, res) => {
                             .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
                             .addOptions(options);
 
-                        await channel.send({
-                            components: [new ActionRowBuilder().addComponents(selectMenu)]
-                        });
+                        container.addSeparatorComponents(
+                            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                        );
+                        container.addActionRowComponents(
+                            new ActionRowBuilder().addComponents(selectMenu)
+                        );
                     } catch(selectErr) {
                         console.error('[Mod] Select-Menü Fehler:', selectErr.message);
                     }
                 }
+
+                container.addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
+                    )
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
+                    );
+
+                await channel.send({
+                    components: [container],
+                    flags: MessageFlags.IsComponentsV2
+                });
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 
