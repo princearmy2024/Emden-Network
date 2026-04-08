@@ -271,7 +271,15 @@ client.on("interactionCreate", async interaction => {
                 return interaction.reply({ content: '❌ Eintrag nicht gefunden.', ephemeral: true });
             }
 
-            const eEmoji = entry.action === 'Ban' ? '🔨' : entry.action === 'Kick' ? '👢' : '⚠️';
+            // Custom Emojis für Aktionen (gleiche Map wie in mod-action)
+            const detailEmojis = {
+                'Ban':         '<:Ban:1490446877785854163>',
+                'One Day Ban': '<:OneDayBan:1490448467498373280>',
+                'Kick':        '<:Kick:1490450344663322727>',
+                'Warn':        '<:Warn:1490447092584288336>',
+                'Notiz':       '<:notizblock:1490444362365272064>',
+            };
+            const eEmoji = detailEmojis[entry.action] || detailEmojis['Warn'];
             const eDate = new Date(entry.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
             const entryIdx = history.indexOf(entry) + 1;
 
@@ -910,7 +918,16 @@ const apiServer = http.createServer(async (req, res) => {
                 }
 
                 const MOD_CHANNEL_ID = "1367243128284905573";
-                const emoji = action === 'Ban' ? '🔨' : action === 'Kick' ? '👢' : '⚠️';
+                // Custom Emojis für Aktionen
+                const actionEmojis = {
+                    'Ban':         { text: '<:Ban:1490446877785854163>',        id: '1490446877785854163', name: 'Ban' },
+                    'One Day Ban': { text: '<:OneDayBan:1490448467498373280>',  id: '1490448467498373280', name: 'OneDayBan' },
+                    'Kick':        { text: '<:Kick:1490450344663322727>',       id: '1490450344663322727', name: 'Kick' },
+                    'Warn':        { text: '<:Warn:1490447092584288336>',       id: '1490447092584288336', name: 'Warn' },
+                    'Notiz':       { text: '<:notizblock:1490444362365272064>', id: '1490444362365272064', name: 'notizblock' },
+                };
+                const getActionEmoji = (a) => actionEmojis[a] || actionEmojis['Warn'];
+                const emoji = getActionEmoji(action).text;
 
                 // Moderator Rang-Emoji ermitteln
                 const rankEmojis = {
@@ -1038,7 +1055,7 @@ const apiServer = http.createServer(async (req, res) => {
                 // Historie-Info wenn vorherige Einträge existieren
                 if (prevCount > 0) {
                     const historyLines = history.slice(-3).map((h) => {
-                        const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
+                        const hEmoji = getActionEmoji(h.action).text;
                         const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
                         return `-# ${hEmoji} ${h.action} · ${h.reason} · ${hDate}`;
                     }).join('\n');
@@ -1056,12 +1073,16 @@ const apiServer = http.createServer(async (req, res) => {
                 if (allEntries.length > 1) {
                     try {
                         const offset = Math.max(0, allEntries.length - 25);
-                        const options = allEntries.slice(-25).map((h, i) => ({
-                            label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
-                            description: `${h.moderator || 'Unbekannt'} · ${new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`.slice(0, 100),
-                            value: `modentry_${userId}_${offset + i}`,
-                            emoji: { name: h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️' }
-                        }));
+                        const options = allEntries.slice(-25).map((h, i) => {
+                            const hE = getActionEmoji(h.action);
+                            const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            return {
+                                label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
+                                description: `von ${h.moderator || 'Unbekannt'} · ${hDate}`.slice(0, 100),
+                                value: `modentry_${userId}_${offset + i}`,
+                                emoji: { name: hE.name, id: hE.id }
+                            };
+                        });
 
                         const selectMenu = new StringSelectMenuBuilder()
                             .setCustomId(`mod_history_select_${userId}`)
