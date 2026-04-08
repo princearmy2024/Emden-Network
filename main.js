@@ -634,6 +634,24 @@ app.whenReady().then(() => {
     // Funktioniert auch wenn das Dashboard im Hintergrund ist
     // ==========================================
     let currentPttKey = 'V';
+    let pttReleaseTimer = null;
+
+    // Release-Timer: wenn 300ms kein Key-Repeat/Keepalive kommt → PTT stoppen
+    function resetPTTReleaseTimer() {
+        clearTimeout(pttReleaseTimer);
+        pttReleaseTimer = setTimeout(() => {
+            if (globalPTTActive) {
+                globalPTTActive = false;
+                console.log('[PTT] Release — kein Keepalive mehr');
+                if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                    robloxOverlayWin.webContents.send('overlay-ptt-stop');
+                }
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('overlay-ptt-stop');
+                }
+            }
+        }, 300);
+    }
 
     function registerPTT(key) {
         if (!key) return;
@@ -645,7 +663,11 @@ app.whenReady().then(() => {
         
         try {
             globalShortcut.register(currentPttKey, () => {
-                if (globalPTTActive) return; // Kein Dauerfeuer
+                // Key-Repeat während PTT aktiv → als Keepalive behandeln
+                if (globalPTTActive) {
+                    resetPTTReleaseTimer();
+                    return;
+                }
                 globalPTTActive = true;
                 console.log('[PTT] Start — Global Shortcut');
 
@@ -658,11 +680,15 @@ app.whenReady().then(() => {
                     mainWindow.webContents.send('overlay-ptt-start');
                 }
 
+                // Release-Timer starten (wird durch Key-Repeats resettet)
+                resetPTTReleaseTimer();
+
                 // Sicherheits-Timeout: PTT automatisch nach 30s stoppen
                 setTimeout(() => {
                     if (globalPTTActive) {
                         console.warn('[PTT] Sicherheits-Timeout: Erzwinge PTT-Stop nach 30s');
                         globalPTTActive = false;
+                        clearTimeout(pttReleaseTimer);
                         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
                             robloxOverlayWin.webContents.send('overlay-ptt-stop');
                         }
@@ -698,23 +724,8 @@ app.whenReady().then(() => {
         registerPTT(newKey.trim());
     });
 
-    // PTT LOSLASSEN — Leider kann globalShortcut kein keyup, deshalb nutzen wir
-    // einen Fallback: Nach 3s automatisch stoppen wenn kein Re-Fire kommt
-    // Der Overlay sendet 'ptt-keepalive' während gedrückt, Main resetzt den Timer
-    let pttReleaseTimer = null;
     ipcMain.on('ptt-keepalive', () => {
-        clearTimeout(pttReleaseTimer);
-        pttReleaseTimer = setTimeout(() => {
-            if (globalPTTActive) {
-                globalPTTActive = false;
-                if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-                    robloxOverlayWin.webContents.send('overlay-ptt-stop');
-                }
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('overlay-ptt-stop');
-                }
-            }
-        }, 200); // 200ms nach letztem keepalive → PTT stopp
+        resetPTTReleaseTimer();
     });
 
     ipcMain.on('ptt-stop', () => {
