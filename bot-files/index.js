@@ -6,7 +6,8 @@ import {
     ActionRowBuilder, EmbedBuilder, MessageFlags,
     ContainerBuilder, TextDisplayBuilder, SectionBuilder,
     SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder,
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder, AttachmentBuilder,
+    MediaGalleryBuilder, MediaGalleryItemBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -911,7 +912,7 @@ const apiServer = http.createServer(async (req, res) => {
         req.on("data", c => (body += c));
         req.on("end", async () => {
             try {
-                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar } = JSON.parse(body || "{}");
+                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar, evidence } = JSON.parse(body || "{}");
                 if (!userId || !action) {
                     res.writeHead(400);
                     return res.end(JSON.stringify({ success: false, error: "userId und action erforderlich" }));
@@ -1100,6 +1101,30 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 }
 
+                // Beweis-Bild anhängen (wenn vorhanden)
+                let evidenceAttachment = null;
+                if (evidence) {
+                    try {
+                        const base64Data = evidence.replace(/^data:image\/\w+;base64,/, '');
+                        const imgBuffer = Buffer.from(base64Data, 'base64');
+                        evidenceAttachment = new AttachmentBuilder(imgBuffer, { name: 'evidence.png' });
+
+                        container.addSeparatorComponents(
+                            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+                        );
+                        container.addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent('📸 **Beweis**')
+                        );
+                        container.addMediaGalleryComponents(
+                            new MediaGalleryBuilder().addItems(
+                                new MediaGalleryItemBuilder().setURL('attachment://evidence.png')
+                            )
+                        );
+                    } catch(imgErr) {
+                        console.error('[Mod] Bild-Fehler:', imgErr.message);
+                    }
+                }
+
                 container.addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large)
                     )
@@ -1107,10 +1132,13 @@ const apiServer = http.createServer(async (req, res) => {
                         new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
-                await channel.send({
+                const sendPayload = {
                     components: [container],
                     flags: MessageFlags.IsComponentsV2
-                });
+                };
+                if (evidenceAttachment) sendPayload.files = [evidenceAttachment];
+
+                await channel.send(sendPayload);
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 

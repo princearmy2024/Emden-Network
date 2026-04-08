@@ -1060,6 +1060,57 @@ const Overlay = (() => {
         if (btn) btn.disabled = !(modSelectedUser && modSelectedAction);
     }
 
+    // ─── BILD-UPLOAD FÜR MOD-EINTRÄGE ─────────────────────
+    let modImageBase64 = null;
+
+    function _handleModImage(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            modImageBase64 = e.target.result; // data:image/png;base64,...
+            const thumb = document.getElementById('modImgThumb');
+            const preview = document.getElementById('modImgPreview');
+            if (thumb) thumb.src = modImageBase64;
+            if (preview) preview.style.display = 'block';
+            document.getElementById('modImgBtn').style.borderColor = 'rgba(0,136,255,0.5)';
+            document.getElementById('modImgBtn').style.color = '#0088ff';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function _clearModImage() {
+        modImageBase64 = null;
+        const preview = document.getElementById('modImgPreview');
+        if (preview) preview.style.display = 'none';
+        document.getElementById('modImgInput').value = '';
+        document.getElementById('modImgBtn').style.borderColor = 'rgba(255,255,255,0.1)';
+        document.getElementById('modImgBtn').style.color = 'rgba(255,255,255,0.5)';
+    }
+
+    // Paste-Support: Bild aus Zwischenablage einfügen
+    document.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    modImageBase64 = ev.target.result;
+                    const thumb = document.getElementById('modImgThumb');
+                    const preview = document.getElementById('modImgPreview');
+                    if (thumb) thumb.src = modImageBase64;
+                    if (preview) preview.style.display = 'block';
+                    document.getElementById('modImgBtn').style.borderColor = 'rgba(0,136,255,0.5)';
+                    document.getElementById('modImgBtn').style.color = '#0088ff';
+                };
+                reader.readAsDataURL(file);
+                break;
+            }
+        }
+    });
+
     async function sendModAction() {
         if (!modSelectedUser || !modSelectedAction) return;
         const reason = document.getElementById('modReasonInput')?.value?.trim() || 'Kein Grund';
@@ -1077,7 +1128,8 @@ const Overlay = (() => {
                     displayName: user.displayName, avatar: user.avatar,
                     created: user.created || '', reason,
                     action: modSelectedAction, moderator,
-                    moderatorAvatar: voiceAvatar || ''
+                    moderatorAvatar: voiceAvatar || '',
+                    evidence: modImageBase64 || null
                 })
             });
             const data = await res.json();
@@ -1085,6 +1137,7 @@ const Overlay = (() => {
             showModMsg('✓ ' + modSelectedAction + ' gesendet', 'ok');
             document.getElementById('modReasonInput').value = '';
             modSelectedAction = null;
+            _clearModImage(); // Bild zurücksetzen
             document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         } catch(e) {
             showModMsg('✗ Fehler beim Senden', 'err');
@@ -1337,7 +1390,7 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
 })();
 
 // ══════════════════════════════════════════════

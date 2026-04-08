@@ -9,7 +9,7 @@
  * - Native Notifications
  */
 
-const { app, BrowserWindow, ipcMain, Notification, globalShortcut, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, globalShortcut, screen, shell, clipboard, nativeImage, desktopCapturer } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
@@ -628,6 +628,51 @@ app.whenReady().then(() => {
             console.error('F2 Shortcut Error:', e.message);
         }
     });
+
+    // ==========================================
+    // SCREENSHOT SHORTCUT (PrintScreen / F5)
+    // Eigener Screenshot weil Windows PrintScreen bei transparenten Overlays buggt
+    // ==========================================
+    globalShortcut.register('PrintScreen', takeScreenshot);
+    globalShortcut.register('F5', takeScreenshot);
+
+    async function takeScreenshot() {
+        try {
+            const sources = await desktopCapturer.getSources({
+                types: ['screen'],
+                thumbnailSize: screen.getPrimaryDisplay().size
+            });
+            if (sources.length === 0) return;
+
+            const img = sources[0].thumbnail;
+            clipboard.writeImage(img);
+
+            // Datei speichern
+            const fs = require('fs');
+            const screenshotDir = path.join(app.getPath('pictures'), 'Emden Network Screenshots');
+            if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });
+            const filename = `Screenshot_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+            const filePath = path.join(screenshotDir, filename);
+            fs.writeFileSync(filePath, img.toPNG());
+
+            console.log('[Screenshot] Gespeichert:', filePath);
+
+            // Benachrichtigung an Dashboard + Overlay senden
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('screenshot-taken', { path: filePath, filename });
+            }
+            if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+                robloxOverlayWin.webContents.send('screenshot-taken', { path: filePath, filename });
+            }
+            // Native Windows Notification
+            new Notification({ title: 'Screenshot gespeichert', body: filename }).show();
+        } catch(e) {
+            console.error('[Screenshot] Fehler:', e.message);
+        }
+    }
+
+    // IPC: Screenshot von Renderer anfragen
+    ipcMain.on('take-screenshot', () => takeScreenshot());
 
     // ==========================================
     // GLOBALER PTT SHORTCUT (V-Taste über Roblox)

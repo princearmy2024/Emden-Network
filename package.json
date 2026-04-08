@@ -6,7 +6,9 @@
     "scripts": {
         "start": "electron .",
         "dev": "electron . --dev",
-        "build": "electron-builder --win"
+        "build": "electron-builder --win",
+        "build:mac": "electron-builder --mac",
+        "build:all": "electron-builder --win --mac"
     },
     "dependencies": {
         "electron-updater": "^6.1.8",
@@ -25,6 +27,20 @@
             ],
             "icon": "icon.ico",
             "requestedExecutionLevel": "requireAdministrator"
+        },
+        "mac": {
+            "target": [
+                "dmg"
+            ],
+            "icon": "icon.icns",
+            "category": "public.app-category.utilities"
+        },
+        "dmg": {
+            "title": "Emden Network",
+            "contents": [
+                { "x": 130, "y": 220 },
+                { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+            ]
         },
         "nsis": {
             "oneClick": true,
