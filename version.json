@@ -1,6 +1,6 @@
 {
-    "version": "4.50.1",
+    "version": "4.50.2",
     "releaseDate": "2026-04-08",
-    "notes": "v4.50.1: Fix Panic Accept — Overlay-Variablen statt localStorage (separates Fenster hat keinen Zugriff).",
+    "notes": "v4.50.2: Panic Accept sichtbar fuer ALLE — Alert schliesst bei allen, Notification wer hilft wem.",
     "forceUpdate": true
 }

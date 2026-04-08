@@ -782,11 +782,18 @@ const Overlay = (() => {
             PanicSystem.showAlert(data);
         });
 
-        // Panic Accepted: Jemand kommt zur Hilfe
+        // Panic Accepted: ALLE sehen wer angenommen hat
         socket.on('panic_accepted', (data) => {
+            console.log(`[PANIC] ${data.acceptedBy} hat angenommen (target: ${data.targetUsername})`);
+            // Panic-Alert schliessen bei allen (jemand kuemmert sich)
+            PanicSystem.dismiss();
+
             if (data.targetDiscordId === discordId) {
-                console.log(`[PANIC] ${data.acceptedBy} kommt zu dir!`);
-                notify({ title: 'Panic Hilfe!', text: `${data.acceptedBy} kommt zu dir!`, type: 'info' });
+                // Du bist der Panic-Sender
+                notify({ title: 'Hilfe kommt!', text: `${data.acceptedBy} kommt zu dir!`, type: 'admin', duration: 10000 });
+            } else {
+                // Alle anderen sehen wer angenommen hat
+                notify({ title: 'Panic angenommen', text: `${data.acceptedBy} hilft ${data.targetUsername}`, type: 'info', duration: 8000 });
             }
         });
 
@@ -1449,6 +1456,7 @@ const PanicSystem = {
                 robloxUsername: myRobloxUsername,
                 avatar: '',
                 targetDiscordId: this._targetDiscordId,
+                targetUsername: this._targetUsername || 'Unbekannt',
             });
             console.log('[PANIC] panic_accept emitted');
         } else {

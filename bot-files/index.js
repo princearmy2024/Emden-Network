@@ -1446,15 +1446,15 @@ io.on("connection", (socket) => {
         });
     });
 
-    // Panic Accept: Jemand kommt zur Hilfe
+    // Panic Accept: Jemand kommt zur Hilfe — ALLE sehen es
     socket.on("panic_accept", (data) => {
         console.log(`[PANIC] ${data.username} akzeptiert Panic von ${data.targetDiscordId}`);
-        // Notify the person who pressed panic
         io.emit("panic_accepted", {
             acceptedBy: data.username,
             acceptedByRoblox: data.robloxUsername,
             acceptedByAvatar: data.avatar,
             targetDiscordId: data.targetDiscordId,
+            targetUsername: data.targetUsername || 'Unbekannt',
         });
     });
 
