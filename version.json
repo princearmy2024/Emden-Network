@@ -1,6 +1,6 @@
 {
-    "version": "4.49.0",
+    "version": "4.49.1",
     "releaseDate": "2026-04-08",
-    "notes": "v4.49.0: Teleport — Clipboard-Ansatz (Roblox Anti-Cheat blockiert simulierten Input). /tp wird kopiert, User drueckt - dann Strg+V.",
+    "notes": "v4.49.1: Teleport — Overlay wird komplett versteckt waehrend SendKeys, damit Roblox den Keyboard-Focus hat.",
     "forceUpdate": true
 }
