@@ -1102,27 +1102,26 @@ const apiServer = http.createServer(async (req, res) => {
                 });
 
                 if (allEntries.length > 1) {
-                    const options = allEntries.slice(-25).map((h, i) => {
-                        const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
-                        const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                        const idx = allEntries.length - 25 + i; // richtiger Index
-                        const realIdx = idx < 0 ? i : idx;
-                        return {
-                            label: `#${realIdx + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 40)}`,
-                            description: `${h.moderator || 'Unbekannt'} · ${hDate}`,
-                            value: `modentry_${userId}_${h.id || realIdx}`,
-                            emoji: hEmoji === '🔨' ? '🔨' : hEmoji === '👢' ? '👢' : '⚠️'
-                        };
-                    });
+                    try {
+                        const offset = Math.max(0, allEntries.length - 25);
+                        const options = allEntries.slice(-25).map((h, i) => ({
+                            label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
+                            description: `${h.moderator || 'Unbekannt'} · ${new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`.slice(0, 100),
+                            value: `modentry_${userId}_${h.id || (offset + i)}`,
+                            emoji: { name: h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️' }
+                        }));
 
-                    const selectMenu = new StringSelectMenuBuilder()
-                        .setCustomId(`mod_history_select_${userId}`)
-                        .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
-                        .addOptions(options);
+                        const selectMenu = new StringSelectMenuBuilder()
+                            .setCustomId(`mod_history_select_${userId}`)
+                            .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
+                            .addOptions(options);
 
-                    await channel.send({
-                        components: [new ActionRowBuilder().addComponents(selectMenu)]
-                    });
+                        await channel.send({
+                            components: [new ActionRowBuilder().addComponents(selectMenu)]
+                        });
+                    } catch(selectErr) {
+                        console.error('[Mod] Select-Menü Fehler:', selectErr.message);
+                    }
                 }
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
