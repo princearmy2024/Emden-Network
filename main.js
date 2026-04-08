@@ -678,8 +678,16 @@ app.whenReady().then(() => {
         }
     }
 
-    // Default registrieren
-    registerPTT('V');
+    // PTT wird NICHT sofort registriert — erst wenn das Dashboard geladen ist
+    // (verhindert, dass V-Taste auf Splash/Login-Screen feuert)
+    let dashboardReadyFlag = false;
+
+    ipcMain.on('dashboard-ready', () => {
+        if (dashboardReadyFlag) return;
+        dashboardReadyFlag = true;
+        console.log('[PTT] Dashboard ready — registriere globalen PTT-Shortcut');
+        registerPTT('V');
+    });
 
     // Dynamisch updaten, wenn Client es ändert
     ipcMain.on('set-ptt-key', (e, newKey) => {

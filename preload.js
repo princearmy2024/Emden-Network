@@ -83,4 +83,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     pttStop:      () => ipcRenderer.send('ptt-stop'),
     setPTTKey:    (key) => ipcRenderer.send('set-ptt-key', key),
     pttStart:     () => ipcRenderer.send('ptt-start'),
+    dashboardReady: () => ipcRenderer.send('dashboard-ready'),
 });

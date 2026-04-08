@@ -890,6 +890,9 @@ const App = window.App = {
             this.renderFullUserList([]);  // Alle als offline rendern
         }
 
+        // Globale Hotkeys erst jetzt aktivieren (nicht auf Splash/Login)
+        if (window.electronAPI?.dashboardReady) window.electronAPI.dashboardReady();
+
         WebSocketService.connect();
         this.loadLiveNews(); // News live von der Website laden
 
