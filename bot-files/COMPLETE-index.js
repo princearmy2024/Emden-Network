@@ -5,7 +5,8 @@ import {
     ModalBuilder, TextInputBuilder, TextInputStyle,
     ActionRowBuilder, EmbedBuilder, MessageFlags,
     ContainerBuilder, TextDisplayBuilder, SectionBuilder,
-    SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder
+    SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder,
+    StringSelectMenuBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -252,6 +253,76 @@ client.on("interactionCreate", async interaction => {
         );
 
         return interaction.showModal(modal);
+    }
+
+    // ============================================
+    // 📋 SELECT MENU: Mod-History Eintrag anzeigen
+    // ============================================
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("mod_history_select_")) {
+        const robloxUserId = interaction.customId.replace('mod_history_select_', '');
+        const selected = interaction.values[0]; // z.B. "modentry_12345_42"
+        const entryId = selected.split('_').pop();
+
+        try {
+            const history = getModHistory(robloxUserId);
+            const entry = history[parseInt(entryId)] || null;
+
+            if (!entry) {
+                return interaction.reply({ content: '❌ Eintrag nicht gefunden.', ephemeral: true });
+            }
+
+            const eEmoji = entry.action === 'Ban' ? '🔨' : entry.action === 'Kick' ? '👢' : '⚠️';
+            const eDate = new Date(entry.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const entryIdx = history.indexOf(entry) + 1;
+
+            const profileUrl = `https://www.roblox.com/users/${robloxUserId}/profile`;
+            const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+
+            const detailContainer = new ContainerBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `${eEmoji} **${entry.action}** — Eintrag #${entryIdx}\n` +
+                        `# ${entry.displayName || 'Unbekannt'}`
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `**User ID** · \`${robloxUserId}\`\n` +
+                        `**Display Name** · ${entry.displayName || '—'}`
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${entry.reason || 'Kein Grund'}`)
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`**Punishment** · ${eEmoji} ${entry.action}`)
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addActionRowComponents(
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setLabel('Roblox Profil')
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(profileUrl)
+                            .setEmoji({ name: 'roblox', id: '1433535007246516446' })
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`-# Moderator: @${entry.moderator || 'Unbekannt'} · ${eDate}`)
+                );
+
+            return interaction.reply({
+                components: [detailContainer],
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral
+            });
+        } catch(e) {
+            console.error('[Mod] Select-Menu Fehler:', e.message);
+            return interaction.reply({ content: '❌ Fehler beim Laden des Eintrags.', ephemeral: true });
+        }
     }
 
     // ============================================
@@ -966,7 +1037,7 @@ const apiServer = http.createServer(async (req, res) => {
                     .addActionRowComponents(buttonRow)
                 // Historie-Info wenn vorherige Einträge existieren
                 if (prevCount > 0) {
-                    const historyLines = history.slice(-3).map((h, i) => {
+                    const historyLines = history.slice(-3).map((h) => {
                         const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
                         const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
                         return `-# ${hEmoji} ${h.action} · ${h.reason} · ${hDate}`;
@@ -987,10 +1058,37 @@ const apiServer = http.createServer(async (req, res) => {
                         new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
+                // Select-Menü für alle Einträge (wenn mehr als 1)
+                // Wird SEPARAT gesendet, da Components V2 Container kein SelectMenu erlaubt
+                const allEntries = getModHistory(userId);
+
                 await channel.send({
                     components: [container],
                     flags: MessageFlags.IsComponentsV2
                 });
+
+                if (allEntries.length > 1) {
+                    try {
+                        const offset = Math.max(0, allEntries.length - 25);
+                        const options = allEntries.slice(-25).map((h, i) => ({
+                            label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
+                            description: `${h.moderator || 'Unbekannt'} · ${new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`.slice(0, 100),
+                            value: `modentry_${userId}_${offset + i}`,
+                            emoji: { name: h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️' }
+                        }));
+
+                        const selectMenu = new StringSelectMenuBuilder()
+                            .setCustomId(`mod_history_select_${userId}`)
+                            .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
+                            .addOptions(options);
+
+                        await channel.send({
+                            components: [new ActionRowBuilder().addComponents(selectMenu)]
+                        });
+                    } catch(selectErr) {
+                        console.error('[Mod] Select-Menü Fehler:', selectErr.message);
+                    }
+                }
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 
@@ -1048,7 +1146,6 @@ const apiServer = http.createServer(async (req, res) => {
                 allEntries.push({ ...e, userId });
             }
         }
-        // Nach Datum sortieren (neueste zuerst)
         allEntries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         const limited = allEntries.slice(0, limit);
 
