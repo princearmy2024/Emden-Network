@@ -14,7 +14,6 @@ import path from "node:path";
 import http from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import crypto from "node:crypto";
-import mysql from "mysql2/promise";
 
 // In-Memory Code Store (alles in einer Datei — kein extra File nötig)
 const verificationCodes = new Map();
@@ -57,59 +56,26 @@ function saveLinks() {
     } catch (e) { console.error("❌ Fehler beim Speichern der Roblox-Links:", e.message); }
 }
 
-// === MySQL Mod History ===
-const dbPool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '',
-    database: process.env.DB_NAME || 'emden_network',
-    waitForConnections: true,
-    connectionLimit: 10,
-});
-
-// Tabelle beim Start erstellen
-async function initModDB() {
+// === Mod History ===
+const MOD_HISTORY_FILE = path.join(path.resolve(), "data", "modHistory.json");
+let modHistory = {};
+if (fs.existsSync(MOD_HISTORY_FILE)) {
+    try { modHistory = JSON.parse(fs.readFileSync(MOD_HISTORY_FILE, "utf-8")); } catch(e) {}
+}
+function saveModHistory() {
     try {
-        await dbPool.execute(`
-            CREATE TABLE IF NOT EXISTS mod_history (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                roblox_user_id VARCHAR(64) NOT NULL,
-                action VARCHAR(32) NOT NULL,
-                reason TEXT,
-                moderator VARCHAR(128),
-                mod_avatar TEXT,
-                display_name VARCHAR(128),
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_roblox_user (roblox_user_id)
-            )
-        `);
-        console.log('✅ MySQL mod_history Tabelle bereit');
-    } catch(e) {
-        console.error('❌ MySQL Fehler:', e.message);
-    }
+        if (!fs.existsSync(path.dirname(MOD_HISTORY_FILE))) fs.mkdirSync(path.dirname(MOD_HISTORY_FILE), { recursive: true });
+        fs.writeFileSync(MOD_HISTORY_FILE, JSON.stringify(modHistory, null, 2));
+    } catch(e) {}
 }
-initModDB();
-
-async function addModEntry(robloxUserId, entry) {
-    const [result] = await dbPool.execute(
-        'INSERT INTO mod_history (roblox_user_id, action, reason, moderator, mod_avatar, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [robloxUserId, entry.action, entry.reason || 'Kein Grund', entry.moderator, entry.modAvatar || null, entry.displayName || null, entry.date || new Date().toISOString()]
-    );
-    const [countRows] = await dbPool.execute('SELECT COUNT(*) as cnt FROM mod_history WHERE roblox_user_id = ?', [robloxUserId]);
-    return countRows[0].cnt;
+function addModEntry(robloxUserId, entry) {
+    if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
+    modHistory[robloxUserId].push(entry);
+    saveModHistory();
+    return modHistory[robloxUserId].length;
 }
-
-async function getModHistory(robloxUserId) {
-    const [rows] = await dbPool.execute(
-        'SELECT * FROM mod_history WHERE roblox_user_id = ? ORDER BY created_at ASC',
-        [robloxUserId]
-    );
-    return rows.map(r => ({
-        action: r.action, reason: r.reason, moderator: r.moderator,
-        date: r.created_at, displayName: r.display_name, modAvatar: r.mod_avatar,
-        id: r.id
-    }));
+function getModHistory(robloxUserId) {
+    return modHistory[robloxUserId] || [];
 }
 
 // === Shift System ===
@@ -298,8 +264,8 @@ client.on("interactionCreate", async interaction => {
         const entryId = selected.split('_').pop();
 
         try {
-            const history = await getModHistory(robloxUserId);
-            const entry = history.find(h => String(h.id) === String(entryId)) || history[parseInt(entryId)] || null;
+            const history = getModHistory(robloxUserId);
+            const entry = history[parseInt(entryId)] || null;
 
             if (!entry) {
                 return interaction.reply({ content: '❌ Eintrag nicht gefunden.', ephemeral: true });
@@ -995,7 +961,7 @@ const apiServer = http.createServer(async (req, res) => {
                 } catch(e) {}
 
                 // History speichern + Eintragsnummer holen
-                const history = await getModHistory(userId);
+                const history = getModHistory(userId);
                 // Moderator-Avatar aus allKnownUsers holen
                 let modAvatarUrl = moderatorAvatar || null;
                 if (!modAvatarUrl) {
@@ -1003,7 +969,7 @@ const apiServer = http.createServer(async (req, res) => {
                         if (u.username === moderator) { modAvatarUrl = u.avatar || null; break; }
                     }
                 }
-                const entryNum = await addModEntry(userId, {
+                const entryNum = addModEntry(userId, {
                     action, reason: reason || 'Kein Grund', moderator, date: new Date().toISOString(),
                     displayName: displayName || username, modAvatar: modAvatarUrl
                 });
@@ -1094,7 +1060,7 @@ const apiServer = http.createServer(async (req, res) => {
 
                 // Select-Menü für alle Einträge (wenn mehr als 1)
                 // Wird SEPARAT gesendet, da Components V2 Container kein SelectMenu erlaubt
-                const allEntries = await getModHistory(userId);
+                const allEntries = getModHistory(userId);
 
                 await channel.send({
                     components: [container],
@@ -1107,7 +1073,7 @@ const apiServer = http.createServer(async (req, res) => {
                         const options = allEntries.slice(-25).map((h, i) => ({
                             label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
                             description: `${h.moderator || 'Unbekannt'} · ${new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`.slice(0, 100),
-                            value: `modentry_${userId}_${h.id || (offset + i)}`,
+                            value: `modentry_${userId}_${offset + i}`,
                             emoji: { name: h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️' }
                         }));
 
@@ -1149,7 +1115,7 @@ const apiServer = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/mod-history") {
         const userId = url.searchParams.get("userId");
         if (!userId) { res.writeHead(400); return res.end(JSON.stringify({ error: "userId required" })); }
-        const history = await getModHistory(userId);
+        const history = getModHistory(userId);
 
         // Moderator-Avatare aus allKnownUsers holen
         const enriched = history.map((h, i) => {
@@ -1174,15 +1140,14 @@ const apiServer = http.createServer(async (req, res) => {
     // GET /api/mod-log — Gibt die letzten Moderations-Einträge zurück (alle User)
     if (req.method === "GET" && url.pathname === "/api/mod-log") {
         const limit = parseInt(url.searchParams.get("limit")) || 50;
-        const [rows] = await dbPool.execute(
-            'SELECT * FROM mod_history ORDER BY created_at DESC LIMIT ?',
-            [limit]
-        );
-        const limited = rows.map(r => ({
-            action: r.action, reason: r.reason, moderator: r.moderator,
-            date: r.created_at, displayName: r.display_name, modAvatar: r.mod_avatar,
-            userId: r.roblox_user_id, id: r.id
-        }));
+        const allEntries = [];
+        for (const [userId, entries] of Object.entries(modHistory)) {
+            for (const e of entries) {
+                allEntries.push({ ...e, userId });
+            }
+        }
+        allEntries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        const limited = allEntries.slice(0, limit);
 
         // Moderator-Avatare anreichern
         const enriched = limited.map(e => {
@@ -1395,15 +1360,14 @@ const apiServer = http.createServer(async (req, res) => {
                 const hasPermission = await isLead(leadDiscordId);
                 if (!hasPermission) { res.writeHead(403); return res.end(JSON.stringify({ error: "Keine Berechtigung" })); }
 
-                // Eintrag per Index finden (alle Einträge des Users holen, dann per Index löschen)
-                const allEntries = await getModHistory(userId);
-                if (!allEntries || entryIndex < 0 || entryIndex >= allEntries.length) {
+                const history = modHistory[userId];
+                if (!history || entryIndex < 0 || entryIndex >= history.length) {
                     res.writeHead(404); return res.end(JSON.stringify({ error: "Eintrag nicht gefunden" }));
                 }
-                const entryToDelete = allEntries[entryIndex];
-                if (entryToDelete.id) {
-                    await dbPool.execute('DELETE FROM mod_history WHERE id = ?', [entryToDelete.id]);
-                }
+
+                history.splice(entryIndex, 1);
+                if (history.length === 0) delete modHistory[userId];
+                saveModHistory();
 
                 console.log(`[Mod] Lead ${leadDiscordId} hat Eintrag #${entryIndex} von User ${userId} gelöscht`);
                 res.writeHead(200);
@@ -1901,12 +1865,14 @@ client.once("ready", async () => {
                             const mod = moderatorText.replace(/Moderator:\s*@?/i, '').trim();
 
                             if (robloxUserId && punishment) {
-                                await addModEntry(robloxUserId, {
+                                if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
+                                modHistory[robloxUserId].push({
                                     action: punishment,
                                     reason,
                                     moderator: mod,
                                     date: msg.createdAt.toISOString(),
                                     displayName,
+                                    source: 'trident'
                                 });
                                 imported++;
                             }
@@ -1919,7 +1885,8 @@ client.once("ready", async () => {
                     }
                 }
                 if (imported > 0) {
-                    console.log(`[Mod] ✅ ${imported} Einträge aus Trident in MySQL importiert`);
+                    saveModHistory();
+                    console.log(`[Mod] ✅ ${imported} Einträge aus Trident importiert (${Object.keys(modHistory).length} User)`);
                 } else {
                     console.log('[Mod] Keine Trident-Einträge gefunden.');
                 }
