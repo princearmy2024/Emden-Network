@@ -782,6 +782,14 @@ const Overlay = (() => {
             PanicSystem.showAlert(data);
         });
 
+        // Panic Accepted: Jemand kommt zur Hilfe
+        socket.on('panic_accepted', (data) => {
+            if (data.targetDiscordId === discordId) {
+                console.log(`[PANIC] ${data.acceptedBy} kommt zu dir!`);
+                notify({ title: 'Panic Hilfe!', text: `${data.acceptedBy} kommt zu dir!`, type: 'info' });
+            }
+        });
+
         if (window.electronAPI) {
             socket.on('overlay_game_start_test', (data) => setGameRunning(true, data.startTime));
         }
@@ -1330,6 +1338,7 @@ const Overlay = (() => {
 // ══════════════════════════════════════════════
 const PanicSystem = {
     _targetUsername: null,
+    _targetDiscordId: null,
     _lastTrigger: 0,
     _autoCloseTimer: null,
     _focusInterval: null,
@@ -1377,6 +1386,7 @@ const PanicSystem = {
 
     showAlert(data) {
         this._targetUsername = data.robloxUsername || data.username || '?';
+        this._targetDiscordId = data.discordId || null;
         const el = document.getElementById('panicAlert');
         const userEl = document.getElementById('panicAlertUser');
         console.log('[PANIC] showAlert called — el:', !!el, 'userEl:', !!userEl, 'target:', this._targetUsername);
@@ -1429,41 +1439,35 @@ const PanicSystem = {
         }, 1000);
     },
 
-    teleport() {
-        if (!this._targetUsername) return;
-        if (this._teleporting) return; // Guard gegen Mehrfach-Klick
-        this._teleporting = true;
+    accept() {
+        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+        const user = session?.user;
+        if (!user?.discordId) { console.log('[PANIC] Accept: Kein User eingeloggt'); return; }
 
-        const target = this._targetUsername;
-        console.log(`[PANIC] Teleportiere zu: ${target}`);
-        console.log(`[PANIC] electronAPI vorhanden: ${!!window.electronAPI}, robloxTeleport: ${!!window.electronAPI?.robloxTeleport}`);
-
-        // ERST Focus-Loop + Timer stoppen, damit Roblox Focus behalten kann
-        if (this._focusInterval) { clearInterval(this._focusInterval); this._focusInterval = null; }
-        if (this._autoCloseTimer) { clearInterval(this._autoCloseTimer); this._autoCloseTimer = null; }
-
-        // Alert sofort schliessen + Focus abgeben
-        const el = document.getElementById('panicAlert');
-        if (el) { el.classList.remove('active'); el.style.display = 'none'; }
-        this._targetUsername = null;
-        const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;
-        if (reqFocus) reqFocus(false);
-
-        // Kurz warten damit Roblox Focus hat, dann Teleport IPC senden
-        setTimeout(() => {
+        let robloxUsername = Overlay.getRobloxUsername() || '';
+        if (!robloxUsername) {
             try {
-                if (window.electronAPI && window.electronAPI.robloxTeleport) {
-                    window.electronAPI.robloxTeleport(target);
-                    console.log(`[PANIC] IPC roblox-teleport gesendet fuer: ${target}`);
-                } else {
-                    console.error('[PANIC] electronAPI.robloxTeleport NICHT verfuegbar!');
-                }
-            } catch (e) {
-                console.error('[PANIC] Teleport IPC Fehler:', e);
-            }
-            // Guard nach 3s resetten
-            setTimeout(() => { this._teleporting = false; }, 3000);
-        }, 300);
+                const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
+                robloxUsername = rblx?.username || rblx?.displayName || '';
+            } catch(e) {}
+        }
+        if (!robloxUsername) robloxUsername = user.username || '?';
+
+        const socket = window._overlaySocket;
+        console.log(`[PANIC] Accept von ${user.username} (Roblox: ${robloxUsername}) fuer target: ${this._targetDiscordId}`);
+
+        if (socket?.connected) {
+            socket.emit('panic_accept', {
+                discordId: user.discordId,
+                username: user.username || 'Unbekannt',
+                robloxUsername: robloxUsername,
+                avatar: user.avatar || '',
+                targetDiscordId: this._targetDiscordId,
+            });
+            console.log('[PANIC] panic_accept emitted');
+        }
+
+        this.dismiss();
     },
 
     dismiss() {
@@ -1477,6 +1481,7 @@ const PanicSystem = {
             el.style.display = 'none';
         }
         this._targetUsername = null;
+        this._targetDiscordId = null;
 
         // Focus zurückgeben
         const reqFocus = window.electronAPI?.requestOverlayFocus || window.electronAPI?.overlayRequestFocus;

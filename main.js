@@ -94,57 +94,7 @@ function createWindow() {
 
 // === IPC HANDLER (Hauptprozess-Seite) ===
 
-// Roblox Chat Teleport: Simuliert Tasteneingabe im Spiel
-ipcMain.on('roblox-teleport', (event, { robloxUsername }) => {
-    if (!robloxUsername) return;
-    console.log(`[Teleport] Starte -/tp ${robloxUsername}...`);
-    const { exec } = require('child_process');
-
-    // OVERLAY KOMPLETT VERSTECKEN damit es keinen Keyboard-Focus klaut
-    if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-        robloxOverlayWin.hide();
-        console.log('[Teleport] Overlay versteckt');
-    }
-
-    // PowerShell AppActivate + WScript.Shell SendKeys
-    const safeUsername = robloxUsername.replace(/'/g, "''");
-    const lines = [
-        'Add-Type -AssemblyName Microsoft.VisualBasic',
-        '',
-        '$roblox = Get-Process -Name "RobloxPlayerBeta" -ErrorAction SilentlyContinue | Select-Object -First 1',
-        'if (-not $roblox) { $roblox = Get-Process -Name "RobloxPlayer" -ErrorAction SilentlyContinue | Select-Object -First 1 }',
-        'if (-not $roblox) { Write-Host "FEHLER: Roblox nicht gefunden"; exit 1 }',
-        'Write-Host "Roblox PID: $($roblox.Id)"',
-        '',
-        '[Microsoft.VisualBasic.Interaction]::AppActivate($roblox.Id)',
-        'Start-Sleep -Milliseconds 1000',
-        '',
-        '$wsh = New-Object -ComObject WScript.Shell',
-        '$wsh.SendKeys("-")',
-        'Start-Sleep -Milliseconds 600',
-        '$wsh.SendKeys("/tp ' + safeUsername + '")',
-        'Start-Sleep -Milliseconds 300',
-        '$wsh.SendKeys("{ENTER}")',
-        'Write-Host "OK: -/tp ' + safeUsername + '"',
-    ];
-    const psContent = lines.join('\r\n');
-
-    const tmpFile = path.join(os.tmpdir(), `en_teleport_${Date.now()}.ps1`);
-    fs.writeFileSync(tmpFile, psContent, 'utf-8');
-
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`, { timeout: 15000 }, (err, stdout, stderr) => {
-        if (stdout.trim()) console.log(`[Teleport] stdout: ${stdout.trim()}`);
-        if (err) console.error('[Teleport] Fehler:', err.message, stderr);
-
-        // Overlay wieder anzeigen
-        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-            robloxOverlayWin.showInactive();
-            console.log('[Teleport] Overlay wieder sichtbar');
-        }
-
-        fs.unlink(tmpFile, () => {});
-    });
-});
+// Teleport wurde entfernt (v4.50.0) — ersetzt durch Panic Accept System
 
 // Sound abspielen (delegiert an Main Window weil Overlay keinen Audio-Focus hat)
 ipcMain.on('play-notification-sound', () => {

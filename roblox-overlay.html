@@ -1405,12 +1405,12 @@ body.overlay-active #panelPanic { pointer-events: auto; }
     transition: all 0.2s; pointer-events: auto;
 }
 .panic-alert-btn:hover { transform: translateY(-2px); }
-.panic-tp {
-    background: linear-gradient(135deg, #0070d4, #0090ff);
+.panic-accept {
+    background: linear-gradient(135deg, #059669, #10b981);
     color: #fff;
-    box-shadow: 0 4px 20px rgba(0,136,255,0.3);
+    box-shadow: 0 4px 20px rgba(16,185,129,0.3);
 }
-.panic-tp:hover { box-shadow: 0 8px 32px rgba(0,136,255,0.4); }
+.panic-accept:hover { box-shadow: 0 8px 32px rgba(16,185,129,0.4); }
 .panic-dismiss {
     background: rgba(255,255,255,0.06);
     color: rgba(255,255,255,0.5);
@@ -1680,7 +1680,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   <div class="grid-pattern"></div>
   <div class="bottom-bar-content">
     <div class="bottom-hint"><kbd>F2</kbd> Dashboard <kbd>F3</kbd> Commands <kbd>F4</kbd> Mod <kbd>V</kbd> Talk</div>
-    <div class="bottom-version">Emden Network v4.49.1</div>
+    <div class="bottom-version">Emden Network v4.50.0</div>
   </div>
 </div>
 
@@ -1837,12 +1837,12 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
         <div class="panic-alert-sub">braucht sofort Hilfe!</div>
         <div class="panic-alert-timer" id="panicTimer">60s</div>
         <div class="panic-alert-buttons">
-            <button class="panic-alert-btn panic-tp" onclick="PanicSystem.teleport()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 3L3 10.5l7.5 3 3 7.5z"/></svg>
-                Teleportieren
+            <button class="panic-alert-btn panic-accept" onclick="PanicSystem.accept()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="20 6 9 17 4 12"/></svg>
+                Ich komme!
             </button>
             <button class="panic-alert-btn panic-dismiss" onclick="PanicSystem.dismiss()">
-                Wegmachen
+                Ablehnen
             </button>
         </div>
     </div>

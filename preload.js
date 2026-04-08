@@ -46,8 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Notification Sound (delegiert an Main Window)
     playNotificationSound: () => ipcRenderer.send('play-notification-sound'),
 
-    // Roblox Teleport (simuliert Chat-Eingabe)
-    robloxTeleport: (robloxUsername) => ipcRenderer.send('roblox-teleport', { robloxUsername }),
+    // Teleport wurde entfernt (v4.50.0)
 
     // Mod-Button erstellen (für Admins)
     createModButton: () => ipcRenderer.send('create-mod-button'),
@@ -73,8 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateOverlayState: (state) => ipcRenderer.send('update-overlay-state', state),
     onUpdateOverlayState: (callback) => ipcRenderer.on('update-overlay-state', (event, state) => callback(state)),
 
-    // Teleport Clipboard Notification
-    onTeleportClipboard: (cb) => ipcRenderer.on('teleport-clipboard', (event, data) => cb(data)),
+    // Teleport Clipboard entfernt (v4.50.0)
 
     // ── GLOBALES PTT SYSTEM ───────────────────────────────────────
     // Main-Prozess sendet diese Events wenn die globale V-Taste gedrückt wird

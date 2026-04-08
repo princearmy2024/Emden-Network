@@ -1446,6 +1446,18 @@ io.on("connection", (socket) => {
         });
     });
 
+    // Panic Accept: Jemand kommt zur Hilfe
+    socket.on("panic_accept", (data) => {
+        console.log(`[PANIC] ${data.username} akzeptiert Panic von ${data.targetDiscordId}`);
+        // Notify the person who pressed panic
+        io.emit("panic_accepted", {
+            acceptedBy: data.username,
+            acceptedByRoblox: data.robloxUsername,
+            acceptedByAvatar: data.avatar,
+            targetDiscordId: data.targetDiscordId,
+        });
+    });
+
     // Chat: User registriert sich mit discordId für PNs
     socket.on("chat_register", ({ discordId, username }) => {
         socket.chatUserId = discordId;
