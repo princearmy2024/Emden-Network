@@ -1,6 +1,6 @@
 {
-    "version": "4.50.0",
-    "releaseDate": "2026-04-07",
-    "notes": "v4.50.0: Panic Alert Redesign — Teleport entfernt, neues Accept-System (Ich komme! Button), Server-seitige panic_accept/panic_accepted Events.",
+    "version": "4.50.1",
+    "releaseDate": "2026-04-08",
+    "notes": "v4.50.1: Fix Panic Accept — Overlay-Variablen statt localStorage (separates Fenster hat keinen Zugriff).",
     "forceUpdate": true
 }

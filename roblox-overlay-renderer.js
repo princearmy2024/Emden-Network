@@ -1330,7 +1330,7 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername };
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
 })();
 
 // ══════════════════════════════════════════════
@@ -1352,31 +1352,23 @@ const PanicSystem = {
         }
         this._lastTrigger = now;
 
-        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
-        const user = session?.user;
-        if (!user?.discordId) { console.log('[PANIC] Kein User eingeloggt'); return; }
+        // Overlay-Variablen nutzen (localStorage ist leer — separates Fenster!)
+        const myDiscordId = Overlay.getDiscordId();
+        const myUsername = Overlay.getUsername();
+        if (!myDiscordId) { console.log('[PANIC] Kein discordId'); return; }
 
-        // Roblox Username aus Overlay holen (wurde beim Init von API geladen)
-        let robloxUsername = Overlay.getRobloxUsername() || '';
-        if (!robloxUsername) {
-            // Fallback: aus localStorage versuchen
-            try {
-                const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
-                robloxUsername = rblx?.username || rblx?.displayName || '';
-            } catch(e) {}
-        }
-        if (!robloxUsername) robloxUsername = user.username || '?';
-        console.log(`[PANIC] Roblox Username resolved: ${robloxUsername}`);
+        const robloxUsername = Overlay.getRobloxUsername() || myUsername || '?';
+        console.log(`[PANIC] Roblox Username: ${robloxUsername}`);
 
         const socket = window._overlaySocket;
-        console.log(`[PANIC] Button gedrückt! Socket connected: ${!!socket?.connected}, User: ${user.username}, Roblox: ${robloxUsername}`);
+        console.log(`[PANIC] Button gedrückt! Socket connected: ${!!socket?.connected}, User: ${myUsername}, Roblox: ${robloxUsername}`);
 
         if (socket?.connected) {
             socket.emit('panic_button', {
-                discordId: user.discordId,
-                username: user.username || 'Unbekannt',
+                discordId: myDiscordId,
+                username: myUsername || 'Unbekannt',
                 robloxUsername: robloxUsername,
-                avatar: user.avatar || '',
+                avatar: '',
             });
             console.log('[PANIC] Socket emit gesendet');
         } else {
@@ -1440,31 +1432,27 @@ const PanicSystem = {
     },
 
     accept() {
-        const session = JSON.parse(localStorage.getItem('en_session') || 'null');
-        const user = session?.user;
-        if (!user?.discordId) { console.log('[PANIC] Accept: Kein User eingeloggt'); return; }
+        // Overlay-Variablen nutzen (localStorage ist leer — separates Fenster!)
+        const myDiscordId = Overlay.getDiscordId();
+        const myUsername = Overlay.getUsername();
+        const myRobloxUsername = Overlay.getRobloxUsername() || myUsername || '?';
 
-        let robloxUsername = Overlay.getRobloxUsername() || '';
-        if (!robloxUsername) {
-            try {
-                const rblx = JSON.parse(localStorage.getItem('rblx_profile') || 'null');
-                robloxUsername = rblx?.username || rblx?.displayName || '';
-            } catch(e) {}
-        }
-        if (!robloxUsername) robloxUsername = user.username || '?';
+        if (!myDiscordId) { console.log('[PANIC] Accept: Kein discordId'); return; }
 
         const socket = window._overlaySocket;
-        console.log(`[PANIC] Accept von ${user.username} (Roblox: ${robloxUsername}) fuer target: ${this._targetDiscordId}`);
+        console.log(`[PANIC] Accept von ${myUsername} (Roblox: ${myRobloxUsername}) fuer target: ${this._targetDiscordId}`);
 
         if (socket?.connected) {
             socket.emit('panic_accept', {
-                discordId: user.discordId,
-                username: user.username || 'Unbekannt',
-                robloxUsername: robloxUsername,
-                avatar: user.avatar || '',
+                discordId: myDiscordId,
+                username: myUsername || 'Unbekannt',
+                robloxUsername: myRobloxUsername,
+                avatar: '',
                 targetDiscordId: this._targetDiscordId,
             });
             console.log('[PANIC] panic_accept emitted');
+        } else {
+            console.error('[PANIC] Socket nicht verbunden!');
         }
 
         this.dismiss();
