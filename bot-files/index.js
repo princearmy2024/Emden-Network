@@ -5,7 +5,8 @@ import {
     ModalBuilder, TextInputBuilder, TextInputStyle,
     ActionRowBuilder, EmbedBuilder, MessageFlags,
     ContainerBuilder, TextDisplayBuilder, SectionBuilder,
-    SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder
+    SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder,
+    StringSelectMenuBuilder
 } from "discord.js";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -13,6 +14,7 @@ import path from "node:path";
 import http from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import crypto from "node:crypto";
+import mysql from "mysql2/promise";
 
 // In-Memory Code Store (alles in einer Datei — kein extra File nötig)
 const verificationCodes = new Map();
@@ -55,26 +57,59 @@ function saveLinks() {
     } catch (e) { console.error("❌ Fehler beim Speichern der Roblox-Links:", e.message); }
 }
 
-// === Mod History ===
-const MOD_HISTORY_FILE = path.join(path.resolve(), "data", "modHistory.json");
-let modHistory = {};
-if (fs.existsSync(MOD_HISTORY_FILE)) {
-    try { modHistory = JSON.parse(fs.readFileSync(MOD_HISTORY_FILE, "utf-8")); } catch(e) {}
-}
-function saveModHistory() {
+// === MySQL Mod History ===
+const dbPool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASS || '',
+    database: process.env.DB_NAME || 'emden_network',
+    waitForConnections: true,
+    connectionLimit: 10,
+});
+
+// Tabelle beim Start erstellen
+async function initModDB() {
     try {
-        if (!fs.existsSync(path.dirname(MOD_HISTORY_FILE))) fs.mkdirSync(path.dirname(MOD_HISTORY_FILE), { recursive: true });
-        fs.writeFileSync(MOD_HISTORY_FILE, JSON.stringify(modHistory, null, 2));
-    } catch(e) {}
+        await dbPool.execute(`
+            CREATE TABLE IF NOT EXISTS mod_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                roblox_user_id VARCHAR(64) NOT NULL,
+                action VARCHAR(32) NOT NULL,
+                reason TEXT,
+                moderator VARCHAR(128),
+                mod_avatar TEXT,
+                display_name VARCHAR(128),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_roblox_user (roblox_user_id)
+            )
+        `);
+        console.log('✅ MySQL mod_history Tabelle bereit');
+    } catch(e) {
+        console.error('❌ MySQL Fehler:', e.message);
+    }
 }
-function addModEntry(robloxUserId, entry) {
-    if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
-    modHistory[robloxUserId].push(entry);
-    saveModHistory();
-    return modHistory[robloxUserId].length;
+initModDB();
+
+async function addModEntry(robloxUserId, entry) {
+    const [result] = await dbPool.execute(
+        'INSERT INTO mod_history (roblox_user_id, action, reason, moderator, mod_avatar, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [robloxUserId, entry.action, entry.reason || 'Kein Grund', entry.moderator, entry.modAvatar || null, entry.displayName || null, entry.date || new Date().toISOString()]
+    );
+    const [countRows] = await dbPool.execute('SELECT COUNT(*) as cnt FROM mod_history WHERE roblox_user_id = ?', [robloxUserId]);
+    return countRows[0].cnt;
 }
-function getModHistory(robloxUserId) {
-    return modHistory[robloxUserId] || [];
+
+async function getModHistory(robloxUserId) {
+    const [rows] = await dbPool.execute(
+        'SELECT * FROM mod_history WHERE roblox_user_id = ? ORDER BY created_at ASC',
+        [robloxUserId]
+    );
+    return rows.map(r => ({
+        action: r.action, reason: r.reason, moderator: r.moderator,
+        date: r.created_at, displayName: r.display_name, modAvatar: r.mod_avatar,
+        id: r.id
+    }));
 }
 
 // === Shift System ===
@@ -252,6 +287,76 @@ client.on("interactionCreate", async interaction => {
         );
 
         return interaction.showModal(modal);
+    }
+
+    // ============================================
+    // 📋 SELECT MENU: Mod-History Eintrag anzeigen
+    // ============================================
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("mod_history_select_")) {
+        const robloxUserId = interaction.customId.replace('mod_history_select_', '');
+        const selected = interaction.values[0]; // z.B. "modentry_12345_42"
+        const entryId = selected.split('_').pop();
+
+        try {
+            const history = await getModHistory(robloxUserId);
+            const entry = history.find(h => String(h.id) === String(entryId)) || history[parseInt(entryId)] || null;
+
+            if (!entry) {
+                return interaction.reply({ content: '❌ Eintrag nicht gefunden.', ephemeral: true });
+            }
+
+            const eEmoji = entry.action === 'Ban' ? '🔨' : entry.action === 'Kick' ? '👢' : '⚠️';
+            const eDate = new Date(entry.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const entryIdx = history.indexOf(entry) + 1;
+
+            const profileUrl = `https://www.roblox.com/users/${robloxUserId}/profile`;
+            const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+
+            const detailContainer = new ContainerBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `${eEmoji} **${entry.action}** — Eintrag #${entryIdx}\n` +
+                        `# ${entry.displayName || 'Unbekannt'}`
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `**User ID** · \`${robloxUserId}\`\n` +
+                        `**Display Name** · ${entry.displayName || '—'}`
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${entry.reason || 'Kein Grund'}`)
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`**Punishment** · ${eEmoji} ${entry.action}`)
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addActionRowComponents(
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setLabel('Roblox Profil')
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(profileUrl)
+                            .setEmoji({ name: 'roblox', id: '1433535007246516446' })
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`-# Moderator: @${entry.moderator || 'Unbekannt'} · ${eDate}`)
+                );
+
+            return interaction.reply({
+                components: [detailContainer],
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral
+            });
+        } catch(e) {
+            console.error('[Mod] Select-Menu Fehler:', e.message);
+            return interaction.reply({ content: '❌ Fehler beim Laden des Eintrags.', ephemeral: true });
+        }
     }
 
     // ============================================
@@ -890,7 +995,7 @@ const apiServer = http.createServer(async (req, res) => {
                 } catch(e) {}
 
                 // History speichern + Eintragsnummer holen
-                const history = getModHistory(userId);
+                const history = await getModHistory(userId);
                 // Moderator-Avatar aus allKnownUsers holen
                 let modAvatarUrl = moderatorAvatar || null;
                 if (!modAvatarUrl) {
@@ -898,7 +1003,7 @@ const apiServer = http.createServer(async (req, res) => {
                         if (u.username === moderator) { modAvatarUrl = u.avatar || null; break; }
                     }
                 }
-                const entryNum = addModEntry(userId, {
+                const entryNum = await addModEntry(userId, {
                     action, reason: reason || 'Kein Grund', moderator, date: new Date().toISOString(),
                     displayName: displayName || username, modAvatar: modAvatarUrl
                 });
@@ -966,7 +1071,7 @@ const apiServer = http.createServer(async (req, res) => {
                     .addActionRowComponents(buttonRow)
                 // Historie-Info wenn vorherige Einträge existieren
                 if (prevCount > 0) {
-                    const historyLines = history.slice(-3).map((h, i) => {
+                    const historyLines = history.slice(-3).map((h) => {
                         const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
                         const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
                         return `-# ${hEmoji} ${h.action} · ${h.reason} · ${hDate}`;
@@ -987,10 +1092,38 @@ const apiServer = http.createServer(async (req, res) => {
                         new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
+                // Select-Menü für alle Einträge (wenn mehr als 1)
+                // Wird SEPARAT gesendet, da Components V2 Container kein SelectMenu erlaubt
+                const allEntries = await getModHistory(userId);
+
                 await channel.send({
                     components: [container],
                     flags: MessageFlags.IsComponentsV2
                 });
+
+                if (allEntries.length > 1) {
+                    const options = allEntries.slice(-25).map((h, i) => {
+                        const hEmoji = h.action === 'Ban' ? '🔨' : h.action === 'Kick' ? '👢' : '⚠️';
+                        const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        const idx = allEntries.length - 25 + i; // richtiger Index
+                        const realIdx = idx < 0 ? i : idx;
+                        return {
+                            label: `#${realIdx + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 40)}`,
+                            description: `${h.moderator || 'Unbekannt'} · ${hDate}`,
+                            value: `modentry_${userId}_${h.id || realIdx}`,
+                            emoji: hEmoji === '🔨' ? '🔨' : hEmoji === '👢' ? '👢' : '⚠️'
+                        };
+                    });
+
+                    const selectMenu = new StringSelectMenuBuilder()
+                        .setCustomId(`mod_history_select_${userId}`)
+                        .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
+                        .addOptions(options);
+
+                    await channel.send({
+                        components: [new ActionRowBuilder().addComponents(selectMenu)]
+                    });
+                }
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 
@@ -1017,7 +1150,7 @@ const apiServer = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/mod-history") {
         const userId = url.searchParams.get("userId");
         if (!userId) { res.writeHead(400); return res.end(JSON.stringify({ error: "userId required" })); }
-        const history = getModHistory(userId);
+        const history = await getModHistory(userId);
 
         // Moderator-Avatare aus allKnownUsers holen
         const enriched = history.map((h, i) => {
@@ -1042,15 +1175,15 @@ const apiServer = http.createServer(async (req, res) => {
     // GET /api/mod-log — Gibt die letzten Moderations-Einträge zurück (alle User)
     if (req.method === "GET" && url.pathname === "/api/mod-log") {
         const limit = parseInt(url.searchParams.get("limit")) || 50;
-        const allEntries = [];
-        for (const [userId, entries] of Object.entries(modHistory)) {
-            for (const e of entries) {
-                allEntries.push({ ...e, userId });
-            }
-        }
-        // Nach Datum sortieren (neueste zuerst)
-        allEntries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-        const limited = allEntries.slice(0, limit);
+        const [rows] = await dbPool.execute(
+            'SELECT * FROM mod_history ORDER BY created_at DESC LIMIT ?',
+            [limit]
+        );
+        const limited = rows.map(r => ({
+            action: r.action, reason: r.reason, moderator: r.moderator,
+            date: r.created_at, displayName: r.display_name, modAvatar: r.mod_avatar,
+            userId: r.roblox_user_id, id: r.id
+        }));
 
         // Moderator-Avatare anreichern
         const enriched = limited.map(e => {
@@ -1263,14 +1396,15 @@ const apiServer = http.createServer(async (req, res) => {
                 const hasPermission = await isLead(leadDiscordId);
                 if (!hasPermission) { res.writeHead(403); return res.end(JSON.stringify({ error: "Keine Berechtigung" })); }
 
-                const history = modHistory[userId];
-                if (!history || entryIndex < 0 || entryIndex >= history.length) {
+                // Eintrag per Index finden (alle Einträge des Users holen, dann per Index löschen)
+                const allEntries = await getModHistory(userId);
+                if (!allEntries || entryIndex < 0 || entryIndex >= allEntries.length) {
                     res.writeHead(404); return res.end(JSON.stringify({ error: "Eintrag nicht gefunden" }));
                 }
-
-                history.splice(entryIndex, 1);
-                if (history.length === 0) delete modHistory[userId];
-                saveModHistory();
+                const entryToDelete = allEntries[entryIndex];
+                if (entryToDelete.id) {
+                    await dbPool.execute('DELETE FROM mod_history WHERE id = ?', [entryToDelete.id]);
+                }
 
                 console.log(`[Mod] Lead ${leadDiscordId} hat Eintrag #${entryIndex} von User ${userId} gelöscht`);
                 res.writeHead(200);
@@ -1768,14 +1902,12 @@ client.once("ready", async () => {
                             const mod = moderatorText.replace(/Moderator:\s*@?/i, '').trim();
 
                             if (robloxUserId && punishment) {
-                                if (!modHistory[robloxUserId]) modHistory[robloxUserId] = [];
-                                modHistory[robloxUserId].push({
+                                await addModEntry(robloxUserId, {
                                     action: punishment,
                                     reason,
                                     moderator: mod,
                                     date: msg.createdAt.toISOString(),
                                     displayName,
-                                    source: 'trident'
                                 });
                                 imported++;
                             }
@@ -1788,8 +1920,7 @@ client.once("ready", async () => {
                     }
                 }
                 if (imported > 0) {
-                    saveModHistory();
-                    console.log(`[Mod] ✅ ${imported} Einträge aus Trident importiert (${Object.keys(modHistory).length} User)`);
+                    console.log(`[Mod] ✅ ${imported} Einträge aus Trident in MySQL importiert`);
                 } else {
                     console.log('[Mod] Keine Trident-Einträge gefunden.');
                 }
