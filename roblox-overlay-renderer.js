@@ -807,8 +807,9 @@ const Overlay = (() => {
         socket.on(`overlay_notification_${discordId}`, handleNotif);
         socket.on('overlay_big_announcement', bigAnnounce);
 
-        socket.on('overlay_new_ticket', ({ ticketId, reason }) => {
-            notify({ title: `📩 Neues Ticket #${ticketId}`, text: reason || 'Kein Grund angegeben', type: 'ticket', duration: 15000 });
+        socket.on('overlay_new_ticket', ({ ticketId, reason, channelName }) => {
+            notify({ title: `📩 Neues Ticket`, text: `#${channelName || ticketId} — ${reason || 'Neues Ticket'}`, type: 'ticket', duration: 15000 });
+            try { const a = new Audio('./ticketsound.mp3'); a.volume = 0.5; a.play().catch(()=>{}); } catch(e) {}
         });
 
         // Persönliche Mention
@@ -820,6 +821,7 @@ const Overlay = (() => {
         socket.on('support_waiting', (data) => {
             if (data.action === 'join') {
                 notify({ title: '🎧 Support-Warteraum', text: `${data.username} wartet in ${data.channelName}`, type: 'support', duration: 15000 });
+                try { const a = new Audio('./supportwarteraumsound.mp3'); a.volume = 0.5; a.play().catch(()=>{}); } catch(e) {}
             }
         });
 

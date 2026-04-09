@@ -249,8 +249,7 @@ const WebSocketService = {
                 if (!window.App) return;
                 if (localStorage.getItem('notif_tickets') === 'false') return;
                 NotificationService.show('📩 Neues Ticket', `#${data.channelName || data.ticketId} — ${data.reason}`, 'warn');
-                // Ticket-Sound abspielen
-                try { const a = new Audio('./soynoviembre-short-digital-notification-alert-440353.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
+                try { const a = new Audio('./ticketsound.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
             });
 
             // 🔔 Persönliche Mention/Ping
@@ -270,8 +269,7 @@ const WebSocketService = {
                 if (data.action === 'join') {
                     if (localStorage.getItem('notif_support') === 'false') return;
                     NotificationService.show('🎧 Support-Warteraum', `${data.username} wartet in ${data.channelName}`, 'warn');
-                    // Support-Sound abspielen
-                    try { const a = new Audio('./soynoviembre-short-digital-notification-alert-440353.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
+                    try { const a = new Audio('./supportwarteraumsound.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
                 }
             });
 
