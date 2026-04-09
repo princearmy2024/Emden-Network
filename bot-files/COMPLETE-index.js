@@ -928,7 +928,7 @@ const apiServer = http.createServer(async (req, res) => {
         req.on("data", c => (body += c));
         req.on("end", async () => {
             try {
-                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar, evidence } = JSON.parse(body || "{}");
+                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar, evidence, notiz } = JSON.parse(body || "{}");
                 if (!userId || !action) {
                     res.writeHead(400);
                     return res.end(JSON.stringify({ success: false, error: "userId und action erforderlich" }));
@@ -1005,7 +1005,8 @@ const apiServer = http.createServer(async (req, res) => {
                 }
                 const entryNum = addModEntry(userId, {
                     action, reason: reason || 'Kein Grund', moderator, date: new Date().toISOString(),
-                    displayName: displayName || username, modAvatar: modAvatarUrl
+                    displayName: displayName || username, modAvatar: modAvatarUrl,
+                    notiz: notiz || null
                 });
                 const prevCount = entryNum - 1;
 
@@ -1064,8 +1065,17 @@ const apiServer = http.createServer(async (req, res) => {
                     )
                     .addTextDisplayComponents(
                         new TextDisplayBuilder().setContent(`**Punishment** · ${emoji} ${action}`)
-                    )
-                    .addSeparatorComponents(
+                    );
+                // Notiz anzeigen (wenn vorhanden)
+                if (notiz) {
+                    container.addSeparatorComponents(
+                        new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
+                    );
+                    container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Notiz**\n> ${notiz}`)
+                    );
+                }
+                container.addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
                     .addActionRowComponents(buttonRow)

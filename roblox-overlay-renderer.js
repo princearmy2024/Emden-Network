@@ -1052,6 +1052,9 @@ const Overlay = (() => {
         modSelectedAction = type;
         document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         el.classList.add('on');
+        // Notiz-Textfeld ein/ausblenden
+        const notizBox = document.getElementById('modNotizBox');
+        if (notizBox) notizBox.style.display = type === 'Notiz' ? 'block' : 'none';
         updateModSendBtn();
     }
 
@@ -1114,6 +1117,7 @@ const Overlay = (() => {
     async function sendModAction() {
         if (!modSelectedUser || !modSelectedAction) return;
         const reason = document.getElementById('modReasonInput')?.value?.trim() || 'Kein Grund';
+        const notiz = document.getElementById('modNotizInput')?.value?.trim() || '';
         const user = modSelectedUser;
         const moderator = voiceUsername || 'Unbekannt';
 
@@ -1129,13 +1133,16 @@ const Overlay = (() => {
                     created: user.created || '', reason,
                     action: modSelectedAction, moderator,
                     moderatorAvatar: voiceAvatar || '',
-                    evidence: modImageBase64 || null
+                    evidence: modImageBase64 || null,
+                    notiz: notiz || null
                 })
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Fehler');
             showModMsg('✓ ' + modSelectedAction + ' gesendet', 'ok');
             document.getElementById('modReasonInput').value = '';
+            const notizInp = document.getElementById('modNotizInput'); if (notizInp) notizInp.value = '';
+            const notizBox = document.getElementById('modNotizBox'); if (notizBox) notizBox.style.display = 'none';
             modSelectedAction = null;
             _clearModImage(); // Bild zurücksetzen
             document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));

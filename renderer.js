@@ -546,41 +546,37 @@ const NotificationService = {
      */
     playSmoothSound(type, masterVolume = 0.5) {
         try {
+            if (masterVolume <= 0) return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) return;
             const ctx = new AudioContext();
+            const mv = Math.max(0, Math.min(1, masterVolume));
 
-            const playNote = (freq, startTime, duration, volume = 0.1 * masterVolume) => {
+            const playNote = (freq, startTime, duration, baseVol = 0.1) => {
+                const vol = baseVol * mv;
+                if (vol <= 0) return;
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, startTime);
-
                 gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+                gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
                 gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-
                 osc.start(startTime);
                 osc.stop(startTime + duration);
             };
 
             const now = ctx.currentTime;
-
             if (type === 'success' || type === 'info') {
-                // Heller, doppelter Kristall-Chime
-                playNote(880, now, 0.5, 0.08); // A5
-                playNote(1108.73, now + 0.08, 0.6, 0.06); // C#6
+                playNote(880, now, 0.5, 0.15);
+                playNote(1108.73, now + 0.08, 0.6, 0.12);
             } else if (type === 'warn' || type === 'error') {
-                // Etwas tieferer, dezenterer Warnton
-                playNote(440, now, 0.4, 0.1); // A4
-                playNote(349.23, now + 0.12, 0.5, 0.08); // F4
+                playNote(440, now, 0.4, 0.18);
+                playNote(349.23, now + 0.12, 0.5, 0.15);
             } else {
-                // Standard Blip
-                playNote(659.25, now, 0.3, 0.07); // E5
+                playNote(659.25, now, 0.3, 0.12);
             }
         } catch (e) {
             console.error('Audio Synthesis failed:', e);
@@ -1276,7 +1272,9 @@ const App = window.App = {
             osc.type = 'sine';
             osc.frequency.setValueAtTime(1200, ctx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.06);
-            gain.gain.setValueAtTime(0.015, ctx.currentTime);
+            const uiVol = parseFloat(localStorage.getItem('ui_sound_volume') ?? '0.3');
+            if (uiVol <= 0) return;
+            gain.gain.setValueAtTime(0.015 * uiVol * 3, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
             osc.connect(gain); gain.connect(ctx.destination);
             osc.start(); osc.stop(ctx.currentTime + 0.06);
@@ -1292,7 +1290,9 @@ const App = window.App = {
             osc.frequency.setValueAtTime(600, ctx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.04);
             osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.03, ctx.currentTime);
+            const uiVol2 = parseFloat(localStorage.getItem('ui_sound_volume') ?? '0.3');
+            if (uiVol2 <= 0) return;
+            gain.gain.setValueAtTime(0.03 * uiVol2 * 3, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
             osc.connect(gain); gain.connect(ctx.destination);
             osc.start(); osc.stop(ctx.currentTime + 0.1);
@@ -1932,12 +1932,13 @@ const App = window.App = {
         // Autostart
         const as = localStorage.getItem('autostart');
         if (as) { const cb = document.getElementById('toggleAutostart'); if (cb) cb.checked = as === 'true'; }
-        // Notification Volume
+        // Sound Volumes
         const nv = localStorage.getItem('notif_volume');
-        if (nv !== null) {
-            const sl = document.getElementById('notifVolumeSlider'); if (sl) sl.value = nv;
-            const lb = document.getElementById('notifVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(nv) * 100) + '%';
-        }
+        if (nv !== null) { const sl = document.getElementById('notifVolumeSlider'); if (sl) sl.value = nv; const lb = document.getElementById('notifVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(nv) * 100) + '%'; }
+        const fv = localStorage.getItem('ptt_volume');
+        if (fv) { const sl = document.getElementById('funkVolumeSlider'); if (sl) sl.value = fv; const lb = document.getElementById('funkVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(fv) * 100) + '%'; }
+        const uv = localStorage.getItem('ui_sound_volume');
+        if (uv !== null) { const sl = document.getElementById('uiVolumeSlider'); if (sl) sl.value = uv; const lb = document.getElementById('uiVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(uv) * 100) + '%'; }
     },
 
     toggleSetting(key, val) {
@@ -3604,14 +3605,21 @@ Object.assign(App, {
         this.pttVolume = parseFloat(v);
         localStorage.setItem('ptt_volume', v);
         if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
+        const label = document.getElementById('funkVolumeValue');
+        if (label) label.textContent = Math.round(v * 100) + '%';
     },
 
     setNotifVolume(v) {
         localStorage.setItem('notif_volume', v);
         const label = document.getElementById('notifVolumeValue');
         if (label) label.textContent = Math.round(v * 100) + '%';
-        // Preview-Sound
         if (parseFloat(v) > 0) NotificationService.playSmoothSound('info', parseFloat(v));
+    },
+
+    setUISoundVolume(v) {
+        localStorage.setItem('ui_sound_volume', v);
+        const label = document.getElementById('uiVolumeValue');
+        if (label) label.textContent = Math.round(v * 100) + '%';
     },
 
     // Busy-Ton: error.wav wenn Kanal belegt ──────────────────────
