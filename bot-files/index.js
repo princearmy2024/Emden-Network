@@ -1389,7 +1389,8 @@ const apiServer = http.createServer(async (req, res) => {
     // ================================================================
     if (req.method === "GET" && url.pathname === "/api/gsg9") {
         try {
-            const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const GSG9_GUILD_ID = '1398612779325329418';
+            const guild = client.guilds.cache.get(GSG9_GUILD_ID) || await client.guilds.fetch(GSG9_GUILD_ID);
             await guild.members.fetch().catch(() => {});
 
             const GSG9_ROLES = [
