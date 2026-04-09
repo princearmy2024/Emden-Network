@@ -885,7 +885,7 @@ const Overlay = (() => {
         clearTimeout(modSearchTimer);
         const results = document.getElementById('modResults');
         if (!query || query.length < 2) {
-            results.innerHTML = '<div class="mod-res-empty">Username eingeben</div>';
+            results.innerHTML = '<div class="mod-res-empty">Username, ID oder Anzeigename</div>';
             results.classList.remove('show');
             return;
         }
@@ -894,18 +894,46 @@ const Overlay = (() => {
 
         modSearchTimer = setTimeout(async () => {
             try {
-                const r = await fetch('https://users.roblox.com/v1/usernames/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
-                });
-                const data = await r.json();
-                if (!data.data?.length) {
+                let u = null;
+
+                // 1. Wenn nur Zahlen → direkt als User-ID suchen
+                if (/^\d+$/.test(query.trim())) {
+                    try {
+                        const idRes = await fetch('https://users.roblox.com/v1/users/' + query.trim());
+                        if (idRes.ok) {
+                            const idData = await idRes.json();
+                            if (idData.id) u = { id: idData.id, name: idData.name, displayName: idData.displayName };
+                        }
+                    } catch(e) {}
+                }
+
+                // 2. Wenn nicht per ID gefunden → Username-Suche
+                if (!u) {
+                    const r = await fetch('https://users.roblox.com/v1/usernames/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
+                    });
+                    const data = await r.json();
+                    if (data.data?.length) u = data.data[0];
+                }
+
+                // 3. Wenn immer noch nicht → Display Name Suche
+                if (!u) {
+                    try {
+                        const searchRes = await fetch('https://users.roblox.com/v1/users/search?keyword=' + encodeURIComponent(query) + '&limit=1');
+                        const searchData = await searchRes.json();
+                        if (searchData.data?.length) {
+                            const s = searchData.data[0];
+                            u = { id: s.id, name: s.name, displayName: s.displayName || s.name };
+                        }
+                    } catch(e) {}
+                }
+
+                if (!u) {
                     results.innerHTML = '<div class="mod-res-empty">Nicht gefunden</div>';
                     return;
                 }
-
-                const u = data.data[0];
                 let avatar = '', created = '', displayName = u.displayName || u.name;
                 try {
                     const [pRes, aRes] = await Promise.all([
@@ -938,7 +966,7 @@ const Overlay = (() => {
         // Selected-Leiste
         const sel = document.getElementById('modSelectedUser');
         if (sel) {
-            sel.innerHTML = `<span>${esc(displayName)} (@${esc(username)}) · ${id}</span><button class="mod-sel-x" onclick="Overlay.clearModUser(event)">&times;</button>`;
+            sel.innerHTML = `<span>${esc(displayName)} (<span class="mod-copy" onclick="event.stopPropagation();navigator.clipboard.writeText('${esc(username)}');this.textContent='Kopiert!';setTimeout(()=>this.textContent='@${esc(username)}',800)" title="Username kopieren" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">@${esc(username)}</span>) · <span class="mod-copy" onclick="event.stopPropagation();navigator.clipboard.writeText('${id}');this.textContent='Kopiert!';setTimeout(()=>this.textContent='${id}',800)" title="ID kopieren" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">${id}</span></span><button class="mod-sel-x" onclick="Overlay.clearModUser(event)">&times;</button>`;
             sel.classList.add('show');
         }
 
