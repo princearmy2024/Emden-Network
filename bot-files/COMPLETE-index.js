@@ -8,14 +8,6 @@ import {
     SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder,
     StringSelectMenuBuilder, AttachmentBuilder
 } from "discord.js";
-
-// MediaGallery ist nur in neueren discord.js Versionen verfügbar
-let MediaGalleryBuilder, MediaGalleryItemBuilder;
-try {
-    const djs = await import('discord.js');
-    MediaGalleryBuilder = djs.MediaGalleryBuilder;
-    MediaGalleryItemBuilder = djs.MediaGalleryItemBuilder;
-} catch(e) {}
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
@@ -1115,23 +1107,15 @@ const apiServer = http.createServer(async (req, res) => {
                         const base64Data = evidence.replace(/^data:image\/\w+;base64,/, '');
                         const imgBuffer = Buffer.from(base64Data, 'base64');
                         evidenceAttachment = new AttachmentBuilder(imgBuffer, { name: 'evidence.png' });
-
                         container.addSeparatorComponents(
                             new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                         );
                         container.addTextDisplayComponents(
-                            new TextDisplayBuilder().setContent('📸 **Beweis**')
+                            new TextDisplayBuilder().setContent('📸 **Beweis** — siehe Anhang')
                         );
-                        // MediaGallery nur wenn verfügbar (discord.js 14.16+)
-                        if (MediaGalleryBuilder && MediaGalleryItemBuilder) {
-                            container.addMediaGalleryComponents(
-                                new MediaGalleryBuilder().addItems(
-                                    new MediaGalleryItemBuilder().setURL('attachment://evidence.png')
-                                )
-                            );
-                        }
                     } catch(imgErr) {
                         console.error('[Mod] Bild-Fehler:', imgErr.message);
+                        evidenceAttachment = null;
                     }
                 }
 
@@ -1163,7 +1147,7 @@ const apiServer = http.createServer(async (req, res) => {
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch (e) {
-                console.error("[Mod] Fehler:", e.message);
+                console.error("[Mod] Fehler:", e.message, e.stack);
                 res.writeHead(500);
                 return res.end(JSON.stringify({ success: false, error: e.message }));
             }
