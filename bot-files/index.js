@@ -207,6 +207,32 @@ client.on("interactionCreate", async interaction => {
     // ============================================
     // 🔘 BUTTON: Termin vorschlagen → Modal öffnen
     // ============================================
+    // 📸 BUTTON: Beweis-Bild anzeigen (ephemeral)
+    // ============================================
+    if (interaction.isButton() && interaction.customId.startsWith("evidence_")) {
+        const url = global._evidenceStore?.get(interaction.customId);
+        if (!url) {
+            return interaction.reply({ content: '❌ Beweis nicht mehr verfügbar (abgelaufen).', ephemeral: true });
+        }
+
+        const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+        const downloadRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Bild herunterladen')
+                .setStyle(ButtonStyle.Link)
+                .setURL(url)
+                .setEmoji({ name: '💾' })
+        );
+
+        return interaction.reply({
+            content: `📸 **Beweis-Bild:**`,
+            files: [{ attachment: url, name: 'beweis.png' }],
+            components: [downloadRow],
+            ephemeral: true
+        });
+    }
+
+    // ============================================
     if (interaction.isButton() && interaction.customId.startsWith("phase2_termin_")) {
         const parts = interaction.customId.split("_");
         // Format: phase2_termin_{bewerberId}_{prueferId}
@@ -1100,23 +1126,38 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 }
 
-                // Beweis-Bild anhängen (wenn vorhanden)
-                let evidenceAttachment = null;
+                // Beweis-Bild: hochladen → URL speichern → Button im Container
+                let evidenceUrl = null;
                 if (evidence) {
                     try {
                         const base64Data = evidence.replace(/^data:image\/\w+;base64,/, '');
                         const imgBuffer = Buffer.from(base64Data, 'base64');
-                        evidenceAttachment = new AttachmentBuilder(imgBuffer, { name: 'evidence.png' });
-                        container.addSeparatorComponents(
-                            new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-                        );
-                        container.addTextDisplayComponents(
-                            new TextDisplayBuilder().setContent('📸 **Beweis** — siehe Anhang')
-                        );
+                        const att = new AttachmentBuilder(imgBuffer, { name: `evidence_${userId}_${Date.now()}.png` });
+                        // Bild in den gleichen Channel hochladen (wird sofort gelöscht)
+                        const tmpMsg = await channel.send({ files: [att] });
+                        evidenceUrl = tmpMsg.attachments.first()?.url || null;
+                        await tmpMsg.delete().catch(() => {});
                     } catch(imgErr) {
-                        console.error('[Mod] Bild-Fehler:', imgErr.message);
-                        evidenceAttachment = null;
+                        console.error('[Mod] Bild-Upload Fehler:', imgErr.message);
                     }
+                }
+
+                // Beweis-Button neben Roblox-Button (wenn Bild vorhanden)
+                if (evidenceUrl) {
+                    const evidenceId = `evidence_${userId}_${Date.now()}`;
+                    // URL in Memory speichern für Button-Handler
+                    if (!global._evidenceStore) global._evidenceStore = new Map();
+                    global._evidenceStore.set(evidenceId, evidenceUrl);
+                    // Nach 24h löschen
+                    setTimeout(() => global._evidenceStore?.delete(evidenceId), 86400000);
+
+                    buttonRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(evidenceId)
+                            .setLabel('Beweis')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji({ name: '📸' })
+                    );
                 }
 
                 container.addSeparatorComponents(
@@ -1126,13 +1167,10 @@ const apiServer = http.createServer(async (req, res) => {
                         new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderator || 'Unbekannt'} · <t:${Math.floor(Date.now()/1000)}:R>`)
                     );
 
-                const sendPayload = {
+                await channel.send({
                     components: [container],
                     flags: MessageFlags.IsComponentsV2
-                };
-                if (evidenceAttachment) sendPayload.files = [evidenceAttachment];
-
-                await channel.send(sendPayload);
+                });
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 
