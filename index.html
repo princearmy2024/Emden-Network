@@ -818,6 +818,16 @@
                                     <input type="range" class="volume-slider" min="0" max="1" step="0.05" value="0.5" oninput="App.setVolume(this.value)">
                                 </div>
                             </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Benachrichtigungs-Lautstärke</div>
+                                    <div class="setting-desc">Sound bei Einträgen, Nachrichten usw. (0 = stumm)</div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:200px;">
+                                    <input type="range" class="volume-slider" id="notifVolumeSlider" min="0" max="1" step="0.05" value="0.5" oninput="App.setNotifVolume(this.value)">
+                                    <span id="notifVolumeValue" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);min-width:28px;">50%</span>
+                                </div>
+                            </div>
                             <div class="setting-row hidden">
                                 <div class="setting-info">
                                     <div class="setting-name">Mic-Monitoring (Abhören)</div>

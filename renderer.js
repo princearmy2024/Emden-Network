@@ -500,9 +500,10 @@ const NotificationService = {
         // In Notifications-Liste speichern
         if (window.App?.addNotification) App.addNotification(title, message, type);
 
-        // Sound abspielen (falls in Settings aktiviert)
-        if (document.getElementById('toggleSound')?.checked !== false) {
-            this.playSmoothSound(type);
+        // Sound abspielen (Volume aus localStorage, 0 = stumm)
+        const notifVol = parseFloat(localStorage.getItem('notif_volume') ?? '0.5');
+        if (notifVol > 0 && document.getElementById('toggleSound')?.checked !== false) {
+            this.playSmoothSound(type, notifVol);
         }
 
         const icons = { info: 'ℹ️', success: '✅', warn: '⚠️', error: '❌' };
@@ -543,13 +544,13 @@ const NotificationService = {
      * Erzeugt einen kristallklaren, abgerundeten Synthesizer-Sound
      * @param {'info'|'success'|'warn'|'error'} type 
      */
-    playSmoothSound(type) {
+    playSmoothSound(type, masterVolume = 0.5) {
         try {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) return;
             const ctx = new AudioContext();
 
-            const playNote = (freq, startTime, duration, volume = 0.1) => {
+            const playNote = (freq, startTime, duration, volume = 0.1 * masterVolume) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
@@ -1931,6 +1932,12 @@ const App = window.App = {
         // Autostart
         const as = localStorage.getItem('autostart');
         if (as) { const cb = document.getElementById('toggleAutostart'); if (cb) cb.checked = as === 'true'; }
+        // Notification Volume
+        const nv = localStorage.getItem('notif_volume');
+        if (nv !== null) {
+            const sl = document.getElementById('notifVolumeSlider'); if (sl) sl.value = nv;
+            const lb = document.getElementById('notifVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(nv) * 100) + '%';
+        }
     },
 
     toggleSetting(key, val) {
@@ -3597,6 +3604,14 @@ Object.assign(App, {
         this.pttVolume = parseFloat(v);
         localStorage.setItem('ptt_volume', v);
         if (this._staticLoop) this._staticLoop.volume = this.pttVolume * 0.1;
+    },
+
+    setNotifVolume(v) {
+        localStorage.setItem('notif_volume', v);
+        const label = document.getElementById('notifVolumeValue');
+        if (label) label.textContent = Math.round(v * 100) + '%';
+        // Preview-Sound
+        if (parseFloat(v) > 0) NotificationService.playSmoothSound('info', parseFloat(v));
     },
 
     // Busy-Ton: error.wav wenn Kanal belegt ──────────────────────
