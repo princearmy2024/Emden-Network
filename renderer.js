@@ -244,6 +244,37 @@ const WebSocketService = {
                 App.showNotification('PANIC', `${data.robloxUsername || data.username} braucht Hilfe!`, 'error');
             });
 
+            // 📩 Ticket-Benachrichtigung
+            this.socket.on('dc_notification', (data) => {
+                if (!window.App) return;
+                const typeMap = { ticket: 'warn', support: 'info', mention: 'info' };
+                NotificationService.show(data.title, data.message, typeMap[data.type] || 'info');
+            });
+
+            // 🔔 Persönliche Mention/Ping
+            const myId = AuthService.getUser()?.discordId;
+            if (myId) {
+                this.socket.on(`dc_mention_${myId}`, (data) => {
+                    NotificationService.show(data.title, data.message, 'warn');
+                    // Native Desktop-Notification
+                    if (window.electronAPI?.showNativeNotification) {
+                        window.electronAPI.showNativeNotification(data.title, data.message);
+                    }
+                });
+            }
+
+            // 🎧 Support-Warteraum
+            this.socket.on('support_waiting', (data) => {
+                if (data.action === 'join') {
+                    NotificationService.show('🎧 Support', `${data.username} wartet in ${data.channelName}`, 'warn');
+                }
+            });
+
+            // 🔥 Streak Complete
+            this.socket.on('streak_complete', (data) => {
+                NotificationService.show('🔥 Streak!', `${data.username} hat Streak ${data.streak}!`, 'success');
+            });
+
             // Live Shift-Updates
             this.socket.on('shift_update', (data) => {
                 if (window.ModPanel && App.currentView === 'moderation') {

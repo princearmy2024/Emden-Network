@@ -808,8 +808,29 @@ const Overlay = (() => {
         socket.on('overlay_big_announcement', bigAnnounce);
 
         socket.on('overlay_new_ticket', ({ ticketId, reason }) => {
-            if (!isAdmin) return;
-            notify({ title: `Neues Ticket #${ticketId}`, text: reason || 'Kein Grund angegeben', type: 'ticket', duration: 15000 });
+            notify({ title: `📩 Neues Ticket #${ticketId}`, text: reason || 'Kein Grund angegeben', type: 'ticket', duration: 15000 });
+        });
+
+        // DC Benachrichtigungen (Ticket, Support etc.)
+        socket.on('dc_notification', (data) => {
+            notify({ title: data.title, text: data.message, type: data.type || 'info', duration: 10000 });
+        });
+
+        // Persönliche Mention
+        socket.on(`dc_mention_${discordId}`, (data) => {
+            notify({ title: data.title, text: data.message, type: 'mention', duration: 12000 });
+        });
+
+        // Support-Warteraum
+        socket.on('support_waiting', (data) => {
+            if (data.action === 'join') {
+                notify({ title: '🎧 Support-Warteraum', text: `${data.username} wartet in ${data.channelName}`, type: 'support', duration: 15000 });
+            }
+        });
+
+        // Streak
+        socket.on('streak_complete', (data) => {
+            notify({ title: '🔥 Streak!', text: `${data.username} — ${data.streak} Tage!`, type: 'streak', duration: 8000 });
         });
 
         // ── VOICE EVENTS ──────────────────────────────────────

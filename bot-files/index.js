@@ -2154,11 +2154,97 @@ client.once("ready", async () => {
     setInterval(checkGithubRelease, 5 * 60 * 1000);
 });
 
+// ================================================================
+// 📩 TICKET NOTIFICATION
+// ================================================================
 client.on("channelCreate", channel => {
     if (channel.name && channel.name.startsWith("ticket-")) {
-        const reason = channel.parent ? `Kategorie: ${channel.parent.name}` : "Neues Ticket";
+        const reason = channel.parent ? channel.parent.name : "Neues Ticket";
         const ticketId = channel.name.replace("ticket-", "");
-        io.emit("overlay_new_ticket", { ticketId, reason });
+        console.log(`[Ticket] Neues Ticket: #${channel.name} (${reason})`);
+        io.emit("overlay_new_ticket", { ticketId, reason, channelName: channel.name });
+        // Auch als normale Notification an alle Dashboard-Clients
+        io.emit("dc_notification", {
+            type: 'ticket',
+            title: '📩 Neues Ticket',
+            message: `#${channel.name} — ${reason}`,
+            timestamp: Date.now()
+        });
+    }
+});
+
+// ================================================================
+// 🔔 MENTION/PING NOTIFICATION
+// ================================================================
+client.on("messageCreate", async msg => {
+    if (msg.author.bot) return;
+    if (!msg.guild || msg.guild.id !== GUILD_ID) return;
+
+    // Prüfe ob ein Dashboard-User erwähnt wurde
+    for (const [userId] of msg.mentions.users) {
+        if (dashboardUsers.has(userId) || allKnownUsers.has(userId)) {
+            io.emit(`dc_mention_${userId}`, {
+                type: 'mention',
+                title: '🔔 Du wurdest erwähnt',
+                message: `${msg.author.displayName || msg.author.username} in #${msg.channel.name}: "${msg.content.substring(0, 100)}"`,
+                channelName: msg.channel.name,
+                author: msg.author.displayName || msg.author.username,
+                authorAvatar: msg.author.displayAvatarURL({ size: 64 }),
+                timestamp: Date.now()
+            });
+        }
+    }
+});
+
+// ================================================================
+// 🎧 SUPPORT WARTERAUM TRACKING
+// ================================================================
+const SUPPORT_WAITING_CATEGORY = "Support channel"; // Name der Kategorie
+let supportWaitingUsers = [];
+
+client.on("voiceStateUpdate", (oldState, newState) => {
+    // Prüfe ob jemand einen Support-Warteraum betritt/verlässt
+    const channel = newState.channel || oldState.channel;
+    if (!channel) return;
+
+    const isSupport = channel.parent?.name?.toLowerCase().includes('support') ||
+                      channel.name?.toLowerCase().includes('support') ||
+                      channel.name?.toLowerCase().includes('warteraum') ||
+                      channel.name?.toLowerCase().includes('wartezimmer');
+
+    // Jemand betritt Support-Channel
+    if (newState.channel && isSupport && (!oldState.channel || oldState.channel.id !== newState.channel.id)) {
+        const member = newState.member;
+        // Nur nicht-Staff (keine On-Duty Rolle)
+        if (member && !member.roles.cache.has(ON_DUTY_ROLE_ID)) {
+            console.log(`[Support] ${member.displayName} wartet in ${newState.channel.name}`);
+            io.emit("dc_notification", {
+                type: 'support',
+                title: '🎧 Support-Warteraum',
+                message: `${member.displayName} wartet in ${newState.channel.name}`,
+                timestamp: Date.now()
+            });
+            io.emit("support_waiting", {
+                action: 'join',
+                userId: member.id,
+                username: member.displayName || member.user.username,
+                avatar: member.user.displayAvatarURL({ size: 64 }),
+                channelName: newState.channel.name,
+                channelId: newState.channel.id
+            });
+        }
+    }
+
+    // Jemand verlässt Support-Channel
+    if (oldState.channel && !newState.channel && isSupport) {
+        const member = oldState.member;
+        if (member) {
+            io.emit("support_waiting", {
+                action: 'leave',
+                userId: member.id,
+                username: member.displayName || member.user.username
+            });
+        }
     }
 });
 
