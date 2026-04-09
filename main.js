@@ -65,6 +65,8 @@ function createWindow() {
         minWidth: 960,
         minHeight: 600,
         frame: false,           // Custom Titlebar
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+        trafficLightPosition: { x: 12, y: 12 },  // macOS: Ampel-Buttons positionieren
         transparent: false,
         backgroundColor: '#13151e',
         webPreferences: {
