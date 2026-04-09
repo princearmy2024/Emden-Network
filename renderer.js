@@ -4720,9 +4720,14 @@ const ModPanel = {
             return `<div class="mod-staff-item">
                 <div class="mod-staff-avatar">${avatarInner}</div>
                 <div class="mod-staff-info">
-                    <span class="mod-staff-name"><span class="mod-staff-dot ${dotClass}"></span>${this._escHtml(s.displayName || s.username || '?')} ${statusBadge} ${shiftTime}</span>
+                    <span class="mod-staff-name">
+                        <span class="mod-staff-dot ${dotClass}"></span>
+                        ${this._escHtml(s.displayName || s.username || '?')}
+                        ${statusBadge}
+                    </span>
                     <span class="mod-staff-role">${this._escHtml(topRole)}</span>
                 </div>
+                ${shiftTime}
                 ${leadBtns}
             </div>`;
         }).join('');

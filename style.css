@@ -2944,60 +2944,65 @@ body.has-custom-bg .gif-picker-panel {
 .mod-staff-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid transparent;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: transparent;
     transition: all 0.2s;
     cursor: default;
+    position: relative;
 }
 .mod-staff-item:hover {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.08);
-    transform: translateX(2px);
+    background: rgba(255,255,255,0.04);
 }
 .mod-staff-avatar {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    object-fit: cover;
     flex-shrink: 0;
     background: linear-gradient(135deg, var(--brand-blue), #1e40af);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: #fff;
     overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.06);
 }
 .mod-staff-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .mod-staff-info {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
     min-width: 0;
+    flex: 1;
 }
 .mod-staff-name {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
-    color: #fff;
+    color: rgba(255,255,255,0.9);
     display: flex;
     align-items: center;
     gap: 6px;
+    line-height: 1.2;
 }
 .mod-staff-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #22c55e;
-    box-shadow: 0 0 4px rgba(34,197,94,0.4);
+    box-shadow: 0 0 6px rgba(34,197,94,0.5);
     flex-shrink: 0;
+}
+.mod-staff-dot.on-break {
+    background: #3b82f6;
+    box-shadow: 0 0 6px rgba(59,130,246,0.5);
 }
 .mod-staff-role {
     font-size: 10px;
     color: var(--text-sub);
+    opacity: 0.6;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3374,15 +3379,23 @@ body.has-custom-bg .gif-picker-panel {
     flex-wrap: wrap;
 }
 .mod-staff-badge {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 1px 5px;
-    border-radius: 3px;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
 }
-.mod-staff-badge.active { background: rgba(34,197,94,0.15); color: #22c55e; }
-.mod-staff-badge.paused { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.mod-staff-badge.active { background: rgba(34,197,94,0.12); color: #22c55e; }
+.mod-staff-badge.paused { background: rgba(59,130,246,0.12); color: #3b82f6; }
+.mod-staff-shift {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: rgba(255,255,255,0.35);
+    font-weight: 500;
+    margin-left: auto;
+}
 
 /* Lead time modal */
 .mod-lead-modal {
