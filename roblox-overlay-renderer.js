@@ -768,7 +768,7 @@ const Overlay = (() => {
 
         // Shift sync: wenn jemand anderes (oder Dashboard) shift ändert
         socket.on('shift_update', (data) => {
-            if (data.discordId === discordId) OverlayShift._syncFromServer(data.state);
+            if (data.discordId === discordId) OverlayShift._syncFromServer(data);
         });
 
         // Mod-Eintrag: Custom Notification (top, glass, sound)
@@ -1701,10 +1701,19 @@ const OverlayShift = {
         this._stopTick();
     },
 
-    _syncFromServer(state) {
+    _syncFromServer(data) {
+        const state = typeof data === 'string' ? data : data.state;
         this._state = state;
-        if (state === 'active') { this._startedAt = Date.now(); this._startTick(); }
-        else { this._startedAt = null; this._stopTick(); }
+        if (typeof data === 'object' && data.savedMs !== undefined) {
+            this._savedMs = data.savedMs || 0;
+        }
+        if (state === 'active') {
+            this._startedAt = (typeof data === 'object' && data.startedAt) ? data.startedAt : Date.now();
+            this._startTick();
+        } else {
+            this._startedAt = null;
+            this._stopTick();
+        }
         this._updateUI();
     },
 

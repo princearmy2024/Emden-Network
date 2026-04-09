@@ -1430,7 +1430,7 @@ const apiServer = http.createServer(async (req, res) => {
                 s.breakStartedAt = null;
                 saveShifts();
                 const known = allKnownUsers.get(discordId);
-                io.emit('shift_update', { discordId, state: 'active', username: known?.username || '?' });
+                io.emit('shift_update', { discordId, state: 'active', savedMs: s.savedMs || 0, startedAt: s.startedAt, username: known?.username || '?' });
                 // On Duty Rolle geben
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID);
@@ -1461,7 +1461,7 @@ const apiServer = http.createServer(async (req, res) => {
                 s.breakStartedAt = Date.now();
                 saveShifts();
                 const known = allKnownUsers.get(discordId);
-                io.emit('shift_update', { discordId, state: 'break', username: known?.username || '?' });
+                io.emit('shift_update', { discordId, state: 'break', savedMs: s.savedMs || 0, startedAt: null, username: known?.username || '?' });
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
@@ -1498,7 +1498,7 @@ const apiServer = http.createServer(async (req, res) => {
                 s.startedAt = null;
                 // savedMs bleibt erhalten — User kann weiter machen
                 saveShifts();
-                io.emit('shift_update', { discordId, state: 'off', username: known?.username || '?' });
+                io.emit('shift_update', { discordId, state: 'off', savedMs: s.savedMs || 0, startedAt: null, username: known?.username || '?' });
                 // On Duty Rolle entfernen
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID);
