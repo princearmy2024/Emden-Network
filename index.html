@@ -841,6 +841,30 @@
                                     <span id="uiVolumeValue" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);min-width:28px;">30%</span>
                                 </div>
                             </div>
+                            <!-- NOTIFICATION KATEGORIE -->
+                            <h3 class="settings-title" style="margin-top:16px;">Benachrichtigungen</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Tickets</div>
+                                    <div class="setting-desc">Benachrichtigung wenn ein neues Ticket erstellt wird</div>
+                                </div>
+                                <div id="toggleTickets" class="toggle-switch on" onclick="App.toggleNotifSetting('notif_tickets', this)"><div></div></div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Support-Warteraum</div>
+                                    <div class="setting-desc">Benachrichtigung wenn jemand im Support wartet</div>
+                                </div>
+                                <div id="toggleSupport" class="toggle-switch on" onclick="App.toggleNotifSetting('notif_support', this)"><div></div></div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Mentions / Pings</div>
+                                    <div class="setting-desc">Benachrichtigung wenn dich jemand auf Discord erwaehnt</div>
+                                </div>
+                                <div id="toggleMentions" class="toggle-switch on" onclick="App.toggleNotifSetting('notif_mentions', this)"><div></div></div>
+                            </div>
+
                             <div class="setting-row hidden">
                                 <div class="setting-info">
                                     <div class="setting-name">Mic-Monitoring (Abhören)</div>

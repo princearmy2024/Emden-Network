@@ -244,29 +244,34 @@ const WebSocketService = {
                 App.showNotification('PANIC', `${data.robloxUsername || data.username} braucht Hilfe!`, 'error');
             });
 
-            // 📩 Ticket-Benachrichtigung
-            this.socket.on('dc_notification', (data) => {
+            // 📩 Ticket-Benachrichtigung (eigener Sound)
+            this.socket.on('overlay_new_ticket', (data) => {
                 if (!window.App) return;
-                const typeMap = { ticket: 'warn', support: 'info', mention: 'info' };
-                NotificationService.show(data.title, data.message, typeMap[data.type] || 'info');
+                if (localStorage.getItem('notif_tickets') === 'false') return;
+                NotificationService.show('📩 Neues Ticket', `#${data.channelName || data.ticketId} — ${data.reason}`, 'warn');
+                // Ticket-Sound abspielen
+                try { const a = new Audio('./soynoviembre-short-digital-notification-alert-440353.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
             });
 
             // 🔔 Persönliche Mention/Ping
             const myId = AuthService.getUser()?.discordId;
             if (myId) {
                 this.socket.on(`dc_mention_${myId}`, (data) => {
+                    if (localStorage.getItem('notif_mentions') === 'false') return;
                     NotificationService.show(data.title, data.message, 'warn');
-                    // Native Desktop-Notification
                     if (window.electronAPI?.showNativeNotification) {
                         window.electronAPI.showNativeNotification(data.title, data.message);
                     }
                 });
             }
 
-            // 🎧 Support-Warteraum
+            // 🎧 Support-Warteraum (eigener Sound)
             this.socket.on('support_waiting', (data) => {
                 if (data.action === 'join') {
-                    NotificationService.show('🎧 Support', `${data.username} wartet in ${data.channelName}`, 'warn');
+                    if (localStorage.getItem('notif_support') === 'false') return;
+                    NotificationService.show('🎧 Support-Warteraum', `${data.username} wartet in ${data.channelName}`, 'warn');
+                    // Support-Sound abspielen
+                    try { const a = new Audio('./soynoviembre-short-digital-notification-alert-440353.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
                 }
             });
 
@@ -1970,6 +1975,13 @@ const App = window.App = {
         if (fv) { const sl = document.getElementById('funkVolumeSlider'); if (sl) sl.value = fv; const lb = document.getElementById('funkVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(fv) * 100) + '%'; }
         const uv = localStorage.getItem('ui_sound_volume');
         if (uv !== null) { const sl = document.getElementById('uiVolumeSlider'); if (sl) sl.value = uv; const lb = document.getElementById('uiVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(uv) * 100) + '%'; }
+        // Notification Toggles
+        ['notif_tickets', 'notif_support', 'notif_mentions'].forEach(key => {
+            const val = localStorage.getItem(key) !== 'false';
+            const map = { notif_tickets: 'toggleTickets', notif_support: 'toggleSupport', notif_mentions: 'toggleMentions' };
+            const el = document.getElementById(map[key]);
+            if (el) el.classList.toggle('on', val);
+        });
     },
 
     toggleSetting(key, val) {
@@ -3651,6 +3663,12 @@ Object.assign(App, {
         localStorage.setItem('ui_sound_volume', v);
         const label = document.getElementById('uiVolumeValue');
         if (label) label.textContent = Math.round(v * 100) + '%';
+    },
+
+    toggleNotifSetting(key, el) {
+        const current = localStorage.getItem(key) !== 'false';
+        localStorage.setItem(key, current ? 'false' : 'true');
+        if (el) el.classList.toggle('on', !current);
     },
 
     // Busy-Ton: error.wav wenn Kanal belegt ──────────────────────

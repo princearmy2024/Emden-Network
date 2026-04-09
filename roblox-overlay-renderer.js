@@ -811,11 +811,6 @@ const Overlay = (() => {
             notify({ title: `📩 Neues Ticket #${ticketId}`, text: reason || 'Kein Grund angegeben', type: 'ticket', duration: 15000 });
         });
 
-        // DC Benachrichtigungen (Ticket, Support etc.)
-        socket.on('dc_notification', (data) => {
-            notify({ title: data.title, text: data.message, type: data.type || 'info', duration: 10000 });
-        });
-
         // Persönliche Mention
         socket.on(`dc_mention_${discordId}`, (data) => {
             notify({ title: data.title, text: data.message, type: 'mention', duration: 12000 });

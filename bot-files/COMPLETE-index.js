@@ -2171,12 +2171,6 @@ client.on("channelCreate", channel => {
         const ticketId = name.replace(/^-?ticket-?/, '').replace(/^-/, '') || name;
         console.log(`[Ticket] Neues Ticket: #${name} (${reason})`);
         io.emit("overlay_new_ticket", { ticketId, reason, channelName: name });
-        io.emit("dc_notification", {
-            type: 'ticket',
-            title: '📩 Neues Ticket',
-            message: `#${name} — ${reason}`,
-            timestamp: Date.now()
-        });
     }
 });
 
@@ -2241,15 +2235,12 @@ client.on("voiceStateUpdate", (oldState, newState) => {
     // Jemand betritt Support-Channel
     if (newState.channel && isSupport && (!oldState.channel || oldState.channel.id !== newState.channel.id)) {
         const member = newState.member;
+        // Bots ignorieren (z.B. GalaxyBot 697498867754729482)
+        if (member?.user?.bot) return;
         // Nur nicht-Staff (keine On-Duty Rolle)
         if (member && !member.roles.cache.has(ON_DUTY_ROLE_ID)) {
             console.log(`[Support] ${member.displayName} wartet in ${newState.channel.name}`);
-            io.emit("dc_notification", {
-                type: 'support',
-                title: '🎧 Support-Warteraum',
-                message: `${member.displayName} wartet in ${newState.channel.name}`,
-                timestamp: Date.now()
-            });
+            // NUR support_waiting senden (kein dc_notification — verhindert doppelt)
             io.emit("support_waiting", {
                 action: 'join',
                 userId: member.id,
