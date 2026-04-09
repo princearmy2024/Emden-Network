@@ -6,9 +6,16 @@ import {
     ActionRowBuilder, EmbedBuilder, MessageFlags,
     ContainerBuilder, TextDisplayBuilder, SectionBuilder,
     SeparatorBuilder, SeparatorSpacingSize, ThumbnailBuilder,
-    StringSelectMenuBuilder, AttachmentBuilder,
-    MediaGalleryBuilder, MediaGalleryItemBuilder
+    StringSelectMenuBuilder, AttachmentBuilder
 } from "discord.js";
+
+// MediaGallery ist nur in neueren discord.js Versionen verfügbar
+let MediaGalleryBuilder, MediaGalleryItemBuilder;
+try {
+    const djs = await import('discord.js');
+    MediaGalleryBuilder = djs.MediaGalleryBuilder;
+    MediaGalleryItemBuilder = djs.MediaGalleryItemBuilder;
+} catch(e) {}
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
@@ -1115,11 +1122,14 @@ const apiServer = http.createServer(async (req, res) => {
                         container.addTextDisplayComponents(
                             new TextDisplayBuilder().setContent('📸 **Beweis**')
                         );
-                        container.addMediaGalleryComponents(
-                            new MediaGalleryBuilder().addItems(
-                                new MediaGalleryItemBuilder().setURL('attachment://evidence.png')
-                            )
-                        );
+                        // MediaGallery nur wenn verfügbar (discord.js 14.16+)
+                        if (MediaGalleryBuilder && MediaGalleryItemBuilder) {
+                            container.addMediaGalleryComponents(
+                                new MediaGalleryBuilder().addItems(
+                                    new MediaGalleryItemBuilder().setURL('attachment://evidence.png')
+                                )
+                            );
+                        }
                     } catch(imgErr) {
                         console.error('[Mod] Bild-Fehler:', imgErr.message);
                     }
