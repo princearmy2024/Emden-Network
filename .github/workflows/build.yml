@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -43,6 +44,7 @@ jobs:
 
   release:
     needs: build
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -53,12 +55,14 @@ jobs:
         with:
           name: build-win
           path: dist/
+        continue-on-error: true
 
       - name: Download Mac build
         uses: actions/download-artifact@v4
         with:
           name: build-mac
           path: dist/
+        continue-on-error: true
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
