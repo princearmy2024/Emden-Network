@@ -319,8 +319,8 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
 .gsg9-btn {
   position: fixed;
   bottom: 0;
-  right: clamp(220px, 16vw, 340px);
-  padding: clamp(14px, 1.4vh, 22px) clamp(20px, 1.8vw, 32px) clamp(10px, 1vh, 16px);
+  right: clamp(240px, 18vw, 360px);
+  padding: 16px 24px 10px;
   border-radius: 14px 14px 0 0;
   background: linear-gradient(to top, rgba(6, 8, 18, 0.5) 0%, rgba(8, 14, 32, 0.2) 50%, transparent 100%);
   display: none;
@@ -329,7 +329,8 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
   cursor: pointer;
   color: rgba(255, 255, 255, 0.6);
   z-index: 200;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag;
   transition: color 0.3s;
   font-family: 'Inter', sans-serif;
 }
@@ -1722,7 +1723,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <span class="mod-trigger-text">Eintragen</span>
   </div>
 </div>
-<div id="gsg9-trigger" class="gsg9-btn" onclick="event.stopPropagation();Overlay.toggleGSG9()">
+<div id="gsg9-trigger" class="gsg9-btn" onclick="event.stopPropagation();Overlay.toggleGSG9()" onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)" onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
   <div style="display:flex;align-items:center;gap:5px;">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     <span style="font-size:10px;font-weight:600;letter-spacing:.04em;">GSG9</span>
