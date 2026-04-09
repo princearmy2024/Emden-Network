@@ -1676,39 +1676,27 @@ const OverlayShift = {
     },
 
     async start() {
+        // Nur API aufrufen — shift_update Event kommt via WebSocket zurück
         await this._apiCall('start');
-        this._state = 'active';
-        this._startedAt = Date.now();
-        this._updateUI();
-        this._startTick();
     },
 
     async pause() {
         await this._apiCall('pause');
-        if (this._startedAt) this._savedMs += Date.now() - this._startedAt;
-        this._state = 'break';
-        this._startedAt = null;
-        this._updateUI();
-        this._stopTick();
     },
 
     async end() {
         await this._apiCall('end');
-        if (this._state === 'active' && this._startedAt) this._savedMs += Date.now() - this._startedAt;
-        this._state = 'off';
-        this._startedAt = null;
-        this._updateUI();
-        this._stopTick();
     },
 
     _syncFromServer(data) {
         const state = typeof data === 'string' ? data : data.state;
         this._state = state;
-        if (typeof data === 'object' && data.savedMs !== undefined) {
-            this._savedMs = data.savedMs || 0;
+        if (typeof data === 'object' && data.totalMs !== undefined) {
+            this._savedMs = data.totalMs || 0;
         }
         if (state === 'active') {
-            this._startedAt = (typeof data === 'object' && data.startedAt) ? data.startedAt : Date.now();
+            // totalMs enthält alles bis jetzt — Timer zählt ab hier weiter
+            this._startedAt = Date.now();
             this._startTick();
         } else {
             this._startedAt = null;
@@ -1757,9 +1745,13 @@ const OverlayShift = {
             if (data.success && data.shifts[discordId]) {
                 const s = data.shifts[discordId];
                 this._state = s.state || 'off';
-                this._savedMs = s.savedMs || 0;
-                this._startedAt = s.state === 'active' && s.startedAt ? s.startedAt : null;
+                // totalMs ist vom Server berechnet (savedMs + laufende Zeit)
+                this._savedMs = s.totalMs || s.savedMs || 0;
+                // startedAt auf JETZT setzen, da savedMs bereits die volle Zeit enthält
+                this._startedAt = s.state === 'active' ? Date.now() : null;
+                // savedMs ist jetzt totalMs, startedAt ist jetzt — Timer zählt ab hier weiter
                 if (this._state === 'active') this._startTick();
+                else this._stopTick();
                 this._updateUI();
             }
         } catch(e) {}
