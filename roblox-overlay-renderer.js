@@ -1455,10 +1455,12 @@ const Overlay = (() => {
         if (gsg9Open) {
             panel.style.transform = 'translateY(0)';
             panel.style.pointerEvents = 'auto';
+            requestFocus(true);
             loadGSG9();
         } else {
             panel.style.transform = 'translateY(100%)';
             panel.style.pointerEvents = 'none';
+            requestFocus(false);
         }
     }
 
@@ -1497,7 +1499,8 @@ const Overlay = (() => {
                 </div>`;
             }).join('');
         } catch(e) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:#ff6b6b;font-size:11px;">Fehler beim Laden</div>';
+            container.innerHTML = `<div style="text-align:center;padding:20px;color:#ff6b6b;font-size:11px;">Fehler: ${e.message}</div>`;
+            console.error('[GSG9] Load error:', e);
         }
     }
 
