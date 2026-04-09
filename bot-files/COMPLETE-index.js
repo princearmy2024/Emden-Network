@@ -1057,23 +1057,38 @@ const apiServer = http.createServer(async (req, res) => {
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${reason || 'Kein Grund angegeben'}`)
-                    )
-                    .addSeparatorComponents(
-                        new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
-                    )
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`**Punishment** · ${emoji} ${action}`)
+                // Bei Notiz: Notiz-Text statt Reason/Punishment anzeigen
+                if (action === 'Notiz') {
+                    container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Notiz**\n> ${notiz || reason || 'Keine Notiz'}`)
                     );
-                // Notiz anzeigen (wenn vorhanden)
-                if (notiz) {
+                    if (reason && reason !== 'Kein Grund') {
+                        container.addSeparatorComponents(
+                            new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
+                        );
+                        container.addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent(`-# Grund: ${reason}`)
+                        );
+                    }
+                } else {
+                    container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${reason || 'Kein Grund angegeben'}`)
+                    );
                     container.addSeparatorComponents(
                         new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
                     );
                     container.addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Notiz**\n> ${notiz}`)
+                        new TextDisplayBuilder().setContent(`**Punishment** · ${emoji} ${action}`)
                     );
+                    // Extra Notiz (wenn bei Nicht-Notiz-Aktion trotzdem eine Notiz dabei ist)
+                    if (notiz) {
+                        container.addSeparatorComponents(
+                            new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small)
+                        );
+                        container.addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Notiz**\n> ${notiz}`)
+                        );
+                    }
                 }
                 container.addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
