@@ -1923,19 +1923,14 @@ body.has-custom-bg .gif-picker-panel {
     background: rgba(0, 209, 167, 0.08) !important;
     border: 1px solid rgba(0, 209, 167, 0.2) !important;
     color: var(--brand-blue) !important;
-    animation: notifierPulse 2.5s ease-in-out infinite;
     margin-top: 4px;
-    overflow: hidden;
 }
 .nav-update-btn:hover {
     background: rgba(0, 209, 167, 0.15) !important;
-    border-color: rgba(0, 209, 167, 0.4) !important;
-    transform: scale(1.05);
-    box-shadow: 0 0 12px rgba(0, 209, 167, 0.2) !important;
+    border-color: rgba(0, 209, 167, 0.35) !important;
 }
 .nav-update-btn svg {
     color: var(--brand-blue);
-    filter: drop-shadow(0 0 3px rgba(0, 209, 167, 0.4));
 }
 
 .update-notifier {
