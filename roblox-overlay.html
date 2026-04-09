@@ -316,6 +316,7 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 body.overlay-active.is-admin #mod-trigger,
 body.overlay-active.is-staff #mod-trigger { display: flex; }
 body.overlay-active.is-staff #gsg9-trigger { display: flex; }
+#gsg9-trigger:hover { color: #fff; }
 
 /* Klick-Area */
 #mod-trigger::before {
@@ -1697,19 +1698,17 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <div class="glow-line-left"></div>
 <div class="glow-line-bottom"></div>
 
-<!-- GSG9 TRIGGER BUTTON -->
-<div id="gsg9-trigger" onclick="Overlay.toggleGSG9()" style="position:fixed;bottom:0;right:clamp(260px,18vw,380px);padding:clamp(14px,1.4vh,22px) clamp(20px,2vw,32px) clamp(10px,1vh,16px);border-radius:14px 14px 0 0;background:linear-gradient(to top,rgba(6,8,18,0.5) 0%,rgba(8,14,32,0.2) 50%,transparent 100%);display:none;flex-direction:column;align-items:center;cursor:pointer;color:rgba(255,255,255,0.6);z-index:200;pointer-events:auto;transition:color .3s;font-family:'Inter',sans-serif;">
-  <div style="display:flex;align-items:center;gap:6px;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    <span style="font-size:11px;font-weight:600;letter-spacing:.04em;">GSG9</span>
-  </div>
-</div>
-
-<!-- MOD TRIGGER BUTTON — "Eintragen" -->
+<!-- MOD TRIGGER BUTTON — "Eintragen" + GSG9 -->
 <div id="mod-trigger" onclick="Overlay.toggleModSlide()">
   <div class="mod-trigger-inner">
     <i data-lucide="clipboard-edit"></i>
     <span class="mod-trigger-text">Eintragen</span>
+  </div>
+</div>
+<div id="gsg9-trigger" onclick="event.stopPropagation();Overlay.toggleGSG9()" style="position:fixed;bottom:0;right:clamp(220px,16vw,340px);padding:clamp(14px,1.4vh,22px) clamp(20px,1.8vw,32px) clamp(10px,1vh,16px);border-radius:14px 14px 0 0;background:linear-gradient(to top,rgba(6,8,18,0.5) 0%,rgba(8,14,32,0.2) 50%,transparent 100%);display:none;flex-direction:column;align-items:center;cursor:pointer;color:rgba(255,255,255,0.6);z-index:200;pointer-events:auto;transition:color .3s;font-family:'Inter',sans-serif;">
+  <div style="display:flex;align-items:center;gap:5px;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span style="font-size:10px;font-weight:600;letter-spacing:.04em;">GSG9</span>
   </div>
 </div>
 
