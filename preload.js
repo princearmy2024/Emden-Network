@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     pttStop:      () => ipcRenderer.send('ptt-stop'),
     setPTTKey:    (key) => ipcRenderer.send('set-ptt-key', key),
     pttStart:     () => ipcRenderer.send('ptt-start'),
+    pttDisable:   () => ipcRenderer.send('ptt-disable'),
     dashboardReady: () => ipcRenderer.send('dashboard-ready'),
     takeScreenshot: () => ipcRenderer.send('take-screenshot'),
     onScreenshotTaken: (cb) => ipcRenderer.on('screenshot-taken', (event, data) => cb(data)),

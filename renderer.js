@@ -3430,7 +3430,8 @@ Object.assign(App, {
     // --- PTT HOTKEY LOGIK ---
     isSpeaking: false,          // V-Taste gedrückt (Kanal offen)
     isActuallySending: false,   // Nur wenn Sprache erkannt
-    pttKey: localStorage.getItem('ptt_key') || 'v',
+    pttKey: localStorage.getItem('ptt_key') || '',
+    pttEnabled: localStorage.getItem('ptt_enabled') !== 'false',
     pttSoundUrl: localStorage.getItem('ptt_sound_url') || './walkie-talkie-start.mp3.wav',
     pttVolume: parseFloat(localStorage.getItem('ptt_volume') || '0.5'),
     radioEffectEnabled: localStorage.getItem('radio_effect') !== 'false', // Default: an
@@ -3468,16 +3469,18 @@ Object.assign(App, {
             console.error('[Mic] Zugriff verweigert:', e);
         }
 
-        // V-Taste DRÜCKEN → Kanal öffnen
+        // PTT-Taste DRÜCKEN → Kanal öffnen (nur wenn Key gesetzt + aktiviert)
         document.addEventListener('keydown', (e) => {
-            if (e.repeat) return; // Key-Repeat verhindern
+            if (e.repeat) return;
+            if (!this.pttKey || !this.pttEnabled) return;
             if (e.key.toLowerCase() !== this.pttKey) return;
             const active = document.activeElement;
             if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
             if (!this.isSpeaking) this.startPTT();
         });
-        // V-Taste LOSLASSEN → Kanal schließen
+        // PTT-Taste LOSLASSEN → Kanal schließen
         document.addEventListener('keyup', (e) => {
+            if (!this.pttKey || !this.pttEnabled) return;
             if (e.key.toLowerCase() !== this.pttKey) return;
             const active = document.activeElement;
             if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
@@ -3492,32 +3495,52 @@ Object.assign(App, {
             window.electronAPI.onOverlayPTTStop(() => this.stopPTT());
         }
 
-        // Initiale Sync mit main.js
-        if (window.electronAPI?.setPTTKey) {
+        // Initiale Sync mit main.js — nur wenn Key gesetzt UND aktiviert
+        if (this.pttKey && this.pttEnabled && window.electronAPI?.setPTTKey) {
             window.electronAPI.setPTTKey(this.pttKey.toUpperCase());
+        } else if (!this.pttEnabled && window.electronAPI?.pttDisable) {
+            window.electronAPI.pttDisable();
         }
-        
+
         // PTT Hint im UI updaten
         const pttKeyHint = document.getElementById('wt-ptt-key-hint');
-        if (pttKeyHint) pttKeyHint.textContent = `[ ${this.pttKey.toUpperCase()} ]`;
+        if (pttKeyHint) pttKeyHint.textContent = this.pttKey ? `[ ${this.pttKey.toUpperCase()} ]` : '[ Nicht gesetzt ]';
     },
 
     setPTTKey(k) {
         if (!k || k.length === 0) return;
         this.pttKey = k.toLowerCase().charAt(0);
         localStorage.setItem('ptt_key', this.pttKey);
-        
+
         const inp = document.getElementById('pttKeyInput');
         if (inp) inp.value = this.pttKey.toUpperCase();
-        
+
         const pttKeyHint = document.getElementById('wt-ptt-key-hint');
         if (pttKeyHint) pttKeyHint.textContent = `[ ${this.pttKey.toUpperCase()} ]`;
 
-        if (window.electronAPI?.setPTTKey) {
+        // Nur registrieren wenn aktiviert
+        if (this.pttEnabled && window.electronAPI?.setPTTKey) {
             window.electronAPI.setPTTKey(this.pttKey.toUpperCase());
         }
-        
+
         NotificationService.show('Hotkey geändert', `Neuer Funk-Key: ${this.pttKey.toUpperCase()}`, 'info');
+    },
+
+    // Toggle: Globalen PTT-Hotkey aktivieren/deaktivieren
+    togglePTTEnabled() {
+        this.pttEnabled = !this.pttEnabled;
+        localStorage.setItem('ptt_enabled', this.pttEnabled ? 'true' : 'false');
+
+        if (this.pttEnabled && this.pttKey) {
+            window.electronAPI?.setPTTKey(this.pttKey.toUpperCase());
+            NotificationService.show('Hotkey aktiviert', `Funk-Key ${this.pttKey.toUpperCase()} ist jetzt global aktiv`, 'success');
+        } else {
+            window.electronAPI?.pttDisable();
+            NotificationService.show('Hotkey deaktiviert', 'Globaler Funk-Key ist aus', 'info');
+        }
+
+        const toggle = document.getElementById('pttEnabledToggle');
+        if (toggle) toggle.classList.toggle('on', this.pttEnabled);
     },
 
     setPTTSound(url) {
@@ -3529,7 +3552,11 @@ Object.assign(App, {
 
     syncSoundUI() {
         const hInp = document.getElementById('pttKeyInput');
-        if (hInp) hInp.value = this.pttKey.toUpperCase();
+        if (hInp) hInp.value = this.pttKey ? this.pttKey.toUpperCase() : '';
+
+        // Toggle-Status setzen
+        const toggle = document.getElementById('pttEnabledToggle');
+        if (toggle) toggle.classList.toggle('on', this.pttEnabled);
         
         const sInp = document.getElementById('pttSoundInput');
         if (sInp) sInp.value = this.pttSoundUrl;

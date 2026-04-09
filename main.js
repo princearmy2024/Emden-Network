@@ -84,9 +84,18 @@ function createWindow() {
         mainWindow.show();
     });
 
+    // macOS: Fenster verstecken statt beenden (Dock-Klick öffnet wieder)
+    mainWindow.on('close', (e) => {
+        if (process.platform === 'darwin' && !app.isQuitting) {
+            e.preventDefault();
+            mainWindow.hide();
+            return;
+        }
+    });
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
+
 
     // DevTools nur im Dev-Modus
     // mainWindow.webContents.openDevTools();
@@ -756,8 +765,14 @@ app.whenReady().then(() => {
     ipcMain.on('dashboard-ready', () => {
         if (dashboardReadyFlag) return;
         dashboardReadyFlag = true;
-        console.log('[PTT] Dashboard ready — registriere globalen PTT-Shortcut');
-        registerPTT('V');
+        console.log('[PTT] Dashboard ready — warte auf Hotkey-Config vom Client');
+        // KEIN Default-Hotkey! User muss erst in den Einstellungen einen setzen.
+    });
+
+    // PTT komplett deaktivieren
+    ipcMain.on('ptt-disable', () => {
+        try { globalShortcut.unregister(currentPttKey); } catch(e) {}
+        console.log('[PTT] Global Hotkey deaktiviert');
     });
 
     // Dynamisch updaten, wenn Client es ändert
@@ -885,25 +900,36 @@ app.whenReady().then(() => {
         try { fs.writeFileSync(file, JSON.stringify({ x, y, w, h })); } catch(e) {}
     }
 
-    globalShortcut.register('F4', () => {
-        // F4 → Overlay Toggle (wenn Overlay offen)
+    // F4 (Windows) + Shift+F4 (Mac, weil F4=Launchpad auf macOS)
+    const modPanelHandler = () => {
         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
             robloxOverlayWin.webContents.send('toggle-mod-panel');
         } else {
-            // Fallback: altes Mod-Panel System wenn kein Overlay
             toggleModButton();
         }
-    });
+    };
+    globalShortcut.register('F4', modPanelHandler);
+    globalShortcut.register('Shift+F4', modPanelHandler);
 
     app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+        // macOS: Klick auf Dock-Icon stellt Fenster wieder her
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            if (!mainWindow.isVisible()) mainWindow.show();
+            mainWindow.focus();
+        } else {
+            createWindow();
+        }
     });
 
     // App ist bereit!
 });
 
+app.on('before-quit', () => {
+    app.isQuitting = true;
+});
+
 app.on('will-quit', () => {
-    // Shortcuts beim Beenden freigeben
     globalShortcut.unregisterAll();
 });
 
