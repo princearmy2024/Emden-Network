@@ -4683,10 +4683,15 @@ const ModPanel = {
     // ACTIVE STAFF (Live + Shift Status)
     // ══════════════════════════════════════════════
 
+    _streaks: {},
     async loadStaff() {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/on-duty`, { headers: { 'x-api-key': CONFIG.API_KEY } });
-            const data = await res.json();
+            const [staffRes, streakRes] = await Promise.all([
+                fetch(`${CONFIG.API_URL}/api/on-duty`, { headers: { 'x-api-key': CONFIG.API_KEY } }),
+                fetch(`${CONFIG.API_URL}/api/streaks`, { headers: { 'x-api-key': CONFIG.API_KEY } }).catch(() => null)
+            ]);
+            const data = await staffRes.json();
+            if (streakRes) { const sd = await streakRes.json(); if (sd.success) this._streaks = sd.streaks || {}; }
             if (data.success && Array.isArray(data.staff)) this.renderStaff(data.staff);
         } catch (err) {}
     },
@@ -4717,6 +4722,11 @@ const ModPanel = {
                 <button class="mod-staff-micro-btn" onclick="ModPanel.openTimeModal('${s.discordId}','${this._escHtml(s.displayName || s.username)}')" title="Zeit verwalten">⏱</button>
             </div>` : '';
 
+            // Streak
+            const streak = this._streaks[s.discordId];
+            const streakNum = streak?.streak || 0;
+            const streakHtml = streakNum > 0 ? `<span class="mod-staff-streak" title="${streakNum} Tage Streak${streak?.protected ? ' (geschützt)' : ''}">🔥${streakNum}</span>` : '';
+
             return `<div class="mod-staff-item">
                 <div class="mod-staff-avatar">${avatarInner}</div>
                 <div class="mod-staff-info">
@@ -4724,6 +4734,7 @@ const ModPanel = {
                         <span class="mod-staff-dot ${dotClass}"></span>
                         ${this._escHtml(s.displayName || s.username || '?')}
                         ${statusBadge}
+                        ${streakHtml}
                     </span>
                     <span class="mod-staff-role">${this._escHtml(topRole)}</span>
                 </div>

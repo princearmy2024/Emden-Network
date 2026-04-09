@@ -113,6 +113,99 @@ function getShiftTotalMs(discordId) {
     return total;
 }
 
+// === Daily Streak System ===
+const STREAK_FILE = path.join(path.resolve(), "data", "streaks.json");
+const STREAK_MIN_MS = 10 * 60 * 1000;     // 10 Minuten On Duty
+const STREAK_MIN_ENTRIES = 5;               // 5 Mod-Einträge
+const STREAK_PROTECTED_ROLE = "1372674954625024012"; // Diese Rolle verliert den Streak NIE
+let streakData = {};
+// { discordId: { streak, lastDate, lastCompletedDate, todayMs, todayEntries, bestStreak } }
+
+if (fs.existsSync(STREAK_FILE)) {
+    try { streakData = JSON.parse(fs.readFileSync(STREAK_FILE, "utf-8")); } catch(e) {}
+}
+function saveStreaks() {
+    try {
+        if (!fs.existsSync(path.dirname(STREAK_FILE))) fs.mkdirSync(path.dirname(STREAK_FILE), { recursive: true });
+        fs.writeFileSync(STREAK_FILE, JSON.stringify(streakData, null, 2));
+    } catch(e) {}
+}
+
+function getToday() { return new Date().toISOString().split('T')[0]; }
+function getYesterday() { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; }
+
+function getStreak(discordId) {
+    if (!streakData[discordId]) {
+        streakData[discordId] = { streak: 0, lastDate: null, lastCompletedDate: null, todayMs: 0, todayEntries: 0, bestStreak: 0, protected: false };
+    }
+    const s = streakData[discordId];
+    const today = getToday();
+
+    // Neuer Tag → Reset der Tages-Werte
+    if (s.lastDate && s.lastDate !== today) {
+        const yesterday = getYesterday();
+        if (s.lastCompletedDate !== yesterday && s.lastCompletedDate !== today) {
+            // Gestern nicht abgeschlossen → Streak reset (außer protected)
+            if (!s.protected) {
+                s.streak = 0;
+            }
+        }
+        s.todayMs = 0;
+        s.todayEntries = 0;
+        s.lastDate = today;
+    }
+    if (!s.lastDate) s.lastDate = today;
+
+    return s;
+}
+
+// Protected-Status für Rolle prüfen (beim Bot-Start + periodisch)
+async function updateStreakProtection() {
+    try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (!guild) return;
+        for (const [discordId, s] of Object.entries(streakData)) {
+            try {
+                const member = await guild.members.fetch(discordId).catch(() => null);
+                s.protected = member ? member.roles.cache.has(STREAK_PROTECTED_ROLE) : false;
+            } catch(e) { s.protected = false; }
+        }
+        saveStreaks();
+    } catch(e) {}
+}
+
+function checkStreakComplete(discordId) {
+    const s = getStreak(discordId);
+    const today = getToday();
+    const alreadyCompleted = s.lastCompletedDate === today;
+
+    if (!alreadyCompleted && s.todayMs >= STREAK_MIN_MS && s.todayEntries >= STREAK_MIN_ENTRIES) {
+        s.streak += 1;
+        s.lastCompletedDate = today;
+        if (s.streak > (s.bestStreak || 0)) s.bestStreak = s.streak;
+        saveStreaks();
+        console.log(`[Streak] 🔥 ${discordId} Streak ${s.streak}! (${s.todayMs}ms + ${s.todayEntries} Einträge)`);
+        return true; // Streak gerade erhöht
+    }
+    return false;
+}
+
+function addStreakTime(discordId, ms) {
+    const s = getStreak(discordId);
+    s.todayMs += ms;
+    s.lastDate = getToday();
+    saveStreaks();
+    return checkStreakComplete(discordId);
+}
+
+function addStreakEntry(discordId) {
+    const s = getStreak(discordId);
+    s.todayEntries += 1;
+    s.lastDate = getToday();
+    saveStreaks();
+    return checkStreakComplete(discordId);
+}
+
 // Lead role IDs that can manage shifts + delete mod entries
 const LEAD_ROLE_IDS = [
     "1365085407381028864",  // Projektleitung
@@ -1179,6 +1272,19 @@ const apiServer = http.createServer(async (req, res) => {
 
                 console.log(`[Mod] ${moderator} → ${action} ${username} (${userId}): ${reason}`);
 
+                // Streak: Eintrag zählen (Moderator Discord-ID finden)
+                let modIdForStreak = null;
+                for (const [id, u] of allKnownUsers.entries()) {
+                    if (u.username === moderator) { modIdForStreak = id; break; }
+                }
+                if (modIdForStreak) {
+                    const streakUp = addStreakEntry(modIdForStreak);
+                    if (streakUp) {
+                        const st = getStreak(modIdForStreak);
+                        io.emit('streak_complete', { discordId: modIdForStreak, streak: st.streak, bestStreak: st.bestStreak, username: moderator });
+                    }
+                }
+
                 // Live broadcast: neuer Eintrag an alle Clients
                 io.emit('mod_new_entry', {
                     userId, username, displayName: displayName || username,
@@ -1258,6 +1364,24 @@ const apiServer = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/on-duty") {
         res.writeHead(200);
         return res.end(JSON.stringify({ success: true, staff: cachedOnDutyStaff }));
+    }
+
+    // GET /api/streaks — Alle Streak-Daten
+    if (req.method === "GET" && url.pathname === "/api/streaks") {
+        const result = {};
+        for (const [id, s] of Object.entries(streakData)) {
+            const known = allKnownUsers.get(id);
+            const gs = getStreak(id); // Aktualisiert Tag-Reset
+            result[id] = {
+                streak: gs.streak, bestStreak: gs.bestStreak || 0,
+                todayMs: gs.todayMs, todayEntries: gs.todayEntries,
+                protected: gs.protected || false,
+                completed: gs.lastCompletedDate === getToday(),
+                username: known?.username || '?', avatar: known?.avatar || '',
+            };
+        }
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, streaks: result, requirements: { minMs: STREAK_MIN_MS, minEntries: STREAK_MIN_ENTRIES } }));
     }
 
     // ================================================================
@@ -1362,6 +1486,13 @@ const apiServer = http.createServer(async (req, res) => {
                 shiftLeaderboard[discordId].username = known?.username || shiftLeaderboard[discordId].username || '?';
                 shiftLeaderboard[discordId].avatar = known?.avatar || shiftLeaderboard[discordId].avatar || '';
                 saveLeaderboard();
+
+                // Streak: Zeit hinzufügen
+                const streakUp = addStreakTime(discordId, s.savedMs || 0);
+                if (streakUp) {
+                    const st = getStreak(discordId);
+                    io.emit('streak_complete', { discordId, streak: st.streak, bestStreak: st.bestStreak, username: known?.username || '?' });
+                }
 
                 s.state = 'off';
                 s.startedAt = null;
@@ -1989,6 +2120,10 @@ client.once("ready", async () => {
     await client.guilds.fetch().catch(() => { });
     await updateBotStatus(client);
     setInterval(() => updateBotStatus(client), STATUS_UPDATE_INTERVAL);
+
+    // Streak-Schutz prüfen (beim Start + alle 30min)
+    await updateStreakProtection();
+    setInterval(() => updateStreakProtection(), 30 * 60 * 1000);
     startOverlayDataLoop();
 
     // Auto-Start: Alle mit On Duty Rolle bekommen aktiven Shift
