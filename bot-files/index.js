@@ -210,24 +210,15 @@ client.on("interactionCreate", async interaction => {
     // 📸 BUTTON: Beweis-Bild anzeigen (ephemeral)
     // ============================================
     if (interaction.isButton() && interaction.customId.startsWith("evidence_")) {
-        const url = global._evidenceStore?.get(interaction.customId);
-        if (!url) {
+        const base64Data = global._evidenceStore?.get(interaction.customId);
+        if (!base64Data) {
             return interaction.reply({ content: '❌ Beweis nicht mehr verfügbar (abgelaufen).', ephemeral: true });
         }
 
-        const { ButtonBuilder, ButtonStyle } = await import('discord.js');
-        const downloadRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Bild herunterladen')
-                .setStyle(ButtonStyle.Link)
-                .setURL(url)
-                .setEmoji({ name: '💾' })
-        );
-
+        const imgBuffer = Buffer.from(base64Data, 'base64');
         return interaction.reply({
             content: `📸 **Beweis-Bild:**`,
-            files: [{ attachment: url, name: 'beweis.png' }],
-            components: [downloadRow],
+            files: [new AttachmentBuilder(imgBuffer, { name: 'beweis.png' })],
             ephemeral: true
         });
     }
@@ -1126,38 +1117,27 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 }
 
-                // Beweis-Bild: hochladen → URL speichern → Button im Container
-                let evidenceUrl = null;
+                // Beweis-Bild: Base64 speichern + Button im Container
                 if (evidence) {
                     try {
                         const base64Data = evidence.replace(/^data:image\/\w+;base64,/, '');
-                        const imgBuffer = Buffer.from(base64Data, 'base64');
-                        const att = new AttachmentBuilder(imgBuffer, { name: `evidence_${userId}_${Date.now()}.png` });
-                        // Bild in den gleichen Channel hochladen (wird sofort gelöscht)
-                        const tmpMsg = await channel.send({ files: [att] });
-                        evidenceUrl = tmpMsg.attachments.first()?.url || null;
-                        await tmpMsg.delete().catch(() => {});
+                        const evidenceId = `evidence_${userId}_${Date.now()}`;
+                        // Base64 in Memory speichern für Button-Handler
+                        if (!global._evidenceStore) global._evidenceStore = new Map();
+                        global._evidenceStore.set(evidenceId, base64Data);
+                        // Nach 7 Tagen löschen
+                        setTimeout(() => global._evidenceStore?.delete(evidenceId), 7 * 86400000);
+
+                        buttonRow.addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(evidenceId)
+                                .setLabel('Beweis')
+                                .setStyle(ButtonStyle.Secondary)
+                                .setEmoji({ name: '📸' })
+                        );
                     } catch(imgErr) {
-                        console.error('[Mod] Bild-Upload Fehler:', imgErr.message);
+                        console.error('[Mod] Bild-Fehler:', imgErr.message);
                     }
-                }
-
-                // Beweis-Button neben Roblox-Button (wenn Bild vorhanden)
-                if (evidenceUrl) {
-                    const evidenceId = `evidence_${userId}_${Date.now()}`;
-                    // URL in Memory speichern für Button-Handler
-                    if (!global._evidenceStore) global._evidenceStore = new Map();
-                    global._evidenceStore.set(evidenceId, evidenceUrl);
-                    // Nach 24h löschen
-                    setTimeout(() => global._evidenceStore?.delete(evidenceId), 86400000);
-
-                    buttonRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(evidenceId)
-                            .setLabel('Beweis')
-                            .setStyle(ButtonStyle.Secondary)
-                            .setEmoji({ name: '📸' })
-                    );
                 }
 
                 container.addSeparatorComponents(
