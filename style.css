@@ -1289,6 +1289,20 @@ body.has-custom-bg .gif-picker-panel {
 .setting-row:last-child { border-bottom: none; padding-bottom: 0; }
 .setting-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .setting-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* Toggle Switch (custom) */
+.toggle-switch {
+    width: 40px; height: 22px; border-radius: 11px;
+    background: rgba(255,255,255,0.1); position: relative;
+    cursor: pointer; transition: background .3s; flex-shrink: 0;
+}
+.toggle-switch > div {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: transform .3s;
+}
+.toggle-switch.on { background: var(--brand-blue); }
+.toggle-switch.on > div { transform: translateX(18px); }
 .toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
