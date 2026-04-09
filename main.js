@@ -902,7 +902,7 @@ app.whenReady().then(() => {
         try { fs.writeFileSync(file, JSON.stringify({ x, y, w, h })); } catch(e) {}
     }
 
-    // F4 (Windows) + Shift+F4 (Mac, weil F4=Launchpad auf macOS)
+    // Mod-Panel: F4 (Windows) + Cmd+4 / Ctrl+4 (Mac)
     const modPanelHandler = () => {
         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
             robloxOverlayWin.webContents.send('toggle-mod-panel');
@@ -911,7 +911,10 @@ app.whenReady().then(() => {
         }
     };
     globalShortcut.register('F4', modPanelHandler);
-    globalShortcut.register('Shift+F4', modPanelHandler);
+    if (process.platform === 'darwin') {
+        globalShortcut.register('Command+4', modPanelHandler);
+        globalShortcut.register('Control+4', modPanelHandler);
+    }
 
     app.on('activate', () => {
         // macOS: Klick auf Dock-Icon stellt Fenster wieder her
