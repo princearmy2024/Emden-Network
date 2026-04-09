@@ -486,7 +486,9 @@ fetch('https://api.github.com/repos/princearmy2024/Emden-Network/releases?per_pa
     const exe=latest.assets?.find(a=>a.name.endsWith('.exe'));
     if(exe)document.querySelectorAll('.dl-link').forEach(a=>{a.href=exe.browser_download_url});
     const apk=latest.assets?.find(a=>a.name.endsWith('.apk'));
-    if(apk)document.querySelectorAll('.dl-apk').forEach(a=>{a.href=apk.browser_download_url});
+    if(apk)document.querySelectorAll('.dl-apk').forEach(a=>{a.href=apk.browser_download_url;a.style.opacity='1';a.style.pointerEvents='auto';a.style.cursor='pointer';});
+    const dmg=latest.assets?.find(a=>a.name.endsWith('.dmg')||a.name.endsWith('.zip'));
+    if(dmg)document.querySelectorAll('.dl-mac').forEach(a=>{a.href=dmg.browser_download_url;a.style.opacity='1';a.style.pointerEvents='auto';a.style.cursor='pointer';a.querySelector('span')&&(a.querySelector('span').textContent='→');});
   }
   // Build timeline
   const tl=document.getElementById('timeline');
