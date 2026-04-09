@@ -2158,16 +2158,42 @@ client.once("ready", async () => {
 // 📩 TICKET NOTIFICATION
 // ================================================================
 client.on("channelCreate", channel => {
-    if (channel.name && channel.name.startsWith("ticket-")) {
+    // Erkennt: ticket-XXX, -ticket-XXX, oder Channels in Ticket-Kategorien
+    const name = channel.name || '';
+    const parentName = channel.parent?.name?.toLowerCase() || '';
+    const isTicket = name.includes('ticket') ||
+                     parentName.includes('ticket') ||
+                     parentName.includes('support ticket') ||
+                     parentName.includes('report ticket');
+
+    if (isTicket) {
         const reason = channel.parent ? channel.parent.name : "Neues Ticket";
-        const ticketId = channel.name.replace("ticket-", "");
-        console.log(`[Ticket] Neues Ticket: #${channel.name} (${reason})`);
-        io.emit("overlay_new_ticket", { ticketId, reason, channelName: channel.name });
-        // Auch als normale Notification an alle Dashboard-Clients
+        const ticketId = name.replace(/^-?ticket-?/, '').replace(/^-/, '') || name;
+        console.log(`[Ticket] Neues Ticket: #${name} (${reason})`);
+        io.emit("overlay_new_ticket", { ticketId, reason, channelName: name });
         io.emit("dc_notification", {
             type: 'ticket',
             title: '📩 Neues Ticket',
-            message: `#${channel.name} — ${reason}`,
+            message: `#${name} — ${reason}`,
+            timestamp: Date.now()
+        });
+    }
+});
+
+// Auch Threads erkennen (manche Ticket-Bots nutzen Threads)
+client.on("threadCreate", thread => {
+    const name = thread.name || '';
+    const parentName = thread.parent?.name?.toLowerCase() || '';
+    const isTicket = name.includes('ticket') || parentName.includes('ticket');
+
+    if (isTicket) {
+        const reason = thread.parent ? thread.parent.name : "Neues Ticket";
+        console.log(`[Ticket] Neuer Thread-Ticket: ${name} (${reason})`);
+        io.emit("overlay_new_ticket", { ticketId: name, reason, channelName: name });
+        io.emit("dc_notification", {
+            type: 'ticket',
+            title: '📩 Neues Ticket',
+            message: `${name} — ${reason}`,
             timestamp: Date.now()
         });
     }
