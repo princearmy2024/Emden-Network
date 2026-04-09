@@ -315,6 +315,7 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 }
 body.overlay-active.is-admin #mod-trigger,
 body.overlay-active.is-staff #mod-trigger { display: flex; }
+body.overlay-active.is-staff #gsg9-trigger { display: flex; }
 
 /* Klick-Area */
 #mod-trigger::before {
@@ -1696,11 +1697,35 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 <div class="glow-line-left"></div>
 <div class="glow-line-bottom"></div>
 
+<!-- GSG9 TRIGGER BUTTON -->
+<div id="gsg9-trigger" onclick="Overlay.toggleGSG9()" style="position:fixed;bottom:0;right:clamp(260px,18vw,380px);padding:clamp(14px,1.4vh,22px) clamp(20px,2vw,32px) clamp(10px,1vh,16px);border-radius:14px 14px 0 0;background:linear-gradient(to top,rgba(6,8,18,0.5) 0%,rgba(8,14,32,0.2) 50%,transparent 100%);display:none;flex-direction:column;align-items:center;cursor:pointer;color:rgba(255,255,255,0.6);z-index:200;pointer-events:auto;transition:color .3s;font-family:'Inter',sans-serif;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span style="font-size:11px;font-weight:600;letter-spacing:.04em;">GSG9</span>
+  </div>
+</div>
+
 <!-- MOD TRIGGER BUTTON — "Eintragen" -->
 <div id="mod-trigger" onclick="Overlay.toggleModSlide()">
   <div class="mod-trigger-inner">
     <i data-lucide="clipboard-edit"></i>
     <span class="mod-trigger-text">Eintragen</span>
+  </div>
+</div>
+
+<!-- GSG9 SLIDE PANEL -->
+<div id="gsg9-slide" style="position:fixed;bottom:0;right:0;width:340px;height:70vh;z-index:500;transform:translateY(100%);transition:transform .4s cubic-bezier(.16,1,.3,1);pointer-events:none;display:flex;flex-direction:column;">
+  <div style="flex:1;background:rgba(8,12,24,0.95);backdrop-filter:blur(20px);border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,0.06);border-bottom:none;overflow-y:auto;pointer-events:auto;padding:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span style="font-family:'Inter',sans-serif;font-weight:700;font-size:15px;color:#fff;">GSG9 Team</span>
+      </div>
+      <span onclick="Overlay.toggleGSG9()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:18px;">&times;</span>
+    </div>
+    <div id="gsg9Content" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>
+    </div>
   </div>
 </div>
 

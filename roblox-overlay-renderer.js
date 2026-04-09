@@ -1445,7 +1445,63 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
+    // ─── GSG9 PANEL ────────────────────────────────────────
+    let gsg9Open = false;
+
+    async function toggleGSG9() {
+        gsg9Open = !gsg9Open;
+        const panel = document.getElementById('gsg9-slide');
+        if (!panel) return;
+        if (gsg9Open) {
+            panel.style.transform = 'translateY(0)';
+            panel.style.pointerEvents = 'auto';
+            loadGSG9();
+        } else {
+            panel.style.transform = 'translateY(100%)';
+            panel.style.pointerEvents = 'none';
+        }
+    }
+
+    async function loadGSG9() {
+        const container = document.getElementById('gsg9Content');
+        if (!container) return;
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>';
+        try {
+            const res = await fetch(API_URL + '/api/gsg9', { headers: { 'x-api-key': API_KEY } });
+            const data = await res.json();
+            if (!data.success || !data.teams?.length) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Keine Daten</div>';
+                return;
+            }
+            container.innerHTML = data.teams.map(team => {
+                const members = team.members.length > 0
+                    ? team.members.map(m => {
+                        const statusColor = m.status === 'online' ? '#22c55e' : m.status === 'idle' ? '#f59e0b' : m.status === 'dnd' ? '#ef4444' : '#6b7280';
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;transition:background .2s;" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
+                            <div style="position:relative;flex-shrink:0;">
+                                <img src="${m.avatar}" style="width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,0.06);" onerror="this.style.display='none'">
+                                <div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:${statusColor};border:2px solid rgba(8,12,24,0.95);"></div>
+                            </div>
+                            <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);">${m.username}</span>
+                        </div>`;
+                    }).join('')
+                    : '<div style="padding:8px;font-size:10px;color:rgba(255,255,255,0.2);font-style:italic;">Keine Mitglieder</div>';
+
+                return `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;overflow:hidden;">
+                    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <div style="width:8px;height:8px;border-radius:3px;background:${team.color};flex-shrink:0;"></div>
+                        <span style="font-size:12px;font-weight:700;color:${team.color};letter-spacing:.02em;">${team.name}</span>
+                        <span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,0.25);font-family:monospace;">${team.members.length}</span>
+                    </div>
+                    <div style="padding:4px;">${members}</div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#ff6b6b;font-size:11px;">Fehler beim Laden</div>';
+        }
+    }
+
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, toggleGSG9, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
 })();
 
 // ══════════════════════════════════════════════
