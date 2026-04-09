@@ -1052,9 +1052,11 @@ const Overlay = (() => {
         modSelectedAction = type;
         document.querySelectorAll('.mod-act').forEach(a => a.classList.remove('on'));
         el.classList.add('on');
-        // Notiz-Textfeld ein/ausblenden
+        // Notiz-Textfeld immer einblenden wenn eine Aktion gewählt ist
         const notizBox = document.getElementById('modNotizBox');
-        if (notizBox) notizBox.style.display = type === 'Notiz' ? 'block' : 'none';
+        if (notizBox) notizBox.style.display = 'block';
+        const notizInp = document.getElementById('modNotizInput');
+        if (notizInp) notizInp.placeholder = type === 'Notiz' ? 'Notiz eingeben...' : 'Notiz hinzufügen (optional)...';
         updateModSendBtn();
     }
 
