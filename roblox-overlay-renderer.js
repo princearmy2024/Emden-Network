@@ -774,6 +774,13 @@ const Overlay = (() => {
         // Mod-Eintrag: Custom Notification (top, glass, sound)
         socket.on('mod_new_entry', (entry) => {
             showOverlayModNotif(entry);
+            // Live-History aktualisieren
+            if (_modHistoryCache) {
+                _modHistoryCache.unshift(entry);
+                if (_modHistoryCache.length > 15) _modHistoryCache.pop();
+                const c = document.getElementById('modLiveHistory');
+                if (c) renderModHistory(c, _modHistoryCache);
+            }
         });
 
         // Panic Alert empfangen
@@ -877,6 +884,50 @@ const Overlay = (() => {
         else if (window.electronAPI?.requestOverlayFocus) window.electronAPI.requestOverlayFocus(on);
     }
 
+    let _modHistoryCache = null;
+
+    async function loadModHistory() {
+        const container = document.getElementById('modLiveHistory');
+        if (!container) return;
+
+        // Sofort aus Cache
+        if (_modHistoryCache) {
+            renderModHistory(container, _modHistoryCache);
+        }
+
+        try {
+            const res = await fetch(API_URL + '/api/mod-log?limit=15', { headers: { 'x-api-key': API_KEY } });
+            const data = await res.json();
+            if (data.success && data.log?.length) {
+                _modHistoryCache = data.log;
+                renderModHistory(container, data.log);
+            }
+        } catch(e) {}
+    }
+
+    function renderModHistory(container, entries) {
+        const actionColors = { Ban: '#ff6b6b', Kick: '#f59e0b', Warn: '#3b82f6', 'One Day Ban': '#ff8c00', Notiz: '#8b5cf6' };
+        container.innerHTML = `<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Letzte Einträge</div>` +
+            entries.map((e, i) => {
+                const color = actionColors[e.action] || '#3b82f6';
+                const date = e.date ? new Date(e.date).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit'}) : '';
+                const time = e.date ? new Date(e.date).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
+                return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-left:3px solid ${color};border-radius:8px;padding:10px 12px;animation:fadeInUp .3s ease ${i*0.05}s both;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <img src="${e.moderatorAvatar || e.modAvatar || ''}" style="width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);" onerror="this.style.display='none'">
+                        <span style="font-size:11px;font-weight:600;color:#fff;">${esc(e.moderator || '?')}</span>
+                        <span style="font-size:8px;font-weight:700;background:${color}22;color:${color};padding:1px 5px;border-radius:3px;text-transform:uppercase;">${esc(e.action || '?')}</span>
+                        <span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,0.2);font-family:monospace;">${time}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.6);">${esc(e.displayName || e.username || '?')}</span>
+                        <span style="font-size:9px;color:rgba(255,255,255,0.2);">· ${date}</span>
+                    </div>
+                    ${e.reason && e.reason !== 'Kein Grund' ? `<div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:3px;">Grund: ${esc(e.reason).substring(0,60)}</div>` : ''}
+                </div>`;
+            }).join('');
+    }
+
     function toggleModSlide() {
         modSlideOpen = !modSlideOpen;
         const panel = document.getElementById('mod-slide');
@@ -887,6 +938,7 @@ const Overlay = (() => {
         if (modSlideOpen) {
             requestFocus(true);
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
+            loadModHistory();
         } else {
             // IMMER Focus abgeben wenn Panel geschlossen wird
             requestFocus(false);
