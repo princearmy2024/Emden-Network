@@ -236,10 +236,15 @@ const verifyCommand = new SlashCommandBuilder()
     .setName("verify")
     .setDescription("Erhalte deinen Verifikationscode für das Emden Network Dashboard");
 
+const gsg9VerifyCommand = new SlashCommandBuilder()
+    .setName("gsg9verify")
+    .setDescription("Verknüpfe deinen Roblox-Account mit dem GSG9 Panel")
+    .addStringOption(opt => opt.setName("roblox_username").setDescription("Dein Roblox Benutzername").setRequired(true));
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -523,6 +528,59 @@ client.on("interactionCreate", async interaction => {
             } else {
                 await interaction.reply(reply).catch(() => {});
             }
+        }
+        return;
+    }
+
+    // /gsg9verify — Roblox-Account mit GSG9 Panel verknüpfen
+    if (interaction.commandName === "gsg9verify") {
+        try {
+            const GSG9_GUILD_ID = '1398612779325329418';
+            const GSG9_ALLOWED_ROLES = ['1398619556792242206', '1419353950234083480', '1405963717199527998'];
+
+            // Prüfe ob User eine GSG9-Rolle hat
+            const guild = client.guilds.cache.get(GSG9_GUILD_ID) || await client.guilds.fetch(GSG9_GUILD_ID);
+            const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+            if (!member || !GSG9_ALLOWED_ROLES.some(r => member.roles.cache.has(r))) {
+                return interaction.reply({ content: '❌ Du brauchst eine GSG9-Rolle um diesen Command zu nutzen.', ephemeral: true });
+            }
+
+            const robloxUsername = interaction.options.getString('roblox_username');
+            await interaction.deferReply({ ephemeral: true });
+
+            // Roblox-User suchen
+            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: [robloxUsername], excludeBannedUsers: false })
+            });
+            const searchData = await searchRes.json();
+            if (!searchData.data?.length) {
+                return interaction.editReply({ content: `❌ Roblox-User "${robloxUsername}" nicht gefunden.` });
+            }
+
+            const robloxUser = searchData.data[0];
+            robloxLinks.set(interaction.user.id, String(robloxUser.id));
+            saveLinks();
+
+            console.log(`[GSG9] ${interaction.user.username} verknüpft mit Roblox ${robloxUser.name} (${robloxUser.id})`);
+
+            await interaction.editReply({
+                content: [
+                    '## ✅ GSG9 Roblox-Verknüpfung',
+                    '',
+                    `**Discord:** ${interaction.user.displayName || interaction.user.username}`,
+                    `**Roblox:** ${robloxUser.displayName || robloxUser.name} (@${robloxUser.name})`,
+                    `**User ID:** \`${robloxUser.id}\``,
+                    '',
+                    'Dein Roblox-Account ist jetzt im GSG9 Panel verknüpft. 🔗',
+                ].join('\n')
+            });
+        } catch(e) {
+            console.error('[GSG9 Verify] Fehler:', e.message);
+            const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
         }
         return;
     }

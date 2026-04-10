@@ -336,6 +336,7 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
 }
 .gsg9-btn:hover { color: #fff; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+#gsg9-slide div::-webkit-scrollbar { display: none; }
 
 /* Klick-Area */
 #mod-trigger::before {
@@ -1733,7 +1734,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 
 <!-- GSG9 SLIDE PANEL -->
 <div id="gsg9-slide" onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)" onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)" style="position:fixed;bottom:0;right:0;width:340px;height:70vh;z-index:500;transform:translateY(100%);transition:transform .4s cubic-bezier(.16,1,.3,1);pointer-events:none;display:flex;flex-direction:column;">
-  <div style="flex:1;background:rgba(8,12,24,0.92);backdrop-filter:blur(20px);border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,0.06);border-bottom:none;overflow-y:auto;pointer-events:auto;padding:20px;position:relative;">
+  <div style="flex:1;background:rgba(8,12,24,0.92);backdrop-filter:blur(20px);border-radius:16px 16px 0 0;border:1px solid rgba(255,255,255,0.06);border-bottom:none;overflow-y:auto;scrollbar-width:none;pointer-events:auto;padding:20px;position:relative;">
     <div style="position:absolute;inset:0;background:url('./GSG9.png') center/cover no-repeat;opacity:0.06;border-radius:16px 16px 0 0;pointer-events:none;"></div>
     <div style="position:relative;z-index:1;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
