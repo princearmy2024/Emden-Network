@@ -249,7 +249,7 @@ const WebSocketService = {
                 if (!window.App) return;
                 if (localStorage.getItem('notif_tickets') === 'false') return;
                 NotificationService.show('📩 Neues Ticket', `#${data.channelName || data.ticketId} — ${data.reason}`, 'warn');
-                try { const a = new Audio('./ticketsound.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
+                try { const a = new Audio(App.getSoundFile('sound_ticket')); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
             });
 
             // 🔔 Persönliche Mention/Ping
@@ -269,7 +269,7 @@ const WebSocketService = {
                 if (data.action === 'join') {
                     if (localStorage.getItem('notif_support') === 'false') return;
                     NotificationService.show('🎧 Support-Warteraum', `${data.username} wartet in ${data.channelName}`, 'warn');
-                    try { const a = new Audio('./supportwarteraumsound.mp3'); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
+                    try { const a = new Audio(App.getSoundFile('sound_support')); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
                 }
             });
 
@@ -1973,6 +1973,13 @@ const App = window.App = {
         if (fv) { const sl = document.getElementById('funkVolumeSlider'); if (sl) sl.value = fv; const lb = document.getElementById('funkVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(fv) * 100) + '%'; }
         const uv = localStorage.getItem('ui_sound_volume');
         if (uv !== null) { const sl = document.getElementById('uiVolumeSlider'); if (sl) sl.value = uv; const lb = document.getElementById('uiVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(uv) * 100) + '%'; }
+        // Sound Alert Inputs
+        ['sound_ticket', 'sound_support', 'sound_mention', 'sound_entry'].forEach(key => {
+            const val = localStorage.getItem(key);
+            const map = { sound_ticket: 'soundTicket', sound_support: 'soundSupport', sound_mention: 'soundMention', sound_entry: 'soundEntry' };
+            const el = document.getElementById(map[key]);
+            if (el && val) el.value = val;
+        });
         // Notification Toggles
         ['notif_tickets', 'notif_support', 'notif_mentions'].forEach(key => {
             const val = localStorage.getItem(key) !== 'false';
@@ -3667,6 +3674,24 @@ Object.assign(App, {
         const current = localStorage.getItem(key) !== 'false';
         localStorage.setItem(key, current ? 'false' : 'true');
         if (el) el.classList.toggle('on', !current);
+    },
+
+    setSoundAlert(key, val) {
+        localStorage.setItem(key, val || '');
+    },
+
+    testSoundAlert(key) {
+        const defaults = { sound_ticket: './ticketsound.mp3', sound_support: './supportwarteraumsound.mp3', sound_mention: './notif.mp3', sound_entry: './notif.mp3' };
+        const file = localStorage.getItem(key) || defaults[key] || './notif.mp3';
+        const src = file.startsWith('http') ? file : './' + file.replace(/^\.\//, '');
+        const vol = parseFloat(localStorage.getItem('notif_volume') ?? '0.5');
+        try { const a = new Audio(src); a.volume = vol; a.play().catch(() => NotificationService.show('Sound', 'Konnte nicht abgespielt werden', 'error')); } catch(e) {}
+    },
+
+    getSoundFile(key) {
+        const defaults = { sound_ticket: './ticketsound.mp3', sound_support: './supportwarteraumsound.mp3', sound_mention: './notif.mp3', sound_entry: './notif.mp3' };
+        const file = localStorage.getItem(key) || defaults[key] || './notif.mp3';
+        return file.startsWith('http') ? file : './' + file.replace(/^\.\//, '');
     },
 
     // Busy-Ton: error.wav wenn Kanal belegt ──────────────────────

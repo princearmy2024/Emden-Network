@@ -81,6 +81,13 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
+    // DevTools deaktivieren (Sicherheit: Source-Code nicht sichtbar)
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.key === 'F12' || (input.control && input.shift && (input.key === 'I' || input.key === 'i' || input.key === 'J' || input.key === 'j'))) {
+            event.preventDefault();
+        }
+    });
+
     // Fenster erst anzeigen wenn vollständig geladen (verhindert weißes Blitzen)
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();

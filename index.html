@@ -865,6 +865,50 @@
                                 <div id="toggleMentions" class="toggle-switch on" onclick="App.toggleNotifSetting('notif_mentions', this)"><div></div></div>
                             </div>
 
+                            <!-- SOUND ALERTS KATEGORIE -->
+                            <h3 class="settings-title" style="margin-top:16px;">Sound Alerts</h3>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Ticket-Sound</div>
+                                    <div class="setting-desc">Sound bei neuem Ticket</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <input type="text" id="soundTicket" class="input-field" style="width:140px;font-size:10px;" placeholder="ticketsound.mp3" onchange="App.setSoundAlert('sound_ticket',this.value)">
+                                    <button class="btn btn-ghost" style="padding:4px 8px;font-size:9px;" onclick="App.testSoundAlert('sound_ticket')">Test</button>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Support-Sound</div>
+                                    <div class="setting-desc">Sound bei Support-Warteraum</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <input type="text" id="soundSupport" class="input-field" style="width:140px;font-size:10px;" placeholder="supportwarteraumsound.mp3" onchange="App.setSoundAlert('sound_support',this.value)">
+                                    <button class="btn btn-ghost" style="padding:4px 8px;font-size:9px;" onclick="App.testSoundAlert('sound_support')">Test</button>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Mention-Sound</div>
+                                    <div class="setting-desc">Sound bei Discord-Ping</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <input type="text" id="soundMention" class="input-field" style="width:140px;font-size:10px;" placeholder="notif.mp3" onchange="App.setSoundAlert('sound_mention',this.value)">
+                                    <button class="btn btn-ghost" style="padding:4px 8px;font-size:9px;" onclick="App.testSoundAlert('sound_mention')">Test</button>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-info">
+                                    <div class="setting-name">Eintrag-Sound</div>
+                                    <div class="setting-desc">Sound bei neuem Mod-Eintrag</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <input type="text" id="soundEntry" class="input-field" style="width:140px;font-size:10px;" placeholder="notif.mp3" onchange="App.setSoundAlert('sound_entry',this.value)">
+                                    <button class="btn btn-ghost" style="padding:4px 8px;font-size:9px;" onclick="App.testSoundAlert('sound_entry')">Test</button>
+                                </div>
+                            </div>
+                            <div style="font-size:9px;color:var(--text-muted);padding:4px 0;opacity:0.5;">Dateiname (z.B. ticketsound.mp3) oder URL. Leer = Standard-Sound.</div>
+
                             <div class="setting-row hidden">
                                 <div class="setting-info">
                                     <div class="setting-name">Mic-Monitoring (Abhören)</div>
