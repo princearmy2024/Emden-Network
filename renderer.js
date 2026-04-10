@@ -1,3 +1,6 @@
+// Performance-Mode sofort laden (vor allem anderen)
+if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('perf-mode');
+
 /**
  * EMDEN NETWORK DASHBOARD - renderer.js
  * Frontend-Logik (Renderer-Prozess)
@@ -1974,6 +1977,12 @@ const App = window.App = {
         if (fv) { const sl = document.getElementById('funkVolumeSlider'); if (sl) sl.value = fv; const lb = document.getElementById('funkVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(fv) * 100) + '%'; }
         const uv = localStorage.getItem('ui_sound_volume');
         if (uv !== null) { const sl = document.getElementById('uiVolumeSlider'); if (sl) sl.value = uv; const lb = document.getElementById('uiVolumeValue'); if (lb) lb.textContent = Math.round(parseFloat(uv) * 100) + '%'; }
+        // Performance Mode
+        if (localStorage.getItem('perf_mode') === 'true') {
+            document.body.classList.add('perf-mode');
+            const el = document.getElementById('togglePerfMode');
+            if (el) el.classList.add('on');
+        }
         // Sound Alert Inputs
         ['sound_ticket', 'sound_support', 'sound_mention', 'sound_entry'].forEach(key => {
             const val = localStorage.getItem(key);
@@ -3669,6 +3678,15 @@ Object.assign(App, {
         localStorage.setItem('ui_sound_volume', v);
         const label = document.getElementById('uiVolumeValue');
         if (label) label.textContent = Math.round(v * 100) + '%';
+    },
+
+    togglePerfMode(el) {
+        const current = localStorage.getItem('perf_mode') === 'true';
+        const newVal = !current;
+        localStorage.setItem('perf_mode', newVal ? 'true' : 'false');
+        document.body.classList.toggle('perf-mode', newVal);
+        if (el) el.classList.toggle('on', newVal);
+        NotificationService.show('Performance', newVal ? 'Performance-Modus aktiviert' : 'Performance-Modus deaktiviert', 'info');
     },
 
     toggleNotifSetting(key, el) {
