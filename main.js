@@ -233,6 +233,30 @@ function getLocalChangelog() {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// Verified User: Speichert verifizierte User-Daten persistent (ueberlebt Updates + localStorage-Clear)
+const VERIFIED_USER_FILE = path.join(app.getPath('userData'), 'verified-user.json');
+
+ipcMain.handle('save-verified-user', async (event, userData) => {
+    try {
+        fs.writeFileSync(VERIFIED_USER_FILE, JSON.stringify(userData));
+        return { success: true };
+    } catch(e) { return { success: false }; }
+});
+
+ipcMain.handle('load-verified-user', async () => {
+    try {
+        if (fs.existsSync(VERIFIED_USER_FILE)) {
+            return JSON.parse(fs.readFileSync(VERIFIED_USER_FILE, 'utf8'));
+        }
+    } catch(e) {}
+    return null;
+});
+
+ipcMain.handle('clear-verified-user', async () => {
+    try { if (fs.existsSync(VERIFIED_USER_FILE)) fs.unlinkSync(VERIFIED_USER_FILE); } catch(e) {}
+    return { success: true };
+});
+
 // Chat-Backup: Speichert/Lädt Chat-History in userData (überlebt Updates)
 const CHAT_BACKUP_FILE = path.join(app.getPath('userData'), 'chat-backup.json');
 
