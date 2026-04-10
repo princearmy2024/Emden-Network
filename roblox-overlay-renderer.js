@@ -1464,18 +1464,39 @@ const Overlay = (() => {
         }
     }
 
+    let _gsg9Cache = null;
+
     async function loadGSG9() {
         const container = document.getElementById('gsg9Content');
         if (!container) return;
-        container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>';
+
+        // Sofort aus Cache anzeigen (wenn vorhanden)
+        if (_gsg9Cache) {
+            renderGSG9(container, _gsg9Cache);
+        } else {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>';
+        }
+
+        // Im Hintergrund aktualisieren
         try {
             const res = await fetch(API_URL + '/api/gsg9', { headers: { 'x-api-key': API_KEY } });
             const data = await res.json();
             if (!data.success || !data.teams?.length) {
-                container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Keine Daten</div>';
+                if (!_gsg9Cache) container.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Keine Daten</div>';
                 return;
             }
-            container.innerHTML = data.teams.map(team => {
+            _gsg9Cache = data.teams;
+            renderGSG9(container, data.teams);
+        } catch(e) {
+            if (!_gsg9Cache) container.innerHTML = `<div style="text-align:center;padding:20px;color:#ff6b6b;font-size:11px;">Fehler: ${e.message}</div>`;
+            console.error('[GSG9] Load error:', e);
+        }
+    }
+
+    function renderGSG9(container, teams) {
+        if (!container || !teams) return;
+        try {
+            container.innerHTML = teams.map(team => {
                 const members = team.members.length > 0
                     ? team.members.map(m => {
                         const statusColor = m.status === 'online' ? '#22c55e' : m.status === 'idle' ? '#f59e0b' : m.status === 'dnd' ? '#ef4444' : '#6b7280';
