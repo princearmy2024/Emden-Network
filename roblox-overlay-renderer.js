@@ -1581,7 +1581,7 @@ const Overlay = (() => {
     }
 
     // Expose loadGSG9 for back-button
-    function _loadGSG9Public() { loadGSG9(); }
+    function _loadGSG9Public() { requestFocus(true); loadGSG9(); }
 
     return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, toggleGSG9, loadGSG9: _loadGSG9Public, _showGSG9Profile, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
 })();
