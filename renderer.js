@@ -477,6 +477,7 @@ const WebSocketService = {
             // User-Liste rendern — IMMER versuchen, auch wenn dashboardUsers leer ist
             const users = data.dashboardUsers ?? data.onlineUsers ?? data.users ?? [];
             if (users.length > 0) {
+                window._lastOnlineUsers = users;
                 UserRegistry.update(users);
                 App.renderFullUserList(users);
             } else if (parseInt(dashOnline) > 0) {
@@ -4555,8 +4556,18 @@ const ModPanel = {
             if (s.username && s.username !== '?') merged[id].username = s.username;
             if (s.avatar) merged[id].avatar = s.avatar;
         }
+        // Alle online User für Username-Lookup
+        const onlineUsers = window._lastOnlineUsers || [];
         const entries = Object.entries(merged)
-            .map(([id, lb]) => ({ id, totalMs: (lb.totalMs || 0) + (lb.currentMs || 0), username: lb.username, avatar: lb.avatar }))
+            .map(([id, lb]) => {
+                // Username aus verschiedenen Quellen holen falls '?'
+                let name = lb.username;
+                if (!name || name === '?') {
+                    const known = onlineUsers.find(u => u.discordId === id);
+                    if (known) name = known.username;
+                }
+                return { id, totalMs: (lb.totalMs || 0) + (lb.currentMs || 0), username: name || '?', avatar: lb.avatar };
+            })
             .filter(e => e.totalMs > 0)
             .sort((a, b) => b.totalMs - a.totalMs)
             .slice(0, 15);

@@ -1484,7 +1484,13 @@ const apiServer = http.createServer(async (req, res) => {
             shifts[id] = { ...s, totalMs, totalBreakMs, username: known?.username || '?', avatar: known?.avatar || '' };
         }
         res.writeHead(200);
-        return res.end(JSON.stringify({ success: true, shifts, leaderboard: shiftLeaderboard }));
+        // Leaderboard Usernames korrigieren (alte Einträge haben '?')
+        const enrichedLb = {};
+        for (const [id, lb] of Object.entries(shiftLeaderboard)) {
+            const known = allKnownUsers.get(id);
+            enrichedLb[id] = { ...lb, username: known?.username || lb.username || '?', avatar: known?.avatar || lb.avatar || '' };
+        }
+        return res.end(JSON.stringify({ success: true, shifts, leaderboard: enrichedLb }));
     }
 
     // POST /api/shift/start — On Duty starten
