@@ -1144,6 +1144,11 @@ const Overlay = (() => {
         document.getElementById('modDetail').style.display = 'none';
         modHistoryData = [];
         updateModSendBtn();
+        // Live-History sofort aus Cache anzeigen
+        if (_modHistoryCache) {
+            const c = document.getElementById('modLiveHistory');
+            if (c) renderModHistory(c, _modHistoryCache);
+        }
     }
 
     function pickModAction(type, el) {
