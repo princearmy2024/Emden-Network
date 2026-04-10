@@ -216,6 +216,7 @@ const LEAD_ROLE_IDS = [
 
 // === On-Duty Cache (refreshed every 15s in background) ===
 let cachedOnDutyStaff = [];
+let cachedGSG9Teams = [];
 
 const robloxPresenceState = new Map();
 const overlayClients = new Map();
@@ -605,13 +606,20 @@ client.on("interactionCreate", async interaction => {
 
 // === Slash Commands registrieren (Guild = sofort!) ===
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+const GSG9_GUILD_ID_CMD = '1398612779325329418';
 (async () => {
     try {
+        // Haupt-Server
         await rest.put(
             Routes.applicationGuildCommands(process.env.CLIENT_ID, GUILD_ID),
             { body: commandsForDiscord }
         );
-        console.log("✅ Slash Commands sofort registriert!");
+        // GSG9-Server (für /gsg9verify)
+        await rest.put(
+            Routes.applicationGuildCommands(process.env.CLIENT_ID, GSG9_GUILD_ID_CMD),
+            { body: [gsg9VerifyCommand.toJSON()] }
+        );
+        console.log("✅ Slash Commands auf beiden Servern registriert!");
     } catch (e) { console.error("❌ Commands:", e.message); }
 })();
 
@@ -1443,49 +1451,11 @@ const apiServer = http.createServer(async (req, res) => {
     }
 
     // ================================================================
-    // GSG9 TEAM ROSTER (Live)
+    // GSG9 TEAM ROSTER (Cached — refreshed alle 30s im Hintergrund)
     // ================================================================
     if (req.method === "GET" && url.pathname === "/api/gsg9") {
-        try {
-            const GSG9_GUILD_ID = '1398612779325329418';
-            const guild = client.guilds.cache.get(GSG9_GUILD_ID) || await client.guilds.fetch(GSG9_GUILD_ID);
-            await guild.members.fetch().catch(() => {});
-
-            const GSG9_ROLES = [
-                { id: '1398619556792242206', name: 'GSG9' },
-                { id: '1419353950234083480', name: 'GSG9 Chief' },
-                { id: '1405963717199527998', name: 'GSG9 Trial' },
-            ];
-            const GSG9_ON_DUTY_ROLE = '1419050043822047375';
-
-            const teams = GSG9_ROLES.map(r => {
-                const role = guild.roles.cache.get(r.id);
-                if (!role) return { name: r.name, color: '#5B9AFF', members: [] };
-                return {
-                    name: role.name || r.name,
-                    color: role.hexColor !== '#000000' ? role.hexColor : '#5B9AFF',
-                    members: role.members.map(m => {
-                        const onDuty = m.roles.cache.has(GSG9_ON_DUTY_ROLE);
-                        // Roblox-Link prüfen
-                        const robloxId = robloxLinks.get(m.id) || null;
-                        return {
-                            discordId: m.id,
-                            username: m.displayName || m.user.username,
-                            avatar: m.user.displayAvatarURL({ size: 64 }),
-                            status: m.presence?.status || 'offline',
-                            onDuty,
-                            robloxId,
-                        };
-                    })
-                };
-            });
-
-            res.writeHead(200);
-            return res.end(JSON.stringify({ success: true, teams }));
-        } catch(e) {
-            res.writeHead(500);
-            return res.end(JSON.stringify({ success: false, error: e.message }));
-        }
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, teams: cachedGSG9Teams }));
     }
 
     // ================================================================
@@ -2370,7 +2340,44 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 });
 
 let lastSupporterCount = -1;
+// GSG9 Cache Refresh (alle 30s)
+async function refreshGSG9Cache() {
+    try {
+        const GSG9_GID = '1398612779325329418';
+        const guild = client.guilds.cache.get(GSG9_GID);
+        if (!guild) return;
+        await guild.members.fetch().catch(() => {});
+
+        const GSG9_ROLES = [
+            { id: '1398619556792242206', name: 'GSG9' },
+            { id: '1419353950234083480', name: 'GSG9 Chief' },
+            { id: '1405963717199527998', name: 'GSG9 Trial' },
+        ];
+        const GSG9_ON_DUTY_ROLE = '1419050043822047375';
+
+        cachedGSG9Teams = GSG9_ROLES.map(r => {
+            const role = guild.roles.cache.get(r.id);
+            if (!role) return { name: r.name, color: '#5B9AFF', members: [] };
+            return {
+                name: role.name || r.name,
+                color: role.hexColor !== '#000000' ? role.hexColor : '#5B9AFF',
+                members: role.members.map(m => ({
+                    discordId: m.id,
+                    username: m.displayName || m.user.username,
+                    avatar: m.user.displayAvatarURL({ size: 64 }),
+                    status: m.presence?.status || 'offline',
+                    onDuty: m.roles.cache.has(GSG9_ON_DUTY_ROLE),
+                    robloxId: robloxLinks.get(m.id) || null,
+                }))
+            };
+        });
+    } catch(e) {}
+}
+
 function startOverlayDataLoop() {
+    // GSG9 Cache sofort + alle 30s
+    refreshGSG9Cache();
+    setInterval(refreshGSG9Cache, 30000);
     setInterval(async () => {
         try {
             const guild = client.guilds.cache.get(GUILD_ID);
