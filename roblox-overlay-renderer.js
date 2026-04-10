@@ -1479,12 +1479,17 @@ const Overlay = (() => {
                 const members = team.members.length > 0
                     ? team.members.map(m => {
                         const statusColor = m.status === 'online' ? '#22c55e' : m.status === 'idle' ? '#f59e0b' : m.status === 'dnd' ? '#ef4444' : '#6b7280';
-                        return `<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;transition:background .2s;" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
+                        const nameColor = m.onDuty ? '#ff69b4' : 'rgba(255,255,255,0.85)';
+                        const dutyBadge = m.onDuty ? '<span style="font-size:8px;font-weight:700;background:rgba(255,105,180,0.15);color:#ff69b4;padding:1px 5px;border-radius:3px;margin-left:4px;text-transform:uppercase;letter-spacing:.04em;">On Duty</span>' : '';
+                        const robloxBadge = m.robloxId ? `<span onclick="event.stopPropagation();Overlay._showGSG9Profile('${m.discordId}','${m.robloxId}')" style="cursor:pointer;font-size:8px;font-weight:700;background:rgba(59,130,246,0.15);color:#3b82f6;padding:1px 5px;border-radius:3px;margin-left:auto;flex-shrink:0;">ROBLOX</span>` : '';
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;transition:all .2s;animation:fadeInUp .3s ease both;" onmouseenter="this.style.background='rgba(255,255,255,0.04)'" onmouseleave="this.style.background='transparent'">
                             <div style="position:relative;flex-shrink:0;">
-                                <img src="${m.avatar}" style="width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,0.06);" onerror="this.style.display='none'">
+                                <img src="${m.avatar}" style="width:30px;height:30px;border-radius:50%;border:2px solid ${m.onDuty ? 'rgba(255,105,180,0.3)' : 'rgba(255,255,255,0.06)'};" onerror="this.style.display='none'">
                                 <div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:${statusColor};border:2px solid rgba(8,12,24,0.95);"></div>
                             </div>
-                            <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);">${m.username}</span>
+                            <span style="font-size:12px;font-weight:500;color:${nameColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.username}</span>
+                            ${dutyBadge}
+                            ${robloxBadge}
                         </div>`;
                     }).join('')
                     : '<div style="padding:8px;font-size:10px;color:rgba(255,255,255,0.2);font-style:italic;">Keine Mitglieder</div>';
@@ -1504,7 +1509,81 @@ const Overlay = (() => {
         }
     }
 
-    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, toggleGSG9, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
+    // ─── GSG9 ROBLOX PROFILE DETAIL ─────────────────────────
+    async function _showGSG9Profile(discordId, robloxId) {
+        const container = document.getElementById('gsg9Content');
+        if (!container) return;
+
+        container.innerHTML = `<div style="animation:fadeInUp .3s ease;">
+            <div onclick="Overlay.loadGSG9()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;display:flex;align-items:center;gap:4px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Zurück
+            </div>
+            <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.3);font-size:11px;">Lade Profil...</div>
+        </div>`;
+
+        try {
+            const [pRes, aRes] = await Promise.all([
+                fetch('https://users.roblox.com/v1/users/' + robloxId),
+                fetch('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' + robloxId + '&size=420x420&format=Png&isCircular=false')
+            ]);
+            const pData = await pRes.json();
+            const aData = await aRes.json();
+            const avatar = aData.data?.[0]?.imageUrl || '';
+            const created = pData.created ? new Date(pData.created).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
+            container.innerHTML = `<div style="animation:fadeInUp .3s ease;">
+                <div onclick="Overlay.loadGSG9()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:16px;display:flex;align-items:center;gap:4px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Zurück
+                </div>
+                <div style="text-align:center;margin-bottom:16px;">
+                    ${avatar ? `<img src="${avatar}" style="width:80px;height:80px;border-radius:50%;border:3px solid rgba(59,130,246,0.3);margin-bottom:8px;">` : ''}
+                    <div style="font-size:16px;font-weight:700;color:#fff;">${pData.displayName || pData.name}</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.4);">@${pData.name}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.4);">User ID</span>
+                        <span onclick="navigator.clipboard.writeText('${robloxId}');this.textContent='Kopiert!';setTimeout(()=>this.textContent='${robloxId}',800)" style="font-size:11px;color:#3b82f6;cursor:pointer;font-family:monospace;">${robloxId}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.4);">Username</span>
+                        <span onclick="navigator.clipboard.writeText('${pData.name}');this.textContent='Kopiert!';setTimeout(()=>this.textContent='@${pData.name}',800)" style="font-size:11px;color:#3b82f6;cursor:pointer;">@${pData.name}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.4);">Display Name</span>
+                        <span style="font-size:11px;color:rgba(255,255,255,0.7);">${pData.displayName || '—'}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.4);">Erstellt</span>
+                        <span style="font-size:11px;color:rgba(255,255,255,0.7);">${created}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.4);">Discord ID</span>
+                        <span onclick="navigator.clipboard.writeText('${discordId}');this.textContent='Kopiert!';setTimeout(()=>this.textContent='${discordId}',800)" style="font-size:11px;color:#3b82f6;cursor:pointer;font-family:monospace;">${discordId}</span>
+                    </div>
+                    <a href="https://www.roblox.com/users/${robloxId}/profile" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;padding:10px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:8px;color:#3b82f6;font-size:11px;font-weight:600;text-decoration:none;transition:background .2s;" onmouseenter="this.style.background='rgba(59,130,246,0.2)'" onmouseleave="this.style.background='rgba(59,130,246,0.1)'">
+                        Roblox Profil öffnen →
+                    </a>
+                </div>
+                ${pData.description ? `<div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Bio</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">${pData.description.substring(0, 200)}</div>
+                </div>` : ''}
+            </div>`;
+        } catch(e) {
+            container.innerHTML = `<div style="animation:fadeInUp .3s ease;">
+                <div onclick="Overlay.loadGSG9()" style="cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;">← Zurück</div>
+                <div style="text-align:center;padding:20px;color:#ff6b6b;font-size:11px;">Fehler: ${e.message}</div>
+            </div>`;
+        }
+    }
+
+    // Expose loadGSG9 for back-button
+    function _loadGSG9Public() { loadGSG9(); }
+
+    return { init, toggleCmd, toggleModSlide, toggleModPanel, toggleModPin, searchModUser, selectModUser, clearModUser, pickModAction, sendModAction, _handleModImage, _clearModImage, togglePanelPin, toggleOverlayVisibility, openHistoryDetail, closeHistoryDetail, toggleSettings, applySetting, pickColor, resetSettings, toggleGSG9, loadGSG9: _loadGSG9Public, _showGSG9Profile, getRobloxUsername: () => robloxUsername, getDiscordId: () => discordId, getUsername: () => voiceUsername };
 })();
 
 // ══════════════════════════════════════════════

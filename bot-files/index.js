@@ -1398,6 +1398,7 @@ const apiServer = http.createServer(async (req, res) => {
                 { id: '1419353950234083480', name: 'GSG9 Chief' },
                 { id: '1405963717199527998', name: 'GSG9 Trial' },
             ];
+            const GSG9_ON_DUTY_ROLE = '1419050043822047375';
 
             const teams = GSG9_ROLES.map(r => {
                 const role = guild.roles.cache.get(r.id);
@@ -1405,12 +1406,19 @@ const apiServer = http.createServer(async (req, res) => {
                 return {
                     name: role.name || r.name,
                     color: role.hexColor !== '#000000' ? role.hexColor : '#5B9AFF',
-                    members: role.members.map(m => ({
-                        discordId: m.id,
-                        username: m.displayName || m.user.username,
-                        avatar: m.user.displayAvatarURL({ size: 64 }),
-                        status: m.presence?.status || 'offline',
-                    }))
+                    members: role.members.map(m => {
+                        const onDuty = m.roles.cache.has(GSG9_ON_DUTY_ROLE);
+                        // Roblox-Link prüfen
+                        const robloxId = robloxLinks.get(m.id) || null;
+                        return {
+                            discordId: m.id,
+                            username: m.displayName || m.user.username,
+                            avatar: m.user.displayAvatarURL({ size: 64 }),
+                            status: m.presence?.status || 'offline',
+                            onDuty,
+                            robloxId,
+                        };
+                    })
                 };
             });
 
