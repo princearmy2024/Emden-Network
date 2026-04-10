@@ -875,6 +875,17 @@
                                 <div id="togglePerfMode" class="toggle-switch" onclick="App.togglePerfMode(this)"><div></div></div>
                             </div>
 
+                            <!-- MONITOR AUSWAHL -->
+                            <div class="setting-row" id="monitorSelectRow">
+                                <div class="setting-info">
+                                    <div class="setting-name">Overlay-Monitor</div>
+                                    <div class="setting-desc">Auf welchem Bildschirm das Ingame-Overlay angezeigt wird</div>
+                                </div>
+                                <select id="overlayDisplaySelect" class="input-field" style="width:220px;font-size:11px;padding:6px 8px;cursor:pointer;" onchange="App.setOverlayDisplay(this.value)">
+                                    <option value="">Wird geladen...</option>
+                                </select>
+                            </div>
+
                             <!-- SOUND ALERTS KATEGORIE -->
                             <h3 class="settings-title" style="margin-top:16px;">Sound Alerts</h3>
                             <div class="setting-row">

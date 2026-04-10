@@ -77,6 +77,12 @@ const Overlay = (() => {
         document.body.style.opacity   = '1';
         document.body.style.transition = 'opacity 0.8s ease';
 
+        // Performance Mode aus Dashboard-Settings uebernehmen
+        if (localStorage.getItem('perf_mode') === 'true') {
+            document.body.classList.add('perf-mode');
+            document.body.style.transition = 'none';
+        }
+
         // Start: GAR NICHTS — kein Intro, kein Watermark, kein Overlay
         if (isAdmin) document.body.classList.add('is-admin');
         if (isStaff || isAdmin) document.body.classList.add('is-staff');
@@ -572,11 +578,13 @@ const Overlay = (() => {
             overlayHidden = true;
         } else {
             if (!introPlayed) {
-                // Startsound nur beim ersten Mal (mit Intro zusammen)
-                try {
-                    const snd = document.getElementById('ovStartSound');
-                    if (snd) { snd.currentTime = 0; snd.volume = 0.4; snd.play().catch(() => {}); }
-                } catch(e) {}
+                // Startsound nur beim ersten Mal (mit Intro zusammen) — nicht im Perf Mode
+                if (!document.body.classList.contains('perf-mode')) {
+                    try {
+                        const snd = document.getElementById('ovStartSound');
+                        if (snd) { snd.currentTime = 0; snd.volume = 0.4; snd.play().catch(() => {}); }
+                    } catch(e) {}
+                }
                 introPlayed = true;
                 document.body.classList.remove('watermark-visible');
                 playIntro(() => {
@@ -1266,6 +1274,13 @@ const Overlay = (() => {
     function playIntro(onComplete) {
         const intro = document.getElementById('intro-overlay');
         if (!intro) { onComplete(); return; }
+
+        // Performance Mode: Intro komplett ueberspringen
+        if (document.body.classList.contains('perf-mode')) {
+            intro.classList.add('gone');
+            onComplete();
+            return;
+        }
 
         // Username setzen
         const usernameEl = document.getElementById('introUsername');

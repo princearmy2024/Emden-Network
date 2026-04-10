@@ -437,13 +437,27 @@ ipcMain.on('start-roblox-callback-server', (event, { botCallbackUrl }) => {
 });
 
 // === ROBLOX GAME OVERLAY ===
+const OVERLAY_DISPLAY_FILE = path.join(app.getPath('userData'), 'overlay-display.json');
+
+function getSelectedDisplay() {
+    try {
+        const data = JSON.parse(fs.readFileSync(OVERLAY_DISPLAY_FILE, 'utf8'));
+        const all = screen.getAllDisplays();
+        const found = all.find(d => d.id === data.displayId);
+        if (found) return found;
+    } catch(_) {}
+    return screen.getPrimaryDisplay();
+}
+
 function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
     if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
         robloxOverlayWin.close();
     }
-    const { width, height } = screen.getPrimaryDisplay().size;
+    const selectedDisplay = getSelectedDisplay();
+    const { width, height } = selectedDisplay.size;
+    const { x, y } = selectedDisplay.bounds;
     robloxOverlayWin = new BrowserWindow({
-        width: width, height: height, x: 0, y: 0,
+        width: width, height: height, x: x, y: y,
         transparent: true, frame: false,
         titleBarStyle: 'hidden', type: 'toolbar', // Extra Sicherheitsnetze für Frameless
         backgroundColor: '#00000000',
@@ -470,9 +484,11 @@ function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
     });
     
     robloxOverlayWin.once('ready-to-show', () => {
-        // Exakt den vollen Bildschirm abdecken (inkl. Taskbar-Bereich)
-        const { width: sw, height: sh } = screen.getPrimaryDisplay().size;
-        robloxOverlayWin.setBounds({ x: 0, y: 0, width: sw, height: sh });
+        // Exakt den vollen Bildschirm des gewaehlten Monitors abdecken
+        const disp = getSelectedDisplay();
+        const { x: dx, y: dy } = disp.bounds;
+        const { width: sw, height: sh } = disp.size;
+        robloxOverlayWin.setBounds({ x: dx, y: dy, width: sw, height: sh });
         robloxOverlayWin.show();
     });
 }
@@ -597,6 +613,26 @@ ipcMain.on('hide-roblox-overlay', () => {
         robloxOverlayWin.close();
         robloxOverlayWin = null;
     }
+});
+
+// Monitor-Auswahl fuer Overlay
+ipcMain.handle('get-displays', () => {
+    const all = screen.getAllDisplays();
+    const primary = screen.getPrimaryDisplay();
+    let savedId = null;
+    try { savedId = JSON.parse(fs.readFileSync(OVERLAY_DISPLAY_FILE, 'utf8')).displayId; } catch(_) {}
+    return all.map((d, i) => ({
+        id: d.id,
+        label: `Monitor ${i + 1}` + (d.id === primary.id ? ' (Hauptbildschirm)' : '') + ` — ${d.size.width}x${d.size.height}`,
+        width: d.size.width,
+        height: d.size.height,
+        primary: d.id === primary.id,
+        selected: savedId ? d.id === savedId : d.id === primary.id,
+    }));
+});
+ipcMain.on('set-overlay-display', (event, displayId) => {
+    fs.writeFileSync(OVERLAY_DISPLAY_FILE, JSON.stringify({ displayId }), 'utf8');
+    console.log(`[Overlay] Display gesetzt: ${displayId}`);
 });
 
 // Focus toggle for F3 command bar

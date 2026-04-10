@@ -754,6 +754,14 @@ const App = window.App = {
     async runSplash() {
         const bar = document.getElementById('loaderBar');
         const status = document.getElementById('loaderStatus');
+
+        // Performance Mode: Splash sofort durchspringen
+        if (localStorage.getItem('perf_mode') === 'true') {
+            if (bar) bar.style.width = '100%';
+            if (status) status.textContent = 'Bereit';
+            return;
+        }
+
         const steps = [
             [12, 'Systemprüfung...'],
             [28, 'Lade Module...'],
@@ -1983,6 +1991,8 @@ const App = window.App = {
             const el = document.getElementById('togglePerfMode');
             if (el) el.classList.add('on');
         }
+        // Monitor-Auswahl laden
+        this.loadDisplays();
         // Sound Alert Inputs
         ['sound_ticket', 'sound_support', 'sound_mention', 'sound_entry'].forEach(key => {
             const val = localStorage.getItem(key);
@@ -3687,6 +3697,28 @@ Object.assign(App, {
         document.body.classList.toggle('perf-mode', newVal);
         if (el) el.classList.toggle('on', newVal);
         NotificationService.show('Performance', newVal ? 'Performance-Modus aktiviert' : 'Performance-Modus deaktiviert', 'info');
+    },
+
+    async loadDisplays() {
+        try {
+            const displays = await window.electronAPI.getDisplays();
+            const sel = document.getElementById('overlayDisplaySelect');
+            if (!sel || !displays || displays.length < 2) {
+                // Nur 1 Monitor → Row verstecken
+                const row = document.getElementById('monitorSelectRow');
+                if (row) row.style.display = 'none';
+                return;
+            }
+            sel.innerHTML = displays.map(d =>
+                `<option value="${d.id}" ${d.selected ? 'selected' : ''}>${d.label}</option>`
+            ).join('');
+        } catch(e) { console.log('[App] Display-Liste nicht verfuegbar:', e.message); }
+    },
+
+    setOverlayDisplay(displayId) {
+        if (!displayId) return;
+        window.electronAPI.setOverlayDisplay(Number(displayId));
+        NotificationService.show('Monitor', 'Overlay-Monitor geaendert (gilt ab naechstem Overlay-Start)', 'info');
     },
 
     toggleNotifSetting(key, el) {
