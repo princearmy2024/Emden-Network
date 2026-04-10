@@ -4567,7 +4567,7 @@ const ModPanel = {
             return `<div class="mod-lb-item">
                 <span class="mod-lb-rank">#${i + 1}</span>
                 ${avatar}
-                <span class="mod-lb-name">${this._escHtml(e.username || '?')}</span>
+                <span class="mod-lb-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;">${this._escHtml(e.username || '?')}</span>
                 <span class="mod-lb-time">${this._formatMs(e.totalMs)}</span>
                 ${crown}
             </div>`;
@@ -4776,7 +4776,7 @@ const ModPanel = {
         list.innerHTML = staff.map(s => {
             const initial = (s.username || '?')[0].toUpperCase();
             const avatarInner = s.avatar
-                ? `<img src="${this._escHtml(s.avatar)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center">${initial}</span>`
+                ? `<img src="${this._escHtml(s.avatar)}${s.avatar.includes('?') ? '&' : '?'}t=${Math.floor(Date.now()/3600000)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center">${initial}</span>`
                 : initial;
             const topRole = s.roles?.[0] || 'On Duty';
 
@@ -4801,10 +4801,10 @@ const ModPanel = {
 
             return `<div class="mod-staff-item">
                 <div class="mod-staff-avatar">${avatarInner}</div>
-                <div class="mod-staff-info">
-                    <span class="mod-staff-name">
+                <div class="mod-staff-info" style="min-width:0;overflow:hidden;">
+                    <span class="mod-staff-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         <span class="mod-staff-dot ${dotClass}"></span>
-                        ${this._escHtml(s.displayName || s.username || '?')}
+                        <span style="overflow:hidden;text-overflow:ellipsis;">${this._escHtml(s.displayName || s.username || '?')}</span>
                         ${statusBadge}
                         ${streakHtml}
                     </span>
