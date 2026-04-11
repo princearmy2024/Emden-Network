@@ -389,17 +389,32 @@ ipcMain.on('start-app-update', (event, { url }) => {
                     event.sender.send('update_downloaded');
                     
                     setTimeout(() => {
-                        console.log('[Update] Raeume Hintergrund-Prozesse auf...');
-                        try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
-                        try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.close(); robloxOverlayWin = null; } } catch(_) {}
-                        try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.close(); overlayWindow = null; } } catch(_) {}
+                        console.log('[Update] Raeume ALLE Hintergrund-Prozesse auf...');
+                        // 1. Alle Shortcuts deregistrieren
                         globalShortcut.unregisterAll();
-                        console.log('[Update] Starte Installer und beende App...');
+                        // 2. Callback-Server beenden
+                        try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
+                        // 3. Alle BrowserWindows schliessen
+                        try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.destroy(); robloxOverlayWin = null; } } catch(_) {}
+                        try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.destroy(); overlayWindow = null; } } catch(_) {}
+                        try { if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.destroy(); mainWindow = null; } } catch(_) {}
+                        // 4. Alle uebrigen Fenster schliessen (falls es noch welche gibt)
+                        BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch(_) {} });
+                        console.log('[Update] Alle Fenster geschlossen. Starte Installer...');
+                        // 5. Installer starten + App sofort beenden
                         shell.openPath(tempPath).then(() => {
+                            console.log('[Update] Installer gestartet, beende App...');
                             app.exit(0);
                         }).catch(err => {
                             console.error('[Update] Installer konnte nicht gestartet werden:', err);
+                            // Trotzdem beenden damit keine Geisterprozesse bleiben
+                            app.exit(1);
                         });
+                        // 6. Sicherheitsnetz: Falls nach 3s immer noch am Leben → hart beenden
+                        setTimeout(() => {
+                            console.log('[Update] Sicherheitsnetz: process.exit()');
+                            process.exit(0);
+                        }, 3000);
                     }, 500);
                 });
             });
@@ -1004,24 +1019,12 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
     app.isQuitting = true;
     // Alle Hintergrund-Prozesse sauber beenden
-    try {
-        if (robloxCallbackServer && robloxCallbackServer.listening) {
-            robloxCallbackServer.close();
-            robloxCallbackServer = null;
-        }
-    } catch(_) {}
-    try {
-        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-            robloxOverlayWin.close();
-            robloxOverlayWin = null;
-        }
-    } catch(_) {}
-    try {
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.close();
-            overlayWindow = null;
-        }
-    } catch(_) {}
+    globalShortcut.unregisterAll();
+    try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
+    try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.destroy(); robloxOverlayWin = null; } } catch(_) {}
+    try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.destroy(); overlayWindow = null; } } catch(_) {}
+    // Alle uebrigen Fenster zerstoeren
+    BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch(_) {} });
 });
 
 app.on('will-quit', () => {
