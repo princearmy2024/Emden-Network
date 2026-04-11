@@ -329,7 +329,7 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
   position: fixed;
   bottom: 0;
   right: clamp(280px, 20vw, 400px);
-  padding: 18px 28px 12px;
+  padding: clamp(10px, 1.3vw, 18px) clamp(16px, 2vw, 28px) clamp(6px, 0.8vw, 12px);
   border-radius: 14px 14px 0 0;
   background: linear-gradient(to top, rgba(6, 8, 18, 0.5) 0%, rgba(8, 14, 32, 0.2) 50%, transparent 100%);
   display: none;
@@ -1254,11 +1254,11 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 /* iOS-style Glass Notification — fade to transparent at bottom */
 .ov-mod-notif {
     position: fixed;
-    top: 65px;
+    top: clamp(40px, 5vh, 65px);
     left: 50%;
     transform: translateX(-50%) translateY(-120px);
     z-index: 9999;
-    width: 420px;
+    width: clamp(300px, 28vw, 420px);
     max-width: 88vw;
     opacity: 0;
     pointer-events: none;
@@ -1284,8 +1284,8 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 .ov-mod-notif-inner {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 20px 28px;
+    gap: clamp(8px, 1vw, 14px);
+    padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.4vw, 20px) clamp(18px, 2vw, 28px);
     background: rgba(12,14,30,0.55);
     backdrop-filter: blur(60px) saturate(1.8);
     -webkit-backdrop-filter: blur(60px) saturate(1.8);
@@ -1297,7 +1297,7 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.2) 10%, rgba(0,0,0,0.6) 25%, black 50%, black 100%);
 }
 .ov-mod-notif-icon {
-    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+    width: clamp(30px, 2.8vw, 40px); height: clamp(30px, 2.8vw, 40px); border-radius: clamp(8px, 0.8vw, 12px); flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     color: var(--text-main);
 }
@@ -1306,15 +1306,15 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 .ov-mod-notif-icon.ban  { background: rgba(239,68,68,0.15); color: #ef4444; }
 .ov-mod-notif-body { flex: 1; min-width: 0; }
 .ov-mod-notif-action {
-    font-size: 15px; font-weight: 800; color: #fff;
+    font-size: clamp(12px, 1vw, 15px); font-weight: 800; color: #fff;
     margin-bottom: 2px; letter-spacing: -0.01em;
 }
 .ov-mod-notif-text {
-    font-size: 12px; color: rgba(255,255,255,0.45);
+    font-size: clamp(10px, 0.8vw, 12px); color: rgba(255,255,255,0.45);
     line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ov-mod-notif-badge {
-    padding: 4px 10px; border-radius: 8px; font-size: 9px;
+    padding: clamp(3px, 0.3vw, 4px) clamp(6px, 0.6vw, 10px); border-radius: 8px; font-size: clamp(7px, 0.55vw, 9px);
     font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     flex-shrink: 0;
 }
@@ -1394,9 +1394,9 @@ body.overlay-active #panelPanic { pointer-events: auto; }
     backdrop-filter: blur(40px);
     border: 2px solid rgba(239,68,68,0.4);
     border-radius: 24px;
-    padding: 40px 56px;
+    padding: clamp(24px, 3vw, 40px) clamp(32px, 4vw, 56px);
     text-align: center;
-    max-width: 440px;
+    max-width: clamp(320px, 30vw, 440px);
     box-shadow: 0 0 80px rgba(239,68,68,0.15), 0 24px 64px rgba(0,0,0,0.6);
     animation: panicCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1414,29 +1414,29 @@ body.overlay-active #panelPanic { pointer-events: auto; }
     50% { transform: scale(1.1); }
 }
 .panic-alert-title {
-    font-size: 28px; font-weight: 900; color: #ef4444;
+    font-size: clamp(18px, 2vw, 28px); font-weight: 900; color: #ef4444;
     letter-spacing: 0.15em; margin-bottom: 8px;
 }
 .panic-alert-user {
-    font-size: 20px; font-weight: 800; color: #fff;
+    font-size: clamp(14px, 1.4vw, 20px); font-weight: 800; color: #fff;
     margin-bottom: 4px;
 }
 .panic-alert-sub {
-    font-size: 13px; color: rgba(255,255,255,0.45);
+    font-size: clamp(10px, 0.9vw, 13px); color: rgba(255,255,255,0.45);
     margin-bottom: 12px;
 }
 .panic-alert-timer {
-    font-size: 28px; font-weight: 900; color: rgba(239,68,68,0.7);
+    font-size: clamp(18px, 2vw, 28px); font-weight: 900; color: rgba(239,68,68,0.7);
     font-family: var(--font-mono);
-    margin-bottom: 20px;
+    margin-bottom: clamp(12px, 1.5vw, 20px);
     letter-spacing: 0.05em;
 }
 .panic-alert-buttons {
     display: flex; flex-direction: column; gap: 10px;
 }
 .panic-alert-btn {
-    width: 100%; padding: 14px; border-radius: 14px;
-    font-size: 14px; font-weight: 700; border: none;
+    width: 100%; padding: clamp(10px, 1vw, 14px); border-radius: clamp(10px, 1vw, 14px);
+    font-size: clamp(11px, 1vw, 14px); font-weight: 700; border: none;
     cursor: pointer; display: flex; align-items: center;
     justify-content: center; gap: 10px;
     transition: all 0.2s; pointer-events: auto;
