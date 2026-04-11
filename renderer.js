@@ -1087,6 +1087,11 @@ const App = window.App = {
         if (view === 'moderation') {
             ModPanel.init();
         }
+
+        // Speicher-Statistik laden wenn Admin-View geoeffnet
+        if (view === 'admin') {
+            this.loadStorageStats();
+        }
     },
 
     renderFullUserList(onlineUsers) {
@@ -3749,6 +3754,38 @@ Object.assign(App, {
         if (!displayId) return;
         window.electronAPI.setOverlayDisplay(Number(displayId));
         NotificationService.show('Monitor', 'Overlay-Monitor geaendert (gilt ab naechstem Overlay-Start)', 'info');
+    },
+
+    async loadStorageStats() {
+        const el = document.getElementById('storageStats');
+        if (!el) return;
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/storage`, {
+                headers: { 'x-api-key': CONFIG.API_KEY }
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            el.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;">
+                    <div><span style="color:var(--text-muted);">Gesamt-Speicher:</span> <strong style="color:#fff;">${data.total.display}</strong></div>
+                    <div><span style="color:var(--text-muted);">RAM (Heap):</span> <strong style="color:#fff;">${data.memory.heapUsed}</strong></div>
+                    <div><span style="color:var(--text-muted);">Mod-Eintraege:</span> <strong style="color:#fff;">${data.counts.modEntries}</strong> <span style="color:var(--text-muted);">(${data.counts.modUsers} User)</span></div>
+                    <div><span style="color:var(--text-muted);">Beweis-Bilder:</span> <strong style="color:#fff;">${data.counts.evidenceStore}</strong> <span style="color:var(--text-muted);">(im RAM)</span></div>
+                    <div><span style="color:var(--text-muted);">Roblox-Links:</span> <strong style="color:#fff;">${data.counts.robloxLinks}</strong></div>
+                    <div><span style="color:var(--text-muted);">Bekannte User:</span> <strong style="color:#fff;">${data.counts.knownUsers}</strong></div>
+                    <div><span style="color:var(--text-muted);">Aktive Shifts:</span> <strong style="color:#fff;">${data.counts.shifts}</strong></div>
+                    <div><span style="color:var(--text-muted);">Streaks:</span> <strong style="color:#fff;">${data.counts.streaks}</strong></div>
+                    <div><span style="color:var(--text-muted);">Bot-Uptime:</span> <strong style="color:#fff;">${data.uptime}</strong></div>
+                    <div><span style="color:var(--text-muted);">RAM (RSS):</span> <strong style="color:#fff;">${data.memory.rss}</strong></div>
+                </div>
+                <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+                    ${data.files.map(f => `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">${f.desc}</span><span style="color:#fff;">${f.display}</span></div>`).join('')}
+                </div>
+            `;
+        } catch(e) {
+            el.innerHTML = `<span style="color:var(--text-muted);">Fehler: ${e.message}</span>`;
+        }
     },
 
     toggleNotifSetting(key, el) {

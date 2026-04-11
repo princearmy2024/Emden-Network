@@ -1315,6 +1315,16 @@
                                 onclick="App.showNotification('Admin','Diese Funktion wird bald verfügbar','info')">Öffnen</button>
                         </div>
                     </div>
+
+                    <!-- Speicher-Statistik -->
+                    <div class="admin-card" id="storageCard" style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-top:20px;">
+                        <div class="admin-card-title" style="margin-bottom:12px;">Speicher & Datenbank</div>
+                        <div id="storageStats" style="font-size:12px; color:var(--text-secondary); line-height:2;">
+                            <span style="color:var(--text-muted);">Lade Speicher-Statistik...</span>
+                        </div>
+                        <button class="btn btn-ghost" style="margin-top:10px;" onclick="App.loadStorageStats()">Aktualisieren</button>
+                    </div>
+
                 </div> <!-- Ende von view-admin -->
 
             </div><!-- /view-container -->

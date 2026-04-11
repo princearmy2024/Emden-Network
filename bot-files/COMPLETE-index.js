@@ -2127,6 +2127,60 @@ const apiServer = http.createServer(async (req, res) => {
         }); return;
     }
 
+    // GET /api/storage — Speicher-Statistik aller Daten
+    if (req.method === "GET" && url.pathname === "/api/storage") {
+        try {
+            const dataDir = path.join(path.resolve(), "data");
+            const files = [
+                { name: 'modHistory.json', path: MOD_HISTORY_FILE, desc: 'Mod-Eintraege' },
+                { name: 'shifts.json', path: SHIFT_FILE, desc: 'Shift-Daten' },
+                { name: 'shiftLeaderboard.json', path: SHIFT_LEADERBOARD_FILE, desc: 'Shift-Rangliste' },
+                { name: 'streaks.json', path: STREAK_FILE, desc: 'Streak-Daten' },
+                { name: 'robloxLinks.json', path: LINKS_FILE, desc: 'Roblox-Verknuepfungen' },
+                { name: 'allUsers.json', path: ALL_USERS_FILE, desc: 'User-Registry' },
+            ];
+
+            let totalBytes = 0;
+            const details = files.map(f => {
+                let size = 0;
+                try { if (fs.existsSync(f.path)) size = fs.statSync(f.path).size; } catch(_) {}
+                totalBytes += size;
+                return { name: f.name, desc: f.desc, bytes: size, display: size < 1024 ? `${size} B` : size < 1048576 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1048576).toFixed(2)} MB` };
+            });
+
+            // Zaehler
+            let totalEntries = 0;
+            let totalUsers = 0;
+            for (const entries of Object.values(modHistory)) totalEntries += entries.length;
+            totalUsers = Object.keys(modHistory).length;
+
+            res.writeHead(200);
+            return res.end(JSON.stringify({
+                success: true,
+                total: { bytes: totalBytes, display: totalBytes < 1048576 ? `${(totalBytes / 1024).toFixed(1)} KB` : `${(totalBytes / 1048576).toFixed(2)} MB` },
+                files: details,
+                counts: {
+                    modEntries: totalEntries,
+                    modUsers: totalUsers,
+                    shifts: Object.keys(shiftData).length,
+                    streaks: Object.keys(streakData).length,
+                    robloxLinks: robloxLinks.size,
+                    knownUsers: allKnownUsers.size,
+                    evidenceStore: global._evidenceStore?.size || 0,
+                },
+                memory: {
+                    heapUsed: `${(process.memoryUsage().heapUsed / 1048576).toFixed(1)} MB`,
+                    heapTotal: `${(process.memoryUsage().heapTotal / 1048576).toFixed(1)} MB`,
+                    rss: `${(process.memoryUsage().rss / 1048576).toFixed(1)} MB`,
+                },
+                uptime: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`,
+            }));
+        } catch(e) {
+            res.writeHead(500);
+            return res.end(JSON.stringify({ error: e.message }));
+        }
+    }
+
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
     if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
         const robloxId = url.searchParams.get("robloxId");
