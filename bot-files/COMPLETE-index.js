@@ -2541,12 +2541,11 @@ async function updateBotStatus(ci) {
 }
 
 // ================================================================
-// 🚀 GITHUB RELEASE MONITOR
+// 🚀 GITHUB RELEASE MONITOR (Components V2 — direkt via Bot)
 // ================================================================
 const GITHUB_OWNER = 'princearmy2024';
 const GITHUB_REPO  = 'Emden-Network';
-const UPDATE_WEBHOOK_URL = process.env.UPDATE_WEBHOOK_URL ||
-    'https://discord.com/api/webhooks/1488902385786028084/MNd5QLJOThjoA8JZP2LDr2l3-dDzzQVCz4pCqCsMTEVVjIwnMfmqmlyvHXeSosXwOZPc';
+const UPDATE_CHANNEL_ID = '1488902141912559716'; // Channel fuer Update-Nachrichten
 
 let lastKnownTag = null;
 
@@ -2569,43 +2568,84 @@ async function checkGithubRelease() {
 
         lastKnownTag = release.tag_name;
         const version = release.tag_name.replace('v', '');
-        const notes = (release.body || 'Keine Änderungen angegeben.')
-            .split('\n').slice(0, 8).join('\n').trim();
-        const avatarUrl   = `https://github.com/${GITHUB_OWNER}.png`;
-        const now         = new Date();
-        const dateStr     = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dateStr = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-        const payload = JSON.stringify({
-            username:   'Emden Network Updates',
-            avatar_url: avatarUrl,
-            embeds: [{
-                author: {
-                    name:     'Neues Update veröffentlicht',
-                    icon_url: avatarUrl
-                },
-                title:       `⬆️  Emden Network Control Center — ${release.tag_name}`,
-                description: '> Eine neue Version ist verfügbar. Bitte aktualisiere dein Dashboard.',
-                color:       0x0088FF,
-                fields: [
-                    { name: '📦  Version',   value: `\`${version}\``,  inline: true  },
-                    { name: '✅  Status',    value: '`Stabil`',         inline: true  },
-                    { name: '📅  Datum',     value: `\`${dateStr}\``,   inline: true  },
-                    { name: '📝  Änderungen', value: notes.length > 0 ? `\`\`\`\n${notes}\n\`\`\`` : '_Keine Beschreibung_', inline: false }
-                ],
-                footer: {
-                    text:     'Emden Network • Control Center',
-                    icon_url: avatarUrl
-                },
-                timestamp: now.toISOString()
-            }]
+        // Commit-Messages seit letztem Tag holen (was genau geaendert wurde)
+        let changes = [];
+        try {
+            const commitsRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?per_page=15`, {
+                headers: { 'User-Agent': 'EmdenNetwork-Bot' }
+            });
+            if (commitsRes.ok) {
+                const commits = await commitsRes.json();
+                // Commits bis zum vorherigen Tag sammeln
+                for (const c of commits) {
+                    const msg = c.commit?.message?.split('\n')[0] || '';
+                    if (msg.includes('Co-Authored-By')) continue; // Skip co-author lines
+                    if (msg.length < 3) continue;
+                    changes.push(msg);
+                    // Stoppe beim vorherigen Release
+                    if (c.commit?.message?.includes(lastKnownTag)) break;
+                    if (changes.length >= 8) break;
+                }
+            }
+        } catch(_) {}
+
+        // Fallback auf Release-Body wenn keine Commits
+        if (changes.length === 0) {
+            const body = release.body || '';
+            changes = body.split('\n').filter(l => l.trim().length > 2).slice(0, 8);
+        }
+
+        const changeText = changes.length > 0
+            ? changes.map(c => `> ${c.replace(/^[-*•]\s*/, '')}`).join('\n')
+            : '> Keine Details verfuegbar';
+
+        // Components V2 Container
+        const channel = await client.channels.fetch(UPDATE_CHANNEL_ID).catch(() => null);
+        if (!channel) {
+            console.error('[Update] Update-Channel nicht gefunden:', UPDATE_CHANNEL_ID);
+            return;
+        }
+
+        const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+
+        const container = new ContainerBuilder()
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`# Emden Network Control Center — ${release.tag_name}`)
+            )
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(
+                    `**Version** · \`${version}\`\n` +
+                    `**Status** · Stabil\n` +
+                    `**Datum** · ${dateStr}`
+                )
+            )
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`**Aenderungen**\n${changeText}`)
+            )
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setLabel('Download')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/${release.tag_name}`)
+                )
+            )
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`-# Emden Network • Control Center · <t:${Math.floor(Date.now()/1000)}:R>`)
+            );
+
+        await channel.send({
+            components: [container],
+            flags: MessageFlags.IsComponentsV2
         });
 
-        await fetch(UPDATE_WEBHOOK_URL, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    payload
-        });
-        console.log(`[Update] ✅ Discord-Benachrichtigung gesendet für ${release.tag_name}`);
+        console.log(`[Update] ✅ Update-Nachricht gesendet fuer ${release.tag_name}`);
     } catch (e) {
         console.error('[Update] Fehler beim GitHub-Check:', e.message);
     }
