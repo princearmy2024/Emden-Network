@@ -2545,7 +2545,7 @@ async function updateBotStatus(ci) {
 // ================================================================
 const GITHUB_OWNER = 'princearmy2024';
 const GITHUB_REPO  = 'Emden-Network';
-const UPDATE_CHANNEL_ID = '1488902141912559716'; // Channel fuer Update-Nachrichten
+const UPDATE_CHANNEL_ID = '1487189134799011873'; // Channel fuer Update-Nachrichten
 
 let lastKnownTag = null;
 
