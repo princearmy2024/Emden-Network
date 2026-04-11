@@ -242,10 +242,24 @@ const gsg9VerifyCommand = new SlashCommandBuilder()
     .setDescription("Verknüpfe deinen Roblox-Account mit dem GSG9 Panel")
     .addStringOption(opt => opt.setName("roblox_username").setDescription("Dein Roblox Benutzername").setRequired(true));
 
+const moderateCommand = new SlashCommandBuilder()
+    .setName("moderate")
+    .setDescription("Erstelle einen Moderations-Eintrag fuer einen User")
+    .addStringOption(opt => opt.setName("user").setDescription("Roblox Benutzername oder User-ID").setRequired(true).setAutocomplete(true))
+    .addStringOption(opt => opt.setName("punishment").setDescription("Art der Bestrafung").setRequired(true)
+        .addChoices(
+            { name: 'Warn', value: 'Warn' },
+            { name: 'Kick', value: 'Kick' },
+            { name: 'Ban', value: 'Ban' },
+            { name: '1-Day Ban', value: 'One Day Ban' },
+            { name: 'Notiz', value: 'Notiz' },
+        ))
+    .addStringOption(opt => opt.setName("reason").setDescription("Grund fuer die Bestrafung").setRequired(true));
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -485,6 +499,46 @@ client.on("interactionCreate", async interaction => {
     }
 
     // ============================================
+    // 🔍 AUTOCOMPLETE: /moderate user
+    // ============================================
+    if (interaction.isAutocomplete() && interaction.commandName === 'moderate') {
+        const focused = interaction.options.getFocused(true);
+        if (focused.name === 'user') {
+            const query = focused.value.trim();
+            if (!query || query.length < 2) {
+                return interaction.respond([]).catch(() => {});
+            }
+            try {
+                // Prüfe ob es eine User-ID ist (nur Zahlen)
+                if (/^\d+$/.test(query)) {
+                    const res = await fetch(`https://users.roblox.com/v1/users/${query}`).catch(() => null);
+                    if (res?.ok) {
+                        const user = await res.json();
+                        return interaction.respond([
+                            { name: `${user.displayName} (@${user.name}) — ID: ${user.id}`, value: String(user.id) }
+                        ]).catch(() => {});
+                    }
+                }
+                // Username-Suche
+                const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
+                });
+                const searchData = await searchRes.json();
+                const results = (searchData.data || []).map(u => ({
+                    name: `${u.displayName} (@${u.name}) — ID: ${u.id}`,
+                    value: String(u.id)
+                })).slice(0, 10);
+                return interaction.respond(results).catch(() => {});
+            } catch(e) {
+                return interaction.respond([]).catch(() => {});
+            }
+        }
+        return;
+    }
+
+    // ============================================
     // ⚡ SLASH COMMANDS
     // ============================================
     if (!interaction.isChatInputCommand()) return;
@@ -579,6 +633,228 @@ client.on("interactionCreate", async interaction => {
             });
         } catch(e) {
             console.error('[GSG9 Verify] Fehler:', e.message);
+            const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
+        }
+        return;
+    }
+
+    // /moderate — Mod-Eintrag direkt ueber Discord erstellen (nur EN Team)
+    if (interaction.commandName === "moderate") {
+        try {
+            // Staff-Check: Nur EN Team darf moderieren
+            const EN_TEAM_ROLE_ID = "1365083291044282389";
+            const modGuild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const modMember = await modGuild.members.fetch(interaction.user.id).catch(() => null);
+            if (!modMember || !modMember.roles.cache.has(EN_TEAM_ROLE_ID)) {
+                return interaction.reply({ content: '❌ Nur EN Team-Mitglieder koennen diesen Command nutzen.', ephemeral: true });
+            }
+
+            await interaction.deferReply({ ephemeral: true });
+
+            const robloxUserId = interaction.options.getString('user');
+            const action = interaction.options.getString('punishment');
+            const reason = interaction.options.getString('reason');
+            const moderatorName = interaction.user.displayName || interaction.user.username;
+
+            // Roblox User-Daten holen
+            const rblxRes = await fetch(`https://users.roblox.com/v1/users/${robloxUserId}`);
+            if (!rblxRes.ok) {
+                return interaction.editReply({ content: '❌ Roblox-User nicht gefunden.' });
+            }
+            const rblxUser = await rblxRes.json();
+            const username = rblxUser.name;
+            const displayName = rblxUser.displayName || username;
+            const created = new Date(rblxUser.created).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            // Avatar holen
+            let avatar = null;
+            try {
+                const avRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxUserId}&size=150x150&format=Png`);
+                const avData = await avRes.json();
+                avatar = avData.data?.[0]?.imageUrl || null;
+            } catch(_) {}
+
+            // Emojis
+            const actionEmojis = {
+                'Ban':         { text: '<:Ban:1490446877785854163>',        id: '1490446877785854163', name: 'Ban' },
+                'One Day Ban': { text: '<:OneDayBan:1490448467498373280>',  id: '1490448467498373280', name: 'OneDayBan' },
+                'Kick':        { text: '<:Kick:1490450344663322727>',       id: '1490450344663322727', name: 'Kick' },
+                'Warn':        { text: '<:Warn:1490447092584288336>',       id: '1490447092584288336', name: 'Warn' },
+                'Notiz':       { text: '<:notizblock:1490444362365272064>', id: '1490444362365272064', name: 'notizblock' },
+            };
+            const getActionEmoji = (a) => actionEmojis[a] || actionEmojis['Warn'];
+            const emoji = getActionEmoji(action).text;
+
+            // Moderator Rang
+            const rankEmojis = {
+                'projektleitung': '<:Projektleitung:1489311699625578666>',
+                'stv. projektleitung': '<:StvPrpjektleitung:1489311731950944559>',
+                'management': '<:Manager:1489311838016635151>',
+                'manager': '<:Manager:1489311838016635151>',
+                'teamleitung': '<:Teamleitung:1489312932415410237>',
+                'stv. teamleitung': '<:StvTeamleitung:1489312944574435458>',
+                'sen. admin': '<:Administration:1489312566030110721>',
+                'admin': '<:Administration:1489312566030110721>',
+                'administrator': '<:Administration:1489312566030110721>',
+                'jun. admin': '<:Administration:1489312566030110721>',
+                'sen. mod': '<:Moderation:1489312529254449353>',
+                'moderator': '<:Moderation:1489312529254449353>',
+                'mod': '<:Moderation:1489312529254449353>',
+                'trial mod': '<:Trialmoderation:1489312502088073308>',
+                'trial moderator': '<:Trialmoderation:1489312502088073308>',
+            };
+            let modRankEmoji = '<:Trialmoderation:1489312502088073308>';
+            let modRankName = 'Moderator';
+            try {
+                const guild = client.guilds.cache.get(GUILD_ID);
+                if (guild) {
+                    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+                    if (member) {
+                        const roles = member.roles.cache.sort((a, b) => b.position - a.position);
+                        for (const [, role] of roles) {
+                            const roleLower = role.name.toLowerCase();
+                            for (const [key, emojiVal] of Object.entries(rankEmojis)) {
+                                if (roleLower.includes(key)) { modRankEmoji = emojiVal; modRankName = role.name; break; }
+                            }
+                            if (modRankName !== 'Moderator') break;
+                        }
+                    }
+                }
+            } catch(_) {}
+
+            // Mod-Avatar
+            const modAvatarUrl = interaction.user.displayAvatarURL({ size: 128, extension: 'png' });
+
+            // History speichern
+            const history = getModHistory(robloxUserId);
+            const entryNum = addModEntry(robloxUserId, {
+                action, reason: reason || 'Kein Grund', moderator: moderatorName, date: new Date().toISOString(),
+                displayName, modAvatar: modAvatarUrl
+            });
+            const prevCount = entryNum - 1;
+
+            // Container bauen (identisch zum API)
+            const MOD_CHANNEL_ID = "1367243128284905573";
+            const channel = await client.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
+            if (!channel) {
+                return interaction.editReply({ content: '❌ Mod-Kanal nicht gefunden.' });
+            }
+
+            const profileUrl = `https://www.roblox.com/users/${robloxUserId}/profile`;
+            const headerSection = new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName}`)
+                );
+            if (avatar) {
+                headerSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
+            }
+
+            const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+            const buttonRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setLabel('Roblox Profil')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(profileUrl)
+                    .setEmoji({ name: 'roblox', id: '1433535007246516446' })
+            );
+
+            const container = new ContainerBuilder()
+                .addSectionComponents(headerSection)
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `**User ID** · \`${robloxUserId}\`\n` +
+                        `**Display Name** · ${displayName}\n` +
+                        `**Username** · @${username}\n` +
+                        `**Account Created** · ${created}`
+                    )
+                )
+                .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
+            if (action === 'Notiz') {
+                container.addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Notiz**\n> ${reason || 'Keine Notiz'}`)
+                );
+            } else {
+                container.addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`<:notizblock:1490444362365272064> **Reason**\n> ${reason || 'Kein Grund'}`)
+                );
+                container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+                container.addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`**Punishment** · ${emoji} ${action}`)
+                );
+            }
+
+            container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+                .addActionRowComponents(buttonRow);
+
+            if (prevCount > 0) {
+                const historyLines = history.slice(-3).map((h) => {
+                    const hEmoji = getActionEmoji(h.action).text;
+                    const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    return `-# ${hEmoji} ${h.action} · ${h.reason} · ${hDate}`;
+                }).join('\n');
+                container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+                container.addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`📋 **Eintrag #${entryNum}** — ${prevCount} vorherige Bestrafung${prevCount > 1 ? 'en' : ''}\n${historyLines}`)
+                );
+            }
+
+            // Select-Menü
+            const allEntries = getModHistory(robloxUserId);
+            if (allEntries.length > 1) {
+                try {
+                    const offset = Math.max(0, allEntries.length - 25);
+                    const options = allEntries.slice(-25).map((h, i) => {
+                        const hE = getActionEmoji(h.action);
+                        const hDate = new Date(h.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        return {
+                            label: `#${offset + i + 1} ${h.action} — ${(h.reason || 'Kein Grund').slice(0, 50)}`.slice(0, 100),
+                            description: `von ${h.moderator || 'Unbekannt'} · ${hDate}`.slice(0, 100),
+                            value: `modentry_${robloxUserId}_${offset + i}`,
+                            emoji: { name: hE.name, id: hE.id }
+                        };
+                    });
+                    const selectMenu = new StringSelectMenuBuilder()
+                        .setCustomId(`mod_history_select_${robloxUserId}`)
+                        .setPlaceholder(`📋 Alle ${allEntries.length} Einträge anzeigen...`)
+                        .addOptions(options);
+                    container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+                    container.addActionRowComponents(new ActionRowBuilder().addComponents(selectMenu));
+                } catch(selectErr) { console.error('[Mod] Select-Menü Fehler:', selectErr.message); }
+            }
+
+            container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`-# ${modRankEmoji} ${modRankName}: @${moderatorName} · <t:${Math.floor(Date.now()/1000)}:R>`)
+                );
+
+            await channel.send({
+                components: [container],
+                flags: MessageFlags.IsComponentsV2
+            });
+
+            // Streak: Eintrag zaehlen
+            const streakUp = addStreakEntry(interaction.user.id);
+            if (streakUp) {
+                const st = getStreak(interaction.user.id);
+                io.emit('streak_complete', { discordId: interaction.user.id, streak: st.streak, bestStreak: st.bestStreak, username: moderatorName });
+            }
+
+            // Live broadcast an alle Dashboard-Clients
+            io.emit('mod_new_entry', {
+                userId: robloxUserId, username, displayName,
+                avatar: avatar || '', action, reason: reason || 'Kein Grund',
+                moderator: moderatorName, moderatorAvatar: modAvatarUrl || '',
+                date: new Date().toISOString(), entryNum,
+            });
+
+            console.log(`[Mod/CMD] ${moderatorName} → ${action} ${username} (${robloxUserId}): ${reason}`);
+            await interaction.editReply({ content: `✅ **${action}** fuer **${displayName}** (@${username}) erstellt!\nEintrag #${entryNum} wurde im Mod-Kanal gepostet.` });
+        } catch(e) {
+            console.error('[Moderate CMD] Fehler:', e);
             const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
             if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
             else await interaction.reply(reply).catch(() => {});

@@ -389,9 +389,13 @@ ipcMain.on('start-app-update', (event, { url }) => {
                     event.sender.send('update_downloaded');
                     
                     setTimeout(() => {
+                        console.log('[Update] Raeume Hintergrund-Prozesse auf...');
+                        try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
+                        try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.close(); robloxOverlayWin = null; } } catch(_) {}
+                        try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.close(); overlayWindow = null; } } catch(_) {}
+                        globalShortcut.unregisterAll();
                         console.log('[Update] Starte Installer und beende App...');
                         shell.openPath(tempPath).then(() => {
-                            // Hartes Beenden, um Dateisperren sofort aufzuheben
                             app.exit(0);
                         }).catch(err => {
                             console.error('[Update] Installer konnte nicht gestartet werden:', err);
@@ -999,6 +1003,25 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
     app.isQuitting = true;
+    // Alle Hintergrund-Prozesse sauber beenden
+    try {
+        if (robloxCallbackServer && robloxCallbackServer.listening) {
+            robloxCallbackServer.close();
+            robloxCallbackServer = null;
+        }
+    } catch(_) {}
+    try {
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.close();
+            robloxOverlayWin = null;
+        }
+    } catch(_) {}
+    try {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.close();
+            overlayWindow = null;
+        }
+    } catch(_) {}
 });
 
 app.on('will-quit', () => {
