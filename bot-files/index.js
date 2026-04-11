@@ -2630,9 +2630,9 @@ async function checkGithubRelease() {
             .addActionRowComponents(
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
-                        .setLabel('Download')
+                        .setLabel('Emden Network')
                         .setStyle(ButtonStyle.Link)
-                        .setURL(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/${release.tag_name}`)
+                        .setURL('https://enrp.net')
                 )
             )
             .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
