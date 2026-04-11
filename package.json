@@ -1,6 +1,6 @@
 {
     "name": "emden-network",
-    "version": "4.57.0",
+    "version": "4.58.7",
     "description": "Emden Network - Control Center",
     "main": "main.js",
     "scripts": {
@@ -26,14 +26,14 @@
             "target": [
                 "nsis"
             ],
-            "icon": "icon.ico",
+            "icon": "assets/icon.ico",
             "requestedExecutionLevel": "requireAdministrator"
         },
         "mac": {
             "target": [
                 "dmg"
             ],
-            "icon": "icon.icns",
+            "icon": "assets/logoEN.png",
             "category": "public.app-category.utilities"
         },
         "dmg": {
