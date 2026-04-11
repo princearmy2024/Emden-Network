@@ -3766,10 +3766,20 @@ Object.assign(App, {
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
+            const srv = data.server || {};
             el.innerHTML = `
+                ${srv.totalRAM ? `<div style="margin-bottom:12px;padding:10px 14px;background:rgba(0,136,255,0.08);border:1px solid rgba(0,136,255,0.15);border-radius:10px;">
+                    <div style="font-size:11px;font-weight:700;color:rgba(0,136,255,0.8);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Server</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">
+                        <div><span style="color:var(--text-muted);">Festplatte:</span> <strong style="color:#fff;">${srv.disk || 'N/A'}</strong></div>
+                        <div><span style="color:var(--text-muted);">RAM:</span> <strong style="color:#fff;">${srv.usedRAM} / ${srv.totalRAM}</strong> <span style="color:var(--text-muted);">(${srv.ramPercent})</span></div>
+                        <div><span style="color:var(--text-muted);">Frei RAM:</span> <strong style="color:#10b981;">${srv.freeRAM}</strong></div>
+                        <div><span style="color:var(--text-muted);">CPUs:</span> <strong style="color:#fff;">${srv.cpus || '?'}</strong> <span style="color:var(--text-muted);">(${srv.platform})</span></div>
+                    </div>
+                </div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;">
-                    <div><span style="color:var(--text-muted);">Gesamt-Speicher:</span> <strong style="color:#fff;">${data.total.display}</strong></div>
-                    <div><span style="color:var(--text-muted);">RAM (Heap):</span> <strong style="color:#fff;">${data.memory.heapUsed}</strong></div>
+                    <div><span style="color:var(--text-muted);">Daten-Speicher:</span> <strong style="color:#fff;">${data.total.display}</strong></div>
+                    <div><span style="color:var(--text-muted);">Bot RAM:</span> <strong style="color:#fff;">${data.memory.heapUsed}</strong> <span style="color:var(--text-muted);">/ ${data.memory.rss}</span></div>
                     <div><span style="color:var(--text-muted);">Mod-Eintraege:</span> <strong style="color:#fff;">${data.counts.modEntries}</strong> <span style="color:var(--text-muted);">(${data.counts.modUsers} User)</span></div>
                     <div><span style="color:var(--text-muted);">Beweis-Bilder:</span> <strong style="color:#fff;">${data.counts.evidenceStore}</strong> <span style="color:var(--text-muted);">(im RAM)</span></div>
                     <div><span style="color:var(--text-muted);">Roblox-Links:</span> <strong style="color:#fff;">${data.counts.robloxLinks}</strong></div>
@@ -3777,7 +3787,6 @@ Object.assign(App, {
                     <div><span style="color:var(--text-muted);">Aktive Shifts:</span> <strong style="color:#fff;">${data.counts.shifts}</strong></div>
                     <div><span style="color:var(--text-muted);">Streaks:</span> <strong style="color:#fff;">${data.counts.streaks}</strong></div>
                     <div><span style="color:var(--text-muted);">Bot-Uptime:</span> <strong style="color:#fff;">${data.uptime}</strong></div>
-                    <div><span style="color:var(--text-muted);">RAM (RSS):</span> <strong style="color:#fff;">${data.memory.rss}</strong></div>
                 </div>
                 <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
                     ${data.files.map(f => `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">${f.desc}</span><span style="color:#fff;">${f.display}</span></div>`).join('')}

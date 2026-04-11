@@ -14,6 +14,8 @@ import path from "node:path";
 import http from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import crypto from "node:crypto";
+import os from "node:os";
+import { execSync } from "node:child_process";
 
 // In-Memory Code Store (alles in einer Datei — kein extra File nötig)
 const verificationCodes = new Map();
@@ -2172,6 +2174,15 @@ const apiServer = http.createServer(async (req, res) => {
                     heapUsed: `${(process.memoryUsage().heapUsed / 1048576).toFixed(1)} MB`,
                     heapTotal: `${(process.memoryUsage().heapTotal / 1048576).toFixed(1)} MB`,
                     rss: `${(process.memoryUsage().rss / 1048576).toFixed(1)} MB`,
+                },
+                server: {
+                    totalRAM: `${(os.totalmem() / 1073741824).toFixed(1)} GB`,
+                    freeRAM: `${(os.freemem() / 1073741824).toFixed(2)} GB`,
+                    usedRAM: `${((os.totalmem() - os.freemem()) / 1073741824).toFixed(2)} GB`,
+                    ramPercent: `${(((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(0)}%`,
+                    platform: os.platform(),
+                    cpus: os.cpus().length,
+                    disk: (() => { try { const out = execSync('df -h / --output=size,used,avail,pcent 2>/dev/null || df -h / 2>/dev/null', { timeout: 3000 }).toString().trim().split('\n'); return out.length > 1 ? out[1].trim().replace(/\s+/g, ' ') : 'N/A'; } catch(_) { return 'N/A'; } })(),
                 },
                 uptime: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`,
             }));
