@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.1'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.2'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -677,41 +677,19 @@ const App = {
         this._saveMsg(msg, convKey);
     },
 
-    async _notify(msg) {
+    _notify(msg) {
         const text = msg.text || msg.message || '';
         const title = msg.to === 'general' ? '#general' : msg.username;
         const body = (msg.to === 'general' ? msg.username + ': ' : '') + (text.startsWith('data:image') ? '[Bild]' : text.slice(0, 120));
 
-        // Native Capacitor LocalNotification (auch im Hintergrund)
         try {
-            const Local = window.Capacitor?.Plugins?.LocalNotifications;
-            if (Local) {
-                const perm = await Local.checkPermissions().catch(() => ({ display: 'denied' }));
-                if (perm.display !== 'granted') {
-                    await Local.requestPermissions().catch(() => {});
-                }
-                await Local.schedule({
-                    notifications: [{
-                        id: Date.now() % 2147483647,
-                        title,
-                        body,
-                        sound: 'default',
-                        smallIcon: 'ic_stat_icon_config_sample',
-                        channelId: 'emden-chat',
-                    }]
-                }).catch(() => {});
-                return;
-            }
-        } catch(e) {}
-
-        // Fallback: Web Notification API
-        try {
-            if ('Notification' in window && Notification.permission === 'granted') {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                 const n = new Notification(title, { body, icon: msg.avatar || undefined, tag: 'en-mobile-' + (msg.id || Date.now()) });
                 n.onclick = () => { window.focus(); if (msg.to !== 'general') this.openChat('@' + msg.username, msg.avatar); };
             }
         } catch(e) {}
 
+        try { if (navigator.vibrate) navigator.vibrate(80); } catch(e) {}
         try { this._beep(); } catch(e) {}
     },
 
@@ -736,26 +714,9 @@ const App = {
         o.stop(ctx.currentTime + 0.27);
     },
 
-    async requestNotificationPermission() {
+    requestNotificationPermission() {
         try {
-            const Local = window.Capacitor?.Plugins?.LocalNotifications;
-            if (Local) {
-                await Local.requestPermissions().catch(() => {});
-                // Channel anlegen (Android)
-                if (Local.createChannel) {
-                    await Local.createChannel({
-                        id: 'emden-chat',
-                        name: 'Chat & Mod',
-                        description: 'Nachrichten und Mod-Aktionen',
-                        importance: 5,
-                        sound: 'default',
-                        vibration: true,
-                        lights: true,
-                    }).catch(() => {});
-                }
-                return;
-            }
-            if ('Notification' in window && Notification.permission === 'default') {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
                 Notification.requestPermission().catch(() => {});
             }
         } catch(e) {}
