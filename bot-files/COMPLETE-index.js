@@ -2377,17 +2377,22 @@ io.on("connection", (socket) => {
             chatHistory.push(msgData);
             if (chatHistory.length > 50) chatHistory.shift();
             socket.broadcast.emit("receive_message", msgData);
-            // Delivery-Status: zugestellt wenn andere online sind
             socket.emit("msg_status", { id: msgData.id, status: otherCount > 0 ? 'delivered' : 'sent' });
         } else if (to.startsWith('@')) {
-            // PN: NUR an den Empfänger senden
+            // PN: an ALLE Sockets des Empfaengers + Echo an alle anderen Geraete des Senders
             const targetUsername = to.substring(1);
+            const senderUsername = socket.chatUsername || msgData.username;
             let sent = false;
             for (const [, s] of io.sockets.sockets) {
-                if (s.chatUsername === targetUsername && s.id !== socket.id) {
+                if (s.id === socket.id) continue;
+                // Empfaenger
+                if (s.chatUsername === targetUsername) {
                     s.emit("receive_message", msgData);
                     sent = true;
-                    break;
+                }
+                // Echo an Sender's andere Geraete (gleiche username, anderer socket)
+                else if (s.chatUsername === senderUsername) {
+                    s.emit("receive_message", msgData);
                 }
             }
             socket.emit("msg_status", { id: msgData.id, status: sent ? 'delivered' : 'sent' });

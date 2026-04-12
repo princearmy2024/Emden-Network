@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.1'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -115,9 +115,9 @@ const App = {
         this._loadHistory();
         const vEl = document.getElementById('settingsVersion');
         if (vEl) vEl.textContent = MOBILE_VERSION;
-        // Home-Daten laden (Start-Tab)
         this.loadHome();
         this.loadRobloxProfile();
+        this.requestNotificationPermission();
         // Periodisches Home-Refresh
         clearInterval(this._homeRefresh);
         this._homeRefresh = setInterval(() => {
@@ -162,16 +162,30 @@ const App = {
         document.getElementById('loginError').textContent = '';
     },
 
+    _tabOrder: ['home', 'chat', 'mod', 'team', 'settings'],
+    _currentTabIndex: 0,
+
     switchTab(tab) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`view-${tab}`)?.classList.add('active');
+        const order = this._tabOrder;
+        const newIdx = order.indexOf(tab);
+        const direction = newIdx > this._currentTabIndex ? 'right' : (newIdx < this._currentTabIndex ? 'left' : null);
+        this._currentTabIndex = newIdx >= 0 ? newIdx : this._currentTabIndex;
+
+        document.querySelectorAll('.view').forEach(v => {
+            v.classList.remove('active', 'slide-from-right', 'slide-from-left');
+        });
+        const nextView = document.getElementById(`view-${tab}`);
+        if (nextView) {
+            nextView.classList.add('active');
+            if (direction === 'right') nextView.classList.add('slide-from-right');
+            else if (direction === 'left') nextView.classList.add('slide-from-left');
+        }
         document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
 
         const titles = { home: 'Home', chat: 'Chat', mod: 'Moderation', team: 'Team', settings: 'Einstellungen' };
         const titleEl = document.getElementById('topbarTitle');
         if (titleEl) titleEl.textContent = titles[tab] || '';
 
-        // Tab-spezifische Daten laden
         if (tab === 'home') this.loadHome();
         else if (tab === 'team') this.loadTeam();
         else if (tab === 'mod') this.loadModLog();
@@ -641,16 +655,110 @@ const App = {
     receiveMessage(msg) {
         const channel = this.currentChat || 'general';
         const from = msg.to || 'general';
+        const myUser = Auth.user?.username;
+        const isOwnEcho = msg.username === myUser;
 
-        // Nur anzeigen wenn im richtigen Chat
-        const shouldShow = (from === 'general' && channel === 'general') ||
-            (from.startsWith('@') && from === '@' + Auth.user?.username && channel === '@' + msg.username) ||
-            (msg.username === Auth.user?.username);
+        // Bestimme den Konversations-Key
+        // - General: 'general'
+        // - PN von jemandem an mich: '@<sender>' (msg.username)
+        // - Eigene PN an jemanden (echo von Bot): '@<empfaenger>' (msg.to ohne @)
+        let convKey;
+        if (from === 'general') convKey = 'general';
+        else if (isOwnEcho) convKey = from; // '@target'
+        else convKey = '@' + msg.username;
 
-        if (shouldShow) {
+        // Anzeigen wenn aktuell in dieser Konversation
+        if (channel === convKey) {
             this._displayMsg(msg);
+        } else if (!isOwnEcho) {
+            // Notification fuer eingehende Nachrichten in anderen Chats
+            this._notify(msg);
         }
-        this._saveMsg(msg, from.startsWith('@') ? '@' + msg.username : from);
+        this._saveMsg(msg, convKey);
+    },
+
+    async _notify(msg) {
+        const text = msg.text || msg.message || '';
+        const title = msg.to === 'general' ? '#general' : msg.username;
+        const body = (msg.to === 'general' ? msg.username + ': ' : '') + (text.startsWith('data:image') ? '[Bild]' : text.slice(0, 120));
+
+        // Native Capacitor LocalNotification (auch im Hintergrund)
+        try {
+            const Local = window.Capacitor?.Plugins?.LocalNotifications;
+            if (Local) {
+                const perm = await Local.checkPermissions().catch(() => ({ display: 'denied' }));
+                if (perm.display !== 'granted') {
+                    await Local.requestPermissions().catch(() => {});
+                }
+                await Local.schedule({
+                    notifications: [{
+                        id: Date.now() % 2147483647,
+                        title,
+                        body,
+                        sound: 'default',
+                        smallIcon: 'ic_stat_icon_config_sample',
+                        channelId: 'emden-chat',
+                    }]
+                }).catch(() => {});
+                return;
+            }
+        } catch(e) {}
+
+        // Fallback: Web Notification API
+        try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const n = new Notification(title, { body, icon: msg.avatar || undefined, tag: 'en-mobile-' + (msg.id || Date.now()) });
+                n.onclick = () => { window.focus(); if (msg.to !== 'general') this.openChat('@' + msg.username, msg.avatar); };
+            }
+        } catch(e) {}
+
+        try { this._beep(); } catch(e) {}
+    },
+
+    _beep() {
+        if (!this._audioCtx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            this._audioCtx = new AC();
+        }
+        const ctx = this._audioCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(880, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+        o.start();
+        o.stop(ctx.currentTime + 0.27);
+    },
+
+    async requestNotificationPermission() {
+        try {
+            const Local = window.Capacitor?.Plugins?.LocalNotifications;
+            if (Local) {
+                await Local.requestPermissions().catch(() => {});
+                // Channel anlegen (Android)
+                if (Local.createChannel) {
+                    await Local.createChannel({
+                        id: 'emden-chat',
+                        name: 'Chat & Mod',
+                        description: 'Nachrichten und Mod-Aktionen',
+                        importance: 5,
+                        sound: 'default',
+                        vibration: true,
+                        lights: true,
+                    }).catch(() => {});
+                }
+                return;
+            }
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        } catch(e) {}
     },
 
     _displayMsg(data) {
