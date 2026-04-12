@@ -2192,6 +2192,26 @@ const apiServer = http.createServer(async (req, res) => {
         }
     }
 
+    // GET /api/mobile-version — Mobile App Update-Check
+    if (req.method === "GET" && url.pathname === "/api/mobile-version") {
+        // Aktuelle Mobile-Version + APK-URL
+        const MOBILE_VERSION = '1.1.0';
+        const APK_URL = `https://github.com/princearmy2024/Emden-Network/releases/latest/download/Emden-Network-Mobile.apk`;
+        const CHANGELOG = [
+            'Mod-Panel: Roblox-Suche + Warn/Kick/Ban/Notiz',
+            'Mod-History Anzeige pro User',
+            'Auto-Update System',
+        ];
+        res.writeHead(200);
+        return res.end(JSON.stringify({
+            success: true,
+            version: MOBILE_VERSION,
+            apkUrl: APK_URL,
+            changelog: CHANGELOG,
+            mandatory: false,
+        }));
+    }
+
     // GET /api/roblox/lookup?robloxId=xxx — Prüft ob ein Roblox-User mit Discord verknüpft ist
     if (req.method === "GET" && url.pathname === "/api/roblox/lookup") {
         const robloxId = url.searchParams.get("robloxId");

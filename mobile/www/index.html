@@ -26,6 +26,24 @@
         </div>
     </div>
 
+    <!-- UPDATE BANNER -->
+    <div class="update-banner hidden" id="updateBanner">
+        <div class="update-content">
+            <div class="update-header">
+                <div class="update-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div class="update-info">
+                    <div class="update-title">Neue Version verfuegbar</div>
+                    <div class="update-version" id="updateVersion">v1.0.0</div>
+                </div>
+                <button class="update-close" onclick="App._hideUpdateBanner()">×</button>
+            </div>
+            <div class="update-changelog" id="updateChangelog"></div>
+            <button class="btn btn-primary update-btn" id="updateBtn" onclick="App.installUpdate()">Jetzt installieren</button>
+        </div>
+    </div>
+
     <!-- MAIN APP -->
     <div class="screen" id="appScreen">
         <!-- Top Bar -->

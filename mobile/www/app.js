@@ -1,8 +1,20 @@
 // Emden Network Mobile — app.js
+const MOBILE_VERSION = '1.0.0'; // Aktuelle App-Version
 const CONFIG = {
     API_URL: 'http://91.98.124.212:5009',
     API_KEY: 'emden-super-secret-key-2026',
 };
+
+// ── Version Check ──
+function compareVersions(a, b) {
+    const pa = String(a).split('.').map(Number);
+    const pb = String(b).split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+        if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    }
+    return 0;
+}
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -365,6 +377,8 @@ const App = {
         if (Auth.load() && Auth.user) {
             this.showApp();
         }
+        // Update-Check nach 2 Sekunden (nicht beim Start blockieren)
+        setTimeout(() => this.checkForUpdate(), 2000);
         // Mod-Suche: Enter-Key
         document.getElementById('modSearchInput')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this.modSearchUser(); }
@@ -588,6 +602,64 @@ const App = {
         el.classList.remove('hidden');
         if (type === 'success') {
             setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+    },
+
+    // ── Auto-Update ──
+    _updateInfo: null,
+
+    async checkForUpdate() {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mobile-version`, {
+                headers: { 'x-api-key': CONFIG.API_KEY }
+            });
+            const data = await res.json();
+            if (!data.success) return;
+            if (compareVersions(data.version, MOBILE_VERSION) > 0) {
+                this._updateInfo = data;
+                this._showUpdateBanner(data);
+            }
+        } catch(e) {
+            console.log('[Update] Check failed:', e.message);
+        }
+    },
+
+    _showUpdateBanner(info) {
+        const banner = document.getElementById('updateBanner');
+        if (!banner) return;
+        document.getElementById('updateVersion').textContent = `v${info.version}`;
+        const changelog = (info.changelog || []).slice(0, 3).map(c => `• ${escHtml(c)}`).join('<br>');
+        document.getElementById('updateChangelog').innerHTML = changelog || 'Keine Details';
+        banner.classList.remove('hidden');
+    },
+
+    _hideUpdateBanner() {
+        document.getElementById('updateBanner')?.classList.add('hidden');
+    },
+
+    async installUpdate() {
+        if (!this._updateInfo) return;
+        const btn = document.getElementById('updateBtn');
+        btn.textContent = 'Laedt...';
+        btn.disabled = true;
+
+        try {
+            // Versuche nativen Download via Capacitor
+            if (window.Capacitor?.Plugins?.Browser) {
+                // Oeffne APK-URL im Browser → Android Download Manager uebernimmt
+                await window.Capacitor.Plugins.Browser.open({ url: this._updateInfo.apkUrl });
+            } else {
+                // Fallback: normaler Link
+                window.open(this._updateInfo.apkUrl, '_system');
+            }
+            btn.textContent = 'Download gestartet';
+            setTimeout(() => {
+                btn.textContent = 'Jetzt installieren';
+                btn.disabled = false;
+            }, 3000);
+        } catch(e) {
+            btn.textContent = 'Fehler - Retry';
+            btn.disabled = false;
         }
     },
 };
