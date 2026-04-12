@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.59.6'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -113,6 +113,17 @@ const App = {
         this.applyUser();
         connectSocket();
         this._loadHistory();
+        const vEl = document.getElementById('settingsVersion');
+        if (vEl) vEl.textContent = MOBILE_VERSION;
+        // Home-Daten laden (Start-Tab)
+        this.loadHome();
+        this.loadRobloxProfile();
+        // Periodisches Home-Refresh
+        clearInterval(this._homeRefresh);
+        this._homeRefresh = setInterval(() => {
+            const activeView = document.querySelector('.view.active')?.id;
+            if (activeView === 'view-home') this.loadHome();
+        }, 30000);
     },
 
     applyUser() {
@@ -155,6 +166,369 @@ const App = {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(`view-${tab}`)?.classList.add('active');
         document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+
+        const titles = { home: 'Home', chat: 'Chat', mod: 'Moderation', team: 'Team', settings: 'Einstellungen' };
+        const titleEl = document.getElementById('topbarTitle');
+        if (titleEl) titleEl.textContent = titles[tab] || '';
+
+        // Tab-spezifische Daten laden
+        if (tab === 'home') this.loadHome();
+        else if (tab === 'team') this.loadTeam();
+        else if (tab === 'mod') this.loadModLog();
+    },
+
+    switchModTab(sub) {
+        document.querySelectorAll('.mod-tab').forEach(t => t.classList.toggle('active', t.dataset.modtab === sub));
+        document.querySelectorAll('.mod-tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`modtab-${sub}`)?.classList.add('active');
+        if (sub === 'log') this.loadModLog();
+        else if (sub === 'leader') this.loadLeaderboard();
+    },
+
+    showModLog() {
+        this.switchTab('mod');
+        this.switchModTab('log');
+    },
+
+    // ── HOME ──
+    _homeTimer: null,
+    _homeShiftStart: null,
+    _homeShiftBase: 0,
+
+    async loadHome() {
+        this.loadStatus();
+        this.loadOnDuty();
+        this.loadStats();
+        const u = Auth.user;
+        if (u && (u.role === 'staff' || u.role === 'admin' || u.isStaff)) {
+            this.loadMyShift();
+            this.loadMyStreak();
+        }
+    },
+
+    async loadStatus() {
+        try {
+            const res = await fetch(apiUrl('/api/status'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            document.getElementById('homeMembers').textContent = (d.members || 0).toLocaleString('de-DE');
+            document.getElementById('homeOnline').textContent = d.onlineMembers || 0;
+            document.getElementById('homeDash').textContent = d.dashboardOnline || 0;
+        } catch(e) {}
+    },
+
+    async loadOnDuty() {
+        try {
+            const res = await fetch(apiUrl('/api/on-duty'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const list = document.getElementById('homeOnDutyList');
+            const count = document.getElementById('homeOnDutyCount');
+            const staff = d.staff || [];
+            count.textContent = staff.length;
+            if (!staff.length) {
+                list.innerHTML = '<div class="empty-hint">Niemand im Dienst</div>';
+                return;
+            }
+            list.innerHTML = staff.map(s => `
+                <div class="duty-item">
+                    <div class="duty-avatar">${s.avatar ? `<img src="${escHtml(s.avatar)}">` : (s.username || '?')[0].toUpperCase()}</div>
+                    <div class="duty-info">
+                        <div class="duty-name">${escHtml(s.displayName || s.username)}</div>
+                        <div class="duty-role">${escHtml((s.roles || []).slice(0, 2).join(' · ') || 'Staff')}</div>
+                    </div>
+                    <div class="duty-dot"></div>
+                </div>
+            `).join('');
+        } catch(e) {}
+    },
+
+    async loadStats() {
+        try {
+            const res = await fetch(apiUrl('/api/storage'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const grid = document.getElementById('homeStatsGrid');
+            if (!d.success) { grid.innerHTML = '<div class="empty-hint">Keine Daten</div>'; return; }
+            const items = [
+                { k: 'RAM Server', v: d.server?.ramPercent || '—' },
+                { k: 'Mod-Eintraege', v: (d.counts?.modEntries || 0).toLocaleString('de-DE') },
+                { k: 'Bot Uptime', v: d.uptime || '—' },
+                { k: 'Bekannte User', v: (d.counts?.knownUsers || 0).toLocaleString('de-DE') },
+            ];
+            grid.innerHTML = items.map(i => `<div class="stat-item"><div class="stat-key">${i.k}</div><div class="stat-val">${escHtml(i.v)}</div></div>`).join('');
+        } catch(e) {
+            document.getElementById('homeStatsGrid').innerHTML = '<div class="empty-hint">Fehler</div>';
+        }
+    },
+
+    async loadMyShift() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            const res = await fetch(apiUrl('/api/shifts'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const mine = d.shifts?.[u.discordId];
+            const state = mine?.state || 'off';
+            const stateEl = document.getElementById('homeShiftState');
+            const labels = { off: 'Off Duty', active: 'Im Dienst', break: 'Pause' };
+            if (stateEl) stateEl.textContent = labels[state] || 'Off Duty';
+
+            this._homeShiftBase = mine?.savedMs || 0;
+            this._homeShiftStart = state === 'active' && mine?.startedAt ? mine.startedAt : null;
+            this._startShiftTimer();
+
+            const sBtn = document.getElementById('shiftBtnStart');
+            const pBtn = document.getElementById('shiftBtnPause');
+            const eBtn = document.getElementById('shiftBtnEnd');
+            if (sBtn && pBtn && eBtn) {
+                sBtn.disabled = state === 'active';
+                pBtn.disabled = state !== 'active';
+                eBtn.disabled = state === 'off' && !mine?.savedMs;
+            }
+        } catch(e) {}
+    },
+
+    _startShiftTimer() {
+        clearInterval(this._homeTimer);
+        const el = document.getElementById('homeShiftTimer');
+        if (!el) return;
+        const tick = () => {
+            let ms = this._homeShiftBase || 0;
+            if (this._homeShiftStart) ms += Date.now() - this._homeShiftStart;
+            const s = Math.floor(ms / 1000);
+            const h = String(Math.floor(s / 3600)).padStart(2, '0');
+            const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+            const sec = String(s % 60).padStart(2, '0');
+            el.textContent = `${h}:${m}:${sec}`;
+        };
+        tick();
+        this._homeTimer = setInterval(tick, 1000);
+    },
+
+    async shiftStart() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            await fetch(apiUrl('/api/shift/start'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId })
+            });
+            this.loadMyShift();
+        } catch(e) {}
+    },
+
+    async shiftPause() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            await fetch(apiUrl('/api/shift/pause'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId })
+            });
+            this.loadMyShift();
+        } catch(e) {}
+    },
+
+    async shiftEnd() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            await fetch(apiUrl('/api/shift/end'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId })
+            });
+            this.loadMyShift();
+        } catch(e) {}
+    },
+
+    async loadMyStreak() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            const res = await fetch(apiUrl('/api/streaks'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const mine = d.streaks?.[u.discordId];
+            const req = d.requirements || { minMs: 600000, minEntries: 5 };
+
+            const streak = mine?.streak || 0;
+            const best = mine?.bestStreak || 0;
+            const todayMs = mine?.todayMs || 0;
+            const todayEntries = mine?.todayEntries || 0;
+            const completed = mine?.completed || false;
+
+            document.getElementById('homeStreakBadge').textContent = streak;
+            document.getElementById('homeStreakSub').textContent = completed ? `Heute geschafft! Best: ${best}` : `Beste Serie: ${best} Tage`;
+
+            const timePct = Math.min(100, (todayMs / req.minMs) * 100);
+            const entryPct = Math.min(100, (todayEntries / req.minEntries) * 100);
+            const tFill = document.getElementById('homeStreakTimeFill');
+            const eFill = document.getElementById('homeStreakEntryFill');
+            tFill.style.width = timePct + '%';
+            eFill.style.width = entryPct + '%';
+            tFill.classList.toggle('done', timePct >= 100);
+            eFill.classList.toggle('done', entryPct >= 100);
+
+            const minMin = Math.round(req.minMs / 60000);
+            document.getElementById('homeStreakTimeMeta').textContent = `On Duty: ${Math.floor(todayMs / 60000)}m / ${minMin}m`;
+            document.getElementById('homeStreakEntryMeta').textContent = `Eintraege: ${todayEntries} / ${req.minEntries}`;
+        } catch(e) {}
+    },
+
+    // ── TEAM ──
+    async loadTeam() {
+        const body = document.getElementById('teamBody');
+        try {
+            const res = await fetch(apiUrl('/api/team'));
+            const d = await res.json();
+            if (!d.success || !d.roles?.length) {
+                body.innerHTML = '<div class="empty-hint">Keine Team-Daten</div>';
+                return;
+            }
+            body.innerHTML = d.roles.map(role => `
+                <div class="role-group">
+                    <div class="role-head">
+                        <span class="role-dot" style="background:${escHtml(role.color)}"></span>
+                        <span class="role-name">${escHtml(role.name)}</span>
+                        <span class="role-count">${role.members.length}</span>
+                    </div>
+                    <div class="role-members">
+                        ${role.members.map(m => `
+                            <div class="role-member ${m.status === 'offline' ? 'offline' : ''}">
+                                <div class="status-ring ${m.status}"><img src="${escHtml(m.avatar)}" onerror="this.style.opacity=0"></div>
+                                <span class="role-member-name">${escHtml(m.username)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        } catch(e) {
+            body.innerHTML = '<div class="empty-hint">Fehler beim Laden</div>';
+        }
+    },
+
+    // ── MOD LOG ──
+    async loadModLog() {
+        const list = document.getElementById('modLogList');
+        if (!list) return;
+        try {
+            const res = await fetch(apiUrl('/api/mod-log', { limit: 30 }), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const log = d.log || [];
+            if (!log.length) { list.innerHTML = '<div class="empty-hint">Keine Eintraege</div>'; return; }
+            list.innerHTML = log.map(e => {
+                const action = (e.action || 'Warn');
+                const cls = action.toLowerCase().replace(/\s+/g, '').replace('oneday', 'dayban');
+                const cssClass = cls.includes('ban') && cls.includes('day') ? 'dayban' : cls.includes('ban') ? 'ban' : cls.includes('kick') ? 'kick' : cls.includes('notiz') ? 'notiz' : 'warn';
+                const date = new Date(e.date);
+                const now = new Date();
+                const diffMs = now - date;
+                let timeStr;
+                if (diffMs < 3600000) timeStr = Math.floor(diffMs / 60000) + 'm';
+                else if (diffMs < 86400000) timeStr = Math.floor(diffMs / 3600000) + 'h';
+                else timeStr = Math.floor(diffMs / 86400000) + 'd';
+                return `<div class="mod-log-item ${cssClass}">
+                    <div class="mod-log-top">
+                        <span class="mod-log-action">${escHtml(action)}</span>
+                        <span class="mod-log-time">${timeStr}</span>
+                    </div>
+                    <div class="mod-log-user">${escHtml(e.displayName || 'Unknown')}</div>
+                    <div class="mod-log-reason">${escHtml(e.reason || 'Kein Grund')}</div>
+                    <div class="mod-log-moderator">@${escHtml(e.moderator || '?')}</div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            list.innerHTML = '<div class="empty-hint">Fehler</div>';
+        }
+    },
+
+    async loadLeaderboard() {
+        const list = document.getElementById('leaderList');
+        if (!list) return;
+        try {
+            const res = await fetch(apiUrl('/api/shifts'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const lb = Object.entries(d.leaderboard || {})
+                .map(([id, v]) => ({ id, ...v }))
+                .sort((a, b) => (b.totalMs || 0) - (a.totalMs || 0))
+                .slice(0, 20);
+            if (!lb.length) { list.innerHTML = '<div class="empty-hint">Noch kein Ranking</div>'; return; }
+            list.innerHTML = lb.map((x, i) => {
+                const h = Math.floor((x.totalMs || 0) / 3600000);
+                const m = Math.floor(((x.totalMs || 0) % 3600000) / 60000);
+                const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                return `<div class="leader-item">
+                    <div class="leader-rank ${rankCls}">#${i + 1}</div>
+                    <div class="leader-avatar">${x.avatar ? `<img src="${escHtml(x.avatar)}">` : (x.username || '?')[0].toUpperCase()}</div>
+                    <div class="leader-info">
+                        <div class="leader-name">${escHtml(x.username || '?')}</div>
+                        <div class="leader-time">${h}h ${m}m</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            list.innerHTML = '<div class="empty-hint">Fehler</div>';
+        }
+    },
+
+    // ── ROBLOX LINK ──
+    async loadRobloxProfile() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            const res = await fetch(apiUrl('/api/roblox/profile', { discordId: u.discordId }), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const d = await res.json();
+            const card = document.getElementById('robloxDisplay');
+            const sub = document.getElementById('robloxSub');
+            const av = document.getElementById('robloxAvatar');
+            const btn = document.getElementById('robloxLinkBtn');
+            if (d.success && d.profile) {
+                card.textContent = d.profile.displayName || d.profile.username;
+                sub.textContent = '@' + d.profile.username;
+                av.innerHTML = d.profile.avatar ? `<img src="${escHtml(d.profile.avatar)}">` : '?';
+                btn.textContent = 'Neu verknuepfen';
+            } else {
+                card.textContent = 'Nicht verknuepft';
+                sub.textContent = 'Verknuepfe deinen Account';
+                av.innerHTML = '?';
+                btn.textContent = 'Verknuepfen';
+            }
+        } catch(e) {}
+    },
+
+    async robloxOpenLink() {
+        const username = prompt('Roblox Benutzername:');
+        if (!username) return;
+        const u = Auth.user;
+        if (!u?.discordId) return;
+
+        try {
+            const res = await fetch(apiUrl('/api/roblox/start-verify'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId, robloxUsername: username })
+            });
+            const d = await res.json();
+            if (!d.success) return alert('Fehler: ' + (d.error || 'Unbekannt'));
+
+            const ok = confirm(`Fuege diesen Code in deine Roblox-Bio ein:\n\n${d.code}\n\nDann OK druecken um zu pruefen.`);
+            if (!ok) return;
+
+            const confirmRes = await fetch(apiUrl('/api/roblox/confirm-verify'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId })
+            });
+            const cd = await confirmRes.json();
+            if (cd.success) {
+                alert('Erfolgreich verknuepft!');
+                this.loadRobloxProfile();
+            } else {
+                alert('Fehler: ' + (cd.error || 'Code nicht gefunden'));
+            }
+        } catch(e) {
+            alert('Fehler: ' + e.message);
+        }
     },
 
     // ── Users ──
@@ -391,7 +765,7 @@ const App = {
         setTimeout(() => this.checkForUpdate(), 2000);
 
         // Swipe-Navigation zwischen Tabs
-        const tabOrder = ['chat', 'mod', 'settings'];
+        const tabOrder = ['home', 'chat', 'mod', 'team', 'settings'];
         let touchStartX = 0, touchStartY = 0, touchStartT = 0;
         const screen = document.getElementById('appScreen');
         if (screen) {

@@ -50,17 +50,152 @@
         <header class="topbar">
             <div class="topbar-left">
                 <span class="topbar-logo"><span class="logo-e">E</span><span class="logo-n">N</span></span>
+                <span class="topbar-title" id="topbarTitle">Home</span>
             </div>
             <div class="topbar-right">
                 <span class="conn-dot" id="connDot"></span>
-                <div class="topbar-avatar" id="topbarAvatar">A</div>
+                <div class="topbar-avatar" id="topbarAvatar" onclick="App.switchTab('settings')">A</div>
             </div>
         </header>
 
         <!-- Tab Content -->
         <div class="tab-content">
+
+            <!-- HOME VIEW -->
+            <div class="view active" id="view-home">
+                <div class="home-scroll">
+                    <!-- Hero Stats -->
+                    <div class="hero-card">
+                        <div class="hero-row">
+                            <div class="hero-stat">
+                                <div class="hero-value" id="homeMembers">—</div>
+                                <div class="hero-label">Mitglieder</div>
+                            </div>
+                            <div class="hero-stat">
+                                <div class="hero-value hero-value-live" id="homeOnline">—</div>
+                                <div class="hero-label">Online</div>
+                            </div>
+                            <div class="hero-stat">
+                                <div class="hero-value" id="homeDash">—</div>
+                                <div class="hero-label">Dashboard</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Streak Card (staff only) -->
+                    <div class="section-card staff-only hidden" id="homeStreakCard">
+                        <div class="section-head">
+                            <span class="section-icon">🔥</span>
+                            <div class="section-title-wrap">
+                                <div class="section-title">Deine Tagesserie</div>
+                                <div class="section-sub" id="homeStreakSub">Lade...</div>
+                            </div>
+                            <div class="section-badge" id="homeStreakBadge">0</div>
+                        </div>
+                        <div class="streak-progress">
+                            <div class="streak-bar">
+                                <div class="streak-fill" id="homeStreakTimeFill"></div>
+                            </div>
+                            <div class="streak-meta" id="homeStreakTimeMeta">On Duty: 0m / 10m</div>
+                        </div>
+                        <div class="streak-progress">
+                            <div class="streak-bar">
+                                <div class="streak-fill" id="homeStreakEntryFill"></div>
+                            </div>
+                            <div class="streak-meta" id="homeStreakEntryMeta">Eintraege: 0 / 5</div>
+                        </div>
+                    </div>
+
+                    <!-- Shift Card (staff only) -->
+                    <div class="section-card staff-only hidden" id="homeShiftCard">
+                        <div class="section-head">
+                            <span class="section-icon">⏱</span>
+                            <div class="section-title-wrap">
+                                <div class="section-title">Mein Dienst</div>
+                                <div class="section-sub" id="homeShiftState">Off Duty</div>
+                            </div>
+                            <div class="section-timer" id="homeShiftTimer">00:00:00</div>
+                        </div>
+                        <div class="shift-controls">
+                            <button class="shift-btn start" id="shiftBtnStart" onclick="App.shiftStart()">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
+                                Start
+                            </button>
+                            <button class="shift-btn pause" id="shiftBtnPause" onclick="App.shiftPause()">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+                                Pause
+                            </button>
+                            <button class="shift-btn end" id="shiftBtnEnd" onclick="App.shiftEnd()">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6 6h12v12H6z"/></svg>
+                                Ende
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions Grid -->
+                    <div class="quick-grid">
+                        <button class="quick-tile" onclick="App.switchTab('chat')">
+                            <div class="quick-icon" style="background:rgba(59,158,255,0.15);color:#3b9eff">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                            </div>
+                            <div class="quick-label">Chat</div>
+                        </button>
+                        <button class="quick-tile staff-only hidden" onclick="App.switchTab('mod')">
+                            <div class="quick-icon" style="background:rgba(239,68,68,0.15);color:#ef4444">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div class="quick-label">Mod</div>
+                        </button>
+                        <button class="quick-tile" onclick="App.switchTab('team')">
+                            <div class="quick-icon" style="background:rgba(167,139,250,0.15);color:#a78bfa">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                            </div>
+                            <div class="quick-label">Team</div>
+                        </button>
+                        <button class="quick-tile" onclick="App.showModLog()">
+                            <div class="quick-icon" style="background:rgba(245,158,11,0.15);color:#f59e0b">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                            </div>
+                            <div class="quick-label">Mod-Log</div>
+                        </button>
+                    </div>
+
+                    <!-- Active Staff On Duty -->
+                    <div class="section-card">
+                        <div class="section-head">
+                            <span class="section-icon">🟢</span>
+                            <div class="section-title-wrap">
+                                <div class="section-title">Im Dienst</div>
+                                <div class="section-sub">Aktive Moderatoren</div>
+                            </div>
+                            <div class="section-badge" id="homeOnDutyCount">0</div>
+                        </div>
+                        <div class="on-duty-list" id="homeOnDutyList">
+                            <div class="empty-hint">Lade...</div>
+                        </div>
+                    </div>
+
+                    <!-- Server Stats (compact) -->
+                    <div class="section-card">
+                        <div class="section-head">
+                            <span class="section-icon">📊</span>
+                            <div class="section-title-wrap">
+                                <div class="section-title">Server</div>
+                                <div class="section-sub">Live Statistiken</div>
+                            </div>
+                            <button class="section-refresh" onclick="App.loadStats()" aria-label="refresh">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                            </button>
+                        </div>
+                        <div class="stats-grid" id="homeStatsGrid">
+                            <div class="empty-hint">Lade...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- CHAT VIEW -->
-            <div class="view active" id="view-chat">
+            <div class="view" id="view-chat">
                 <div class="chat-header" id="chatHeader">
                     <button class="back-btn hidden" id="chatBackBtn" onclick="App.showUserList()">←</button>
                     <div class="chat-header-avatar" id="chatHeaderAvatar"></div>
@@ -70,7 +205,6 @@
                     </div>
                 </div>
 
-                <!-- User List (Mobile: volle Breite) -->
                 <div class="user-list" id="userListPanel">
                     <div class="user-list-header">
                         <span>LIVE ONLINE</span>
@@ -79,7 +213,6 @@
                     <div id="userList" class="user-list-items"></div>
                 </div>
 
-                <!-- Chat Messages -->
                 <div class="chat-panel hidden" id="chatPanel">
                     <div class="chat-messages" id="chatMessages"></div>
                     <div class="typing-indicator hidden" id="typingIndicator"></div>
@@ -97,72 +230,111 @@
 
             <!-- MOD VIEW -->
             <div class="view" id="view-mod">
-                <div class="mod-header">
-                    <h2>Moderation</h2>
-                    <p class="mod-sub">Schnell User moderieren</p>
+                <div class="mod-tabs">
+                    <button class="mod-tab active" data-modtab="action" onclick="App.switchModTab('action')">Aktion</button>
+                    <button class="mod-tab" data-modtab="log" onclick="App.switchModTab('log')">Mod-Log</button>
+                    <button class="mod-tab" data-modtab="leader" onclick="App.switchModTab('leader')">Ranking</button>
                 </div>
-                <div class="mod-body">
-                    <!-- User Search -->
-                    <div class="mod-search-wrap">
-                        <input type="text" id="modSearchInput" class="input-field" placeholder="Roblox Benutzername oder ID..." autocomplete="off">
-                        <button class="btn btn-primary mod-search-btn" onclick="App.modSearchUser()">Suchen</button>
-                    </div>
-                    <div id="modSearchResult"></div>
 
-                    <!-- Selected User Card -->
-                    <div class="mod-user-card hidden" id="modUserCard">
-                        <div class="mod-user-header">
-                            <div class="mod-user-avatar"><img id="modUserAvatar" src=""></div>
-                            <div class="mod-user-info">
-                                <div class="mod-user-name" id="modUserName">—</div>
-                                <div class="mod-user-username" id="modUserUsername">@—</div>
-                                <div class="mod-user-id" id="modUserId">ID: —</div>
+                <div class="mod-tab-content active" id="modtab-action">
+                    <div class="mod-body">
+                        <div class="mod-search-wrap">
+                            <input type="text" id="modSearchInput" class="input-field" placeholder="Roblox Benutzername oder ID..." autocomplete="off">
+                            <button class="btn btn-primary mod-search-btn" onclick="App.modSearchUser()">Suchen</button>
+                        </div>
+                        <div id="modSearchResult"></div>
+
+                        <div class="mod-user-card hidden" id="modUserCard">
+                            <div class="mod-user-header">
+                                <div class="mod-user-avatar"><img id="modUserAvatar" src=""></div>
+                                <div class="mod-user-info">
+                                    <div class="mod-user-name" id="modUserName">—</div>
+                                    <div class="mod-user-username" id="modUserUsername">@—</div>
+                                    <div class="mod-user-id" id="modUserId">ID: —</div>
+                                </div>
+                                <button class="mod-clear-btn" onclick="App.modClearUser()">×</button>
                             </div>
-                            <button class="mod-clear-btn" onclick="App.modClearUser()">×</button>
-                        </div>
 
-                        <!-- Reason Input -->
-                        <div class="mod-reason-wrap">
-                            <label class="mod-label">Grund</label>
-                            <textarea id="modReasonInput" class="input-field mod-reason" placeholder="Grund eingeben..." rows="3"></textarea>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="mod-action-grid">
-                            <button class="mod-action-btn warn" onclick="App.modSubmit('Warn')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                <span>Warn</span>
-                            </button>
-                            <button class="mod-action-btn kick" onclick="App.modSubmit('Kick')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                                <span>Kick</span>
-                            </button>
-                            <button class="mod-action-btn ban" onclick="App.modSubmit('Ban')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                                <span>Ban</span>
-                            </button>
-                            <button class="mod-action-btn dayban" onclick="App.modSubmit('One Day Ban')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                <span>1-Day</span>
-                            </button>
-                            <button class="mod-action-btn note" onclick="App.modSubmit('Notiz')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                                <span>Notiz</span>
-                            </button>
-                        </div>
-
-                        <!-- History (collapsible) -->
-                        <div class="mod-history-section">
-                            <div class="mod-history-header" onclick="App.modToggleHistory()">
-                                <span>Vorherige Eintraege</span>
-                                <span id="modHistoryCount" class="badge">0</span>
+                            <div class="mod-reason-wrap">
+                                <label class="mod-label">Grund</label>
+                                <textarea id="modReasonInput" class="input-field mod-reason" placeholder="Grund eingeben..." rows="3"></textarea>
                             </div>
-                            <div id="modHistoryList" class="mod-history-list hidden"></div>
+
+                            <div class="mod-action-grid">
+                                <button class="mod-action-btn warn" onclick="App.modSubmit('Warn')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                    <span>Warn</span>
+                                </button>
+                                <button class="mod-action-btn kick" onclick="App.modSubmit('Kick')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                    <span>Kick</span>
+                                </button>
+                                <button class="mod-action-btn ban" onclick="App.modSubmit('Ban')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                    <span>Ban</span>
+                                </button>
+                                <button class="mod-action-btn dayban" onclick="App.modSubmit('One Day Ban')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    <span>1-Day</span>
+                                </button>
+                                <button class="mod-action-btn note" onclick="App.modSubmit('Notiz')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                    <span>Notiz</span>
+                                </button>
+                            </div>
+
+                            <div class="mod-history-section">
+                                <div class="mod-history-header" onclick="App.modToggleHistory()">
+                                    <span>Vorherige Eintraege</span>
+                                    <span id="modHistoryCount" class="badge">0</span>
+                                </div>
+                                <div id="modHistoryList" class="mod-history-list hidden"></div>
+                            </div>
+                        </div>
+
+                        <div id="modStatus" class="mod-status hidden"></div>
+                    </div>
+                </div>
+
+                <div class="mod-tab-content" id="modtab-log">
+                    <div class="mod-log-body">
+                        <div class="mod-log-head">
+                            <h3>Letzte Aktionen</h3>
+                            <button class="section-refresh" onclick="App.loadModLog()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                            </button>
+                        </div>
+                        <div class="mod-log-list" id="modLogList">
+                            <div class="empty-hint">Lade...</div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Status Message -->
-                    <div id="modStatus" class="mod-status hidden"></div>
+                <div class="mod-tab-content" id="modtab-leader">
+                    <div class="mod-log-body">
+                        <div class="mod-log-head">
+                            <h3>Shift-Ranking</h3>
+                            <button class="section-refresh" onclick="App.loadLeaderboard()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                            </button>
+                        </div>
+                        <div class="leader-list" id="leaderList">
+                            <div class="empty-hint">Lade...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TEAM VIEW -->
+            <div class="view" id="view-team">
+                <div class="team-header">
+                    <h2>Team</h2>
+                    <button class="section-refresh" onclick="App.loadTeam()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    </button>
+                </div>
+                <div class="team-body" id="teamBody">
+                    <div class="empty-hint">Lade Team...</div>
                 </div>
             </div>
 
@@ -179,14 +351,44 @@
                             <span class="settings-role" id="settingsRole">Mitglied</span>
                         </div>
                     </div>
-                    <button class="btn btn-danger" onclick="App.logout()" style="width:100%;margin-top:16px;">Abmelden</button>
+
+                    <div class="settings-section">
+                        <div class="settings-section-label">Roblox</div>
+                        <div class="settings-row" id="robloxLinkedCard">
+                            <div class="settings-row-left">
+                                <div class="roblox-avatar" id="robloxAvatar">?</div>
+                                <div>
+                                    <div class="settings-row-title" id="robloxDisplay">Nicht verknuepft</div>
+                                    <div class="settings-row-sub" id="robloxSub">Verknuepfe deinen Account</div>
+                                </div>
+                            </div>
+                            <button class="btn-mini" id="robloxLinkBtn" onclick="App.robloxOpenLink()">Verknuepfen</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-section-label">App</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left">
+                                <div class="settings-row-title">Version</div>
+                                <div class="settings-row-sub" id="settingsVersion">4.59.x</div>
+                            </div>
+                            <button class="btn-mini" onclick="App.checkForUpdate(true)">Pruefen</button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-danger" onclick="App.logout()" style="width:100%;margin-top:20px;">Abmelden</button>
                 </div>
             </div>
         </div>
 
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
-            <button class="nav-item active" data-tab="chat" onclick="App.switchTab('chat')">
+            <button class="nav-item active" data-tab="home" onclick="App.switchTab('home')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3v-6h6v6h3a1 1 0 001-1V10"/></svg>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-tab="chat" onclick="App.switchTab('chat')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 <span>Chat</span>
             </button>
@@ -194,9 +396,13 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
                 <span>Mod</span>
             </button>
+            <button class="nav-item" data-tab="team" onclick="App.switchTab('team')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                <span>Team</span>
+            </button>
             <button class="nav-item" data-tab="settings" onclick="App.switchTab('settings')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                <span>Settings</span>
+                <span>Einst.</span>
             </button>
         </nav>
     </div>
