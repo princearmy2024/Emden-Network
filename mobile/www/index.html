@@ -77,6 +77,77 @@
                 </div>
             </div>
 
+            <!-- MOD VIEW -->
+            <div class="view" id="view-mod">
+                <div class="mod-header">
+                    <h2>Moderation</h2>
+                    <p class="mod-sub">Schnell User moderieren</p>
+                </div>
+                <div class="mod-body">
+                    <!-- User Search -->
+                    <div class="mod-search-wrap">
+                        <input type="text" id="modSearchInput" class="input-field" placeholder="Roblox Benutzername oder ID..." autocomplete="off">
+                        <button class="btn btn-primary mod-search-btn" onclick="App.modSearchUser()">Suchen</button>
+                    </div>
+                    <div id="modSearchResult"></div>
+
+                    <!-- Selected User Card -->
+                    <div class="mod-user-card hidden" id="modUserCard">
+                        <div class="mod-user-header">
+                            <div class="mod-user-avatar"><img id="modUserAvatar" src=""></div>
+                            <div class="mod-user-info">
+                                <div class="mod-user-name" id="modUserName">—</div>
+                                <div class="mod-user-username" id="modUserUsername">@—</div>
+                                <div class="mod-user-id" id="modUserId">ID: —</div>
+                            </div>
+                            <button class="mod-clear-btn" onclick="App.modClearUser()">×</button>
+                        </div>
+
+                        <!-- Reason Input -->
+                        <div class="mod-reason-wrap">
+                            <label class="mod-label">Grund</label>
+                            <textarea id="modReasonInput" class="input-field mod-reason" placeholder="Grund eingeben..." rows="3"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="mod-action-grid">
+                            <button class="mod-action-btn warn" onclick="App.modSubmit('Warn')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                <span>Warn</span>
+                            </button>
+                            <button class="mod-action-btn kick" onclick="App.modSubmit('Kick')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                <span>Kick</span>
+                            </button>
+                            <button class="mod-action-btn ban" onclick="App.modSubmit('Ban')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                <span>Ban</span>
+                            </button>
+                            <button class="mod-action-btn dayban" onclick="App.modSubmit('One Day Ban')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                <span>1-Day</span>
+                            </button>
+                            <button class="mod-action-btn note" onclick="App.modSubmit('Notiz')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                <span>Notiz</span>
+                            </button>
+                        </div>
+
+                        <!-- History (collapsible) -->
+                        <div class="mod-history-section">
+                            <div class="mod-history-header" onclick="App.modToggleHistory()">
+                                <span>Vorherige Eintraege</span>
+                                <span id="modHistoryCount" class="badge">0</span>
+                            </div>
+                            <div id="modHistoryList" class="mod-history-list hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div id="modStatus" class="mod-status hidden"></div>
+                </div>
+            </div>
+
             <!-- SETTINGS VIEW -->
             <div class="view" id="view-settings">
                 <div class="settings-header">
@@ -100,6 +171,10 @@
             <button class="nav-item active" data-tab="chat" onclick="App.switchTab('chat')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 <span>Chat</span>
+            </button>
+            <button class="nav-item staff-only hidden" data-tab="mod" onclick="App.switchTab('mod')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                <span>Mod</span>
             </button>
             <button class="nav-item" data-tab="settings" onclick="App.switchTab('settings')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>

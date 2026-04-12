@@ -111,6 +111,13 @@ const App = {
         if (nameEl) nameEl.textContent = u.username;
         const roleEl = document.getElementById('settingsRole');
         if (roleEl) roleEl.textContent = u.role === 'admin' ? 'Administrator' : 'Mitglied';
+
+        // Mod-Tab nur fuer Staff/Admin sichtbar machen
+        const isStaff = u.isStaff || u.role === 'staff' || u.role === 'admin';
+        document.querySelectorAll('.staff-only').forEach(el => {
+            if (isStaff) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        });
     },
 
     logout() {
@@ -358,6 +365,10 @@ const App = {
         if (Auth.load() && Auth.user) {
             this.showApp();
         }
+        // Mod-Suche: Enter-Key
+        document.getElementById('modSearchInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); this.modSearchUser(); }
+        });
         // Typing indicator
         document.getElementById('chatInput')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { this.sendMessage(); return; }
@@ -398,7 +409,187 @@ const App = {
                 }
             }
         });
-    }
+    },
+
+    // ── Moderation ──
+    _modSelectedUser: null,
+
+    async modSearchUser() {
+        const query = document.getElementById('modSearchInput').value.trim();
+        const result = document.getElementById('modSearchResult');
+        if (!query) { result.innerHTML = ''; return; }
+        result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Suche...</div>';
+
+        try {
+            // Pruefe ob es eine User-ID ist (nur Zahlen)
+            if (/^\d+$/.test(query)) {
+                const r = await fetch(`https://users.roblox.com/v1/users/${query}`);
+                if (r.ok) {
+                    const u = await r.json();
+                    this._modShowSearchResults([{ id: u.id, name: u.name, displayName: u.displayName, created: u.created }]);
+                    return;
+                }
+            }
+
+            // Username-Suche
+            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
+            });
+            const searchData = await searchRes.json();
+            if (!searchData.data?.length) {
+                result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Kein User gefunden.</div>';
+                return;
+            }
+
+            // Vollstaendige Daten holen
+            const users = await Promise.all(searchData.data.slice(0, 5).map(async u => {
+                try {
+                    const fr = await fetch(`https://users.roblox.com/v1/users/${u.id}`);
+                    return await fr.json();
+                } catch(_) { return u; }
+            }));
+            this._modShowSearchResults(users);
+        } catch(e) {
+            result.innerHTML = `<div class="mod-status error">Fehler: ${escHtml(e.message)}</div>`;
+        }
+    },
+
+    async _modShowSearchResults(users) {
+        const result = document.getElementById('modSearchResult');
+        if (!users.length) {
+            result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Kein User gefunden.</div>';
+            return;
+        }
+
+        // Avatare laden (in einem Batch)
+        const ids = users.map(u => u.id).join(',');
+        let avatars = {};
+        try {
+            const av = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids}&size=150x150&format=Png`);
+            const avData = await av.json();
+            (avData.data || []).forEach(a => { avatars[a.targetId] = a.imageUrl; });
+        } catch(_) {}
+
+        result.innerHTML = users.map(u => `
+            <div class="mod-search-result-item" onclick='App.modSelectUser(${JSON.stringify({ id: u.id, name: u.name, displayName: u.displayName || u.name, created: u.created, avatar: avatars[u.id] || "" }).replace(/'/g, "&#39;")})'>
+                <img src="${avatars[u.id] || ''}" onerror="this.style.opacity=0">
+                <div class="mod-search-result-info">
+                    <div class="mod-search-result-name">${escHtml(u.displayName || u.name)}</div>
+                    <div class="mod-search-result-username">@${escHtml(u.name)} · ${u.id}</div>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    modSelectUser(user) {
+        this._modSelectedUser = user;
+        document.getElementById('modSearchResult').innerHTML = '';
+        document.getElementById('modSearchInput').value = '';
+
+        document.getElementById('modUserCard').classList.remove('hidden');
+        document.getElementById('modUserAvatar').src = user.avatar || '';
+        document.getElementById('modUserName').textContent = user.displayName || user.name;
+        document.getElementById('modUserUsername').textContent = '@' + user.name;
+        document.getElementById('modUserId').textContent = 'ID: ' + user.id;
+
+        // History laden
+        this.modLoadHistory(user.id);
+    },
+
+    modClearUser() {
+        this._modSelectedUser = null;
+        document.getElementById('modUserCard').classList.add('hidden');
+        document.getElementById('modReasonInput').value = '';
+        document.getElementById('modStatus').classList.add('hidden');
+        document.getElementById('modHistoryList').classList.add('hidden');
+    },
+
+    modToggleHistory() {
+        document.getElementById('modHistoryList').classList.toggle('hidden');
+    },
+
+    async modLoadHistory(userId) {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-history?userId=${userId}`, {
+                headers: { 'x-api-key': CONFIG.API_KEY }
+            });
+            const data = await res.json();
+            const list = document.getElementById('modHistoryList');
+            const count = document.getElementById('modHistoryCount');
+            if (!data.success || !data.entries) { count.textContent = '0'; list.innerHTML = ''; return; }
+
+            count.textContent = data.entries.length;
+            const entries = data.entries.slice(-10).reverse();
+            list.innerHTML = entries.map(e => {
+                const cls = (e.action || 'warn').toLowerCase().replace(/\s+/g, '');
+                const date = new Date(e.date).toLocaleDateString('de-DE');
+                return `<div class="mod-history-item ${cls.includes('ban') && cls.includes('day') ? 'dayban' : cls.includes('ban') ? 'ban' : cls.includes('kick') ? 'kick' : cls.includes('notiz') ? 'note' : 'warn'}">
+                    <div class="mod-history-action">${escHtml(e.action)}</div>
+                    <div class="mod-history-reason">${escHtml(e.reason || 'Kein Grund')}</div>
+                    <div class="mod-history-meta">@${escHtml(e.moderator || '?')} · ${date}</div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('modHistoryCount').textContent = '?';
+        }
+    },
+
+    async modSubmit(action) {
+        if (!this._modSelectedUser) return;
+        const reason = document.getElementById('modReasonInput').value.trim();
+        if (!reason) {
+            this._modStatus('error', 'Bitte einen Grund eingeben.');
+            return;
+        }
+        const u = this._modSelectedUser;
+        const me = Auth.user;
+        if (!me) { this._modStatus('error', 'Nicht eingeloggt.'); return; }
+
+        this._modStatus('info', `Sende ${action}...`);
+
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({
+                    userId: String(u.id),
+                    username: u.name,
+                    displayName: u.displayName || u.name,
+                    avatar: u.avatar || '',
+                    created: u.created ? new Date(u.created).toLocaleDateString('de-DE') : '',
+                    reason,
+                    action,
+                    moderator: me.username,
+                    moderatorAvatar: me.avatar || '',
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                this._modStatus('success', `✓ ${action} fuer ${u.displayName || u.name} erstellt!`);
+                document.getElementById('modReasonInput').value = '';
+                // History neu laden
+                setTimeout(() => this.modLoadHistory(u.id), 500);
+                // Haptic feedback wenn verfuegbar
+                try { window.Capacitor?.Plugins?.Haptics?.impact({ style: 'medium' }); } catch(_) {}
+            } else {
+                this._modStatus('error', data.error || 'Fehler beim Senden.');
+            }
+        } catch(e) {
+            this._modStatus('error', 'Server nicht erreichbar.');
+        }
+    },
+
+    _modStatus(type, msg) {
+        const el = document.getElementById('modStatus');
+        el.className = 'mod-status ' + type;
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        if (type === 'success') {
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+    },
 };
 
 // Boot
