@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '1.0.1'; // Aktuelle App-Version
+const MOBILE_VERSION = '1.0.2'; // Aktuelle App-Version
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -389,6 +389,49 @@ const App = {
         }
         // Update-Check nach 2 Sekunden (nicht beim Start blockieren)
         setTimeout(() => this.checkForUpdate(), 2000);
+
+        // Swipe-Navigation zwischen Tabs
+        const tabOrder = ['chat', 'mod', 'settings'];
+        let touchStartX = 0, touchStartY = 0, touchStartT = 0;
+        const screen = document.getElementById('appScreen');
+        if (screen) {
+            screen.addEventListener('touchstart', (e) => {
+                const t = e.touches[0];
+                touchStartX = t.clientX; touchStartY = t.clientY; touchStartT = Date.now();
+            }, { passive: true });
+            screen.addEventListener('touchend', (e) => {
+                const t = e.changedTouches[0];
+                const dx = t.clientX - touchStartX;
+                const dy = t.clientY - touchStartY;
+                const dt = Date.now() - touchStartT;
+                // Nur horizontale Swipes (nicht scrollen), schnell, mind. 60px
+                if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 600) return;
+                // Nicht swipen wenn in Privat-Chat (zurück-Pfeil dort)
+                if (this.currentChat && this.currentChat !== 'general') return;
+                const active = document.querySelector('.view.active')?.id?.replace('view-', '');
+                let idx = tabOrder.indexOf(active);
+                if (idx < 0) return;
+                if (dx < 0 && idx < tabOrder.length - 1) {
+                    // Swipe links → nächster Tab (Mod nur wenn Staff)
+                    let next = idx + 1;
+                    if (tabOrder[next] === 'mod' && !document.querySelector('.nav-item[data-tab="mod"]')?.classList.contains('hidden') === false) {
+                        // mod ist hidden? skip
+                    }
+                    const nextTab = tabOrder[next];
+                    const navBtn = document.querySelector(`.nav-item[data-tab="${nextTab}"]`);
+                    if (navBtn && !navBtn.classList.contains('hidden')) this.switchTab(nextTab);
+                    else if (next + 1 < tabOrder.length) this.switchTab(tabOrder[next + 1]);
+                } else if (dx > 0 && idx > 0) {
+                    // Swipe rechts → vorheriger Tab
+                    let prev = idx - 1;
+                    const prevTab = tabOrder[prev];
+                    const navBtn = document.querySelector(`.nav-item[data-tab="${prevTab}"]`);
+                    if (navBtn && !navBtn.classList.contains('hidden')) this.switchTab(prevTab);
+                    else if (prev - 1 >= 0) this.switchTab(tabOrder[prev - 1]);
+                }
+            }, { passive: true });
+        }
+
         // Mod-Suche: Enter-Key
         document.getElementById('modSearchInput')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); this.modSearchUser(); }
@@ -445,60 +488,28 @@ const App = {
         result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Suche...</div>';
 
         try {
-            // Pruefe ob es eine User-ID ist (nur Zahlen)
-            if (/^\d+$/.test(query)) {
-                const r = await fetch(`https://users.roblox.com/v1/users/${query}`);
-                if (r.ok) {
-                    const u = await r.json();
-                    this._modShowSearchResults([{ id: u.id, name: u.name, displayName: u.displayName, created: u.created }]);
-                    return;
-                }
-            }
-
-            // Username-Suche
-            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usernames: [query], excludeBannedUsers: false })
-            });
-            const searchData = await searchRes.json();
-            if (!searchData.data?.length) {
+            const res = await fetch(apiUrl('/api/roblox-search', { q: query }));
+            const data = await res.json();
+            const users = data.users || [];
+            if (!users.length) {
                 result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Kein User gefunden.</div>';
                 return;
             }
-
-            // Vollstaendige Daten holen
-            const users = await Promise.all(searchData.data.slice(0, 5).map(async u => {
-                try {
-                    const fr = await fetch(`https://users.roblox.com/v1/users/${u.id}`);
-                    return await fr.json();
-                } catch(_) { return u; }
-            }));
             this._modShowSearchResults(users);
         } catch(e) {
             result.innerHTML = `<div class="mod-status error">Fehler: ${escHtml(e.message)}</div>`;
         }
     },
 
-    async _modShowSearchResults(users) {
+    _modShowSearchResults(users) {
         const result = document.getElementById('modSearchResult');
         if (!users.length) {
             result.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">Kein User gefunden.</div>';
             return;
         }
-
-        // Avatare laden (in einem Batch)
-        const ids = users.map(u => u.id).join(',');
-        let avatars = {};
-        try {
-            const av = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids}&size=150x150&format=Png`);
-            const avData = await av.json();
-            (avData.data || []).forEach(a => { avatars[a.targetId] = a.imageUrl; });
-        } catch(_) {}
-
         result.innerHTML = users.map(u => `
-            <div class="mod-search-result-item" onclick='App.modSelectUser(${JSON.stringify({ id: u.id, name: u.name, displayName: u.displayName || u.name, created: u.created, avatar: avatars[u.id] || "" }).replace(/'/g, "&#39;")})'>
-                <img src="${avatars[u.id] || ''}" onerror="this.style.opacity=0">
+            <div class="mod-search-result-item" onclick='App.modSelectUser(${JSON.stringify({ id: u.id, name: u.name, displayName: u.displayName || u.name, created: u.created, avatar: u.avatar || "" }).replace(/'/g, "&#39;")})'>
+                <img src="${u.avatar || ''}" onerror="this.style.opacity=0">
                 <div class="mod-search-result-info">
                     <div class="mod-search-result-name">${escHtml(u.displayName || u.name)}</div>
                     <div class="mod-search-result-username">@${escHtml(u.name)} · ${u.id}</div>

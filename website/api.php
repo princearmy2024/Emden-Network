@@ -58,6 +58,57 @@ if ($endpoint === 'download') {
     exit;
 }
 
+// === ROBLOX PROXY (umgeht CORS auf Android) ===
+if ($endpoint === 'roblox-search') {
+    header('Content-Type: application/json');
+    $q = trim($_GET['q'] ?? '');
+    if ($q === '') { echo '{"error":"q required"}'; exit; }
+
+    $users = [];
+    if (ctype_digit($q)) {
+        // ID-Suche
+        $r = curlGet('https://users.roblox.com/v1/users/' . $q, [], 8);
+        if ($r['code'] === 200 && $r['body']) {
+            $u = json_decode($r['body'], true);
+            if ($u && !empty($u['id'])) $users[] = $u;
+        }
+    } else {
+        // Username-Suche via POST
+        $ch = curl_init('https://users.roblox.com/v1/usernames/users');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['usernames' => [$q], 'excludeBannedUsers' => false]));
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $data = json_decode($body, true);
+        if (!empty($data['data'])) {
+            foreach (array_slice($data['data'], 0, 5) as $u) {
+                $r = curlGet('https://users.roblox.com/v1/users/' . $u['id'], [], 5);
+                $full = $r['code'] === 200 ? json_decode($r['body'], true) : $u;
+                if ($full) $users[] = $full;
+            }
+        }
+    }
+
+    // Avatare batch holen
+    $avatars = [];
+    if (!empty($users)) {
+        $ids = implode(',', array_column($users, 'id'));
+        $r = curlGet('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' . $ids . '&size=150x150&format=Png', [], 5);
+        if ($r['code'] === 200 && $r['body']) {
+            $av = json_decode($r['body'], true);
+            foreach (($av['data'] ?? []) as $a) $avatars[$a['targetId']] = $a['imageUrl'] ?? null;
+        }
+    }
+    foreach ($users as &$u) { $u['avatar'] = $avatars[$u['id']] ?? null; }
+
+    echo json_encode(['success' => true, 'users' => $users]);
+    exit;
+}
+
 // === API PROXY (Bot Endpoints) ===
 header('Content-Type: application/json');
 
