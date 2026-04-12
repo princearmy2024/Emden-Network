@@ -3,30 +3,61 @@ header('Access-Control-Allow-Origin: *');
 
 $endpoint = $_GET['e'] ?? 'status';
 
-// === DOWNLOAD REDIRECT (immer neueste Datei aus GitHub Release) ===
+// === DOWNLOAD PROXY (streamt die Datei direkt vom Server) ===
 if ($endpoint === 'download') {
     $type = $_GET['type'] ?? 'exe';  // exe / apk / dmg
     $api = @file_get_contents('https://api.github.com/repos/princearmy2024/Emden-Network/releases/latest', false, stream_context_create([
         'http' => ['header' => "User-Agent: Emden-Network-Website\r\n", 'timeout' => 5]
     ]));
     if ($api === false) {
-        header('Location: https://github.com/princearmy2024/Emden-Network/releases/latest');
-        exit;
+        http_response_code(503);
+        exit('Bot offline');
     }
     $data = json_decode($api, true);
     if (!$data || empty($data['assets'])) {
-        header('Location: https://github.com/princearmy2024/Emden-Network/releases/latest');
-        exit;
+        http_response_code(404);
+        exit('Kein Release verfuegbar');
     }
     $ext = '.' . strtolower($type);
-    foreach ($data['assets'] as $asset) {
-        if (str_ends_with(strtolower($asset['name']), $ext)) {
-            header('Location: ' . $asset['browser_download_url']);
-            exit;
-        }
+    $asset = null;
+    foreach ($data['assets'] as $a) {
+        if (str_ends_with(strtolower($a['name']), $ext)) { $asset = $a; break; }
     }
-    // Fallback wenn nichts gefunden
-    header('Location: https://github.com/princearmy2024/Emden-Network/releases/latest');
+    if (!$asset) {
+        http_response_code(404);
+        exit('Datei nicht gefunden');
+    }
+
+    // Filename + MIME bestimmen
+    $filename = $asset['name'];
+    $mime = match($type) {
+        'exe' => 'application/vnd.microsoft.portable-executable',
+        'apk' => 'application/vnd.android.package-archive',
+        'dmg' => 'application/x-apple-diskimage',
+        default => 'application/octet-stream',
+    };
+
+    // Download-Headers setzen
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . $asset['size']);
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Pragma: no-cache');
+
+    // Datei streamen (mit fopen damit grosse Files nicht in den RAM geladen werden)
+    $ctx = stream_context_create([
+        'http' => ['header' => "User-Agent: Emden-Network-Website\r\n", 'timeout' => 60]
+    ]);
+    $stream = @fopen($asset['browser_download_url'], 'rb', false, $ctx);
+    if ($stream === false) {
+        http_response_code(502);
+        exit('Download fehlgeschlagen');
+    }
+    while (!feof($stream)) {
+        echo fread($stream, 65536);
+        flush();
+    }
+    fclose($stream);
     exit;
 }
 
