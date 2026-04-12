@@ -58,6 +58,31 @@ if ($endpoint === 'download') {
     exit;
 }
 
+// === MOBILE VERSION (dynamisch aus GitHub Latest Release) ===
+if ($endpoint === 'mobile-version') {
+    header('Content-Type: application/json');
+    $res = curlGet('https://api.github.com/repos/princearmy2024/Emden-Network/releases/latest', [], 8);
+    if ($res['code'] !== 200 || !$res['body']) {
+        echo json_encode(['success' => false, 'error' => 'GitHub API unreachable']);
+        exit;
+    }
+    $rel = json_decode($res['body'], true);
+    $tag = ltrim($rel['tag_name'] ?? '0.0.0', 'v');
+    // Changelog aus Release-Body (erste 5 nicht-leere Zeilen)
+    $body = $rel['body'] ?? '';
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $body)), fn($l) => strlen($l) > 2 && !str_contains($l, 'Co-Authored')));
+    $changelog = array_map(fn($l) => preg_replace('/^[-*•]\s*/', '', $l), array_slice($lines, 0, 5));
+    if (empty($changelog)) $changelog = ['Bugfixes und Verbesserungen'];
+    echo json_encode([
+        'success' => true,
+        'version' => $tag,
+        'apkUrl' => "https://github.com/princearmy2024/Emden-Network/releases/download/v{$tag}/Emden-Network-Mobile.apk",
+        'changelog' => $changelog,
+        'mandatory' => false,
+    ]);
+    exit;
+}
+
 // === ROBLOX PROXY (umgeht CORS auf Android) ===
 if ($endpoint === 'roblox-search') {
     header('Content-Type: application/json');
