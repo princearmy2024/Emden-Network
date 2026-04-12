@@ -1,9 +1,19 @@
 // Emden Network Mobile — app.js
 const MOBILE_VERSION = '1.0.0'; // Aktuelle App-Version
 const CONFIG = {
-    API_URL: 'http://91.98.124.212:5009',
+    // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
+    API_URL: 'https://enrp.net/api.php',
+    API_URL_DIRECT: 'http://91.98.124.212:5009', // Fallback fuer WebSockets
     API_KEY: 'emden-super-secret-key-2026',
 };
+
+// Helper: Erstellt API-URLs fuer den PHP-Proxy
+// Beispiel: apiUrl('/api/verify') -> 'https://enrp.net/api.php?e=verify'
+function apiUrl(endpoint, params = {}) {
+    const ep = endpoint.replace(/^\/api\//, '');
+    const qs = new URLSearchParams({ e: ep, ...params }).toString();
+    return CONFIG.API_URL + '?' + qs;
+}
 
 // ── Version Check ──
 function compareVersions(a, b) {
@@ -30,7 +40,7 @@ const Auth = {
 let socket = null;
 function connectSocket() {
     if (socket?.connected) return;
-    socket = io(CONFIG.API_URL, { transports: ['websocket', 'polling'] });
+    socket = io(CONFIG.API_URL_DIRECT, { transports: ['websocket', 'polling'] });
 
     socket.on('connect', () => {
         console.log('[Socket] Connected');
@@ -79,9 +89,9 @@ const App = {
         err.textContent = 'Verbinde...';
 
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/verify`, {
+            const res = await fetch(apiUrl('/api/verify'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code }),
             });
             const data = await res.json();
@@ -526,9 +536,7 @@ const App = {
 
     async modLoadHistory(userId) {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mod-history?userId=${userId}`, {
-                headers: { 'x-api-key': CONFIG.API_KEY }
-            });
+            const res = await fetch(apiUrl('/api/mod-history', { userId }));
             const data = await res.json();
             const list = document.getElementById('modHistoryList');
             const count = document.getElementById('modHistoryCount');
@@ -564,9 +572,9 @@ const App = {
         this._modStatus('info', `Sende ${action}...`);
 
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mod-action`, {
+            const res = await fetch(apiUrl('/api/mod-action'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userId: String(u.id),
                     username: u.name,
@@ -610,9 +618,7 @@ const App = {
 
     async checkForUpdate() {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mobile-version`, {
-                headers: { 'x-api-key': CONFIG.API_KEY }
-            });
+            const res = await fetch(apiUrl('/api/mobile-version'));
             const data = await res.json();
             if (!data.success) return;
             if (compareVersions(data.version, MOBILE_VERSION) > 0) {

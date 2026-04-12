@@ -51,9 +51,47 @@ if ($endpoint === 'download') {
 
 // === API PROXY (Bot Endpoints) ===
 header('Content-Type: application/json');
-$allowed = ['status', 'team'];
-if (!in_array($endpoint, $allowed)) { echo '{"error":"not allowed"}'; exit; }
 
-$res = curlGet('http://91.98.124.212:5009/api/' . $endpoint, ['x-api-key: emden-super-secret-key-2026'], 8);
-if (!$res['body']) { echo '{"error":"bot offline"}'; exit; }
-echo $res['body'];
+// Erlaubte Endpoints (sowohl GET als auch POST)
+$allowedGet  = ['status', 'team', 'mod-history', 'mod-log', 'on-duty', 'gsg9', 'mobile-version', 'shifts', 'streaks'];
+$allowedPost = ['verify', 'heartbeat', 'mod-action', 'check-staff', 'check-lead', 'shift/start', 'shift/pause', 'shift/end'];
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$isPost = $method === 'POST';
+
+if ($isPost) {
+    if (!in_array($endpoint, $allowedPost)) { echo '{"error":"not allowed"}'; exit; }
+} else {
+    if (!in_array($endpoint, $allowedGet)) { echo '{"error":"not allowed"}'; exit; }
+}
+
+// Query-String anhaengen (z.B. ?userId=123)
+$qs = $_GET;
+unset($qs['e']);
+$queryString = !empty($qs) ? '?' . http_build_query($qs) : '';
+
+$url = 'http://91.98.124.212:5009/api/' . $endpoint . $queryString;
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'x-api-key: emden-super-secret-key-2026',
+    'Content-Type: application/json',
+]);
+
+if ($isPost) {
+    curl_setopt($ch, CURLOPT_POST, true);
+    $body = file_get_contents('php://input');
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+}
+
+$result = curl_exec($ch);
+$code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+if (!$result) { echo '{"error":"bot offline"}'; exit; }
+http_response_code($code ?: 200);
+echo $result;
