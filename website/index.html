@@ -373,7 +373,7 @@ section{padding:clamp(80px,10vw,130px) clamp(20px,4vw,60px)}
     <h2 class="s-title rv rv-d1" style="text-align:center">Get it.<br><span style="background:linear-gradient(135deg,var(--b),var(--bl));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Now.</span></h2>
     <p class="s-desc rv rv-d2" style="text-align:center;margin:0 auto 32px">Windows, Mac & Android. iOS bald. Kostenlos.</p>
     <div class="hero-btns rv rv-d3" style="gap:16px;">
-      <a href="https://github.com/princearmy2024/Emden-Network/releases/download/v3.4.0/Emden.Network.Setup.3.4.0.exe" class="btn btn-p dl-link" style="min-width:200px;justify-content:center;">
+      <a href="https://github.com/princearmy2024/Emden-Network/releases/latest" class="btn btn-p dl-link" style="min-width:200px;justify-content:center;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
         Desktop (.exe) <span class="arr">&rarr;</span>
       </a>
@@ -486,18 +486,22 @@ async function loadLiveUsers(){
 loadLiveUsers();
 
 // GITHUB VERSION + CHANGELOG TIMELINE (auto-update from releases)
-fetch('https://api.github.com/repos/princearmy2024/Emden-Network/releases?per_page=8').then(r=>r.json()).then(releases=>{
+// Cache-busting damit immer die neueste Version geholt wird
+fetch('https://api.github.com/repos/princearmy2024/Emden-Network/releases?per_page=8&_=' + Date.now()).then(r=>r.json()).then(releases=>{
   if(!Array.isArray(releases)||!releases.length)return;
-  // Update version + download link
-  const latest=releases[0];
+  // Suche das neueste Release das nicht draft/prerelease ist UND mindestens ein Asset hat
+  const latest=releases.find(r=>!r.draft&&!r.prerelease&&r.assets?.length>0)||releases[0];
   if(latest.tag_name){
     document.getElementById('hv').textContent=latest.tag_name;
     document.getElementById('dv2').textContent=latest.tag_name;
-    const exe=latest.assets?.find(a=>a.name.endsWith('.exe'));
+    // Windows EXE (alle Varianten: Setup, Installer, etc.)
+    const exe=latest.assets?.find(a=>a.name.toLowerCase().endsWith('.exe'));
     if(exe)document.querySelectorAll('.dl-link').forEach(a=>{a.href=exe.browser_download_url});
-    const apk=latest.assets?.find(a=>a.name.endsWith('.apk'));
+    // Android APK
+    const apk=latest.assets?.find(a=>a.name.toLowerCase().endsWith('.apk'));
     if(apk)document.querySelectorAll('.dl-apk').forEach(a=>{a.href=apk.browser_download_url;a.style.opacity='1';a.style.pointerEvents='auto';a.style.cursor='pointer';});
-    const dmg=latest.assets?.find(a=>a.name.endsWith('.dmg')||a.name.endsWith('.zip'));
+    // macOS DMG / ZIP
+    const dmg=latest.assets?.find(a=>{const n=a.name.toLowerCase();return n.endsWith('.dmg')||n.endsWith('.zip');});
     if(dmg)document.querySelectorAll('.dl-mac').forEach(a=>{a.href=dmg.browser_download_url;a.style.opacity='1';a.style.pointerEvents='auto';a.style.cursor='pointer';a.querySelector('span')&&(a.querySelector('span').textContent='→');});
   }
   // Build timeline
