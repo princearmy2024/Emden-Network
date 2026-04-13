@@ -3760,7 +3760,7 @@ Object.assign(App, {
         const el = document.getElementById('storageStats');
         if (!el) return;
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/storage`, {
+            const res = await fetch(`${CONFIG.API_URL}/api/storage?discordId=${encodeURIComponent(AuthService.session?.user?.discordId || '')}`, {
                 headers: { 'x-api-key': CONFIG.API_KEY }
             });
             const data = await res.json();
@@ -4491,7 +4491,7 @@ const ModPanel = {
 
     async loadShifts() {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/shifts`, { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(`${CONFIG.API_URL}/api/shifts?discordId=${encodeURIComponent(AuthService.session?.user?.discordId || '')}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
             const data = await res.json();
             if (data.success) {
                 this._shifts = data.shifts || {};
@@ -4797,7 +4797,7 @@ const ModPanel = {
         try {
             const res = await fetch(`${CONFIG.API_URL}/api/mod-action`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ userId: user.id, username: user.name, displayName: user.displayName || user.name, avatar: user.avatar || '', created: user.created || '', reason, action: punishment, moderator: session?.username || 'Unbekannt', moderatorAvatar: session?.avatar || '' }),
+                body: JSON.stringify({ userId: user.id, username: user.name, displayName: user.displayName || user.name, avatar: user.avatar || '', created: user.created || '', reason, action: punishment, moderator: session?.username || 'Unbekannt', moderatorDiscordId: session?.discordId || '', moderatorAvatar: session?.avatar || '' }),
             });
             const data = await res.json();
             if (data.success) {
@@ -4818,7 +4818,8 @@ const ModPanel = {
 
     async loadLog() {
         try {
-            const res = await fetch(`${CONFIG.API_URL}/api/mod-log`, { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const did = AuthService.session?.user?.discordId || '';
+            const res = await fetch(`${CONFIG.API_URL}/api/mod-log?discordId=${encodeURIComponent(did)}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
             const data = await res.json();
             if (data.success && Array.isArray(data.log)) {
                 this._logData = data.log;
@@ -4870,7 +4871,8 @@ const ModPanel = {
         const globalEntry = this._logData[globalIdx];
         let entryIndex = -1;
         try {
-            const histRes = await fetch(`${CONFIG.API_URL}/api/mod-history?userId=${userId}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const hDid = AuthService.session?.user?.discordId || '';
+            const histRes = await fetch(`${CONFIG.API_URL}/api/mod-history?userId=${userId}&discordId=${encodeURIComponent(hDid)}`, { headers: { 'x-api-key': CONFIG.API_KEY } });
             const histData = await histRes.json();
             if (histData.success) entryIndex = histData.entries.findIndex(h => h.date === globalEntry?.date && h.action === globalEntry?.action);
         } catch(e) {}
@@ -4896,8 +4898,8 @@ const ModPanel = {
     async loadStaff() {
         try {
             const [staffRes, streakRes] = await Promise.all([
-                fetch(`${CONFIG.API_URL}/api/on-duty`, { headers: { 'x-api-key': CONFIG.API_KEY } }),
-                fetch(`${CONFIG.API_URL}/api/streaks`, { headers: { 'x-api-key': CONFIG.API_KEY } }).catch(() => null)
+                fetch(`${CONFIG.API_URL}/api/on-duty?discordId=${encodeURIComponent(AuthService.session?.user?.discordId || '')}`, { headers: { 'x-api-key': CONFIG.API_KEY } }),
+                fetch(`${CONFIG.API_URL}/api/streaks?discordId=${encodeURIComponent(AuthService.session?.user?.discordId || '')}`, { headers: { 'x-api-key': CONFIG.API_KEY } }).catch(() => null)
             ]);
             const data = await staffRes.json();
             if (streakRes) { const sd = await streakRes.json(); if (sd.success) this._streaks = sd.streaks || {}; }
