@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.2'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.3'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -118,12 +118,36 @@ const App = {
         this.loadHome();
         this.loadRobloxProfile();
         this.requestNotificationPermission();
-        // Periodisches Home-Refresh
+        // Rolle nochmal live beim Server pruefen (Cached-Session koennte veraltet sein)
+        this.verifyRoleLive();
         clearInterval(this._homeRefresh);
         this._homeRefresh = setInterval(() => {
             const activeView = document.querySelector('.view.active')?.id;
             if (activeView === 'view-home') this.loadHome();
         }, 30000);
+    },
+
+    async verifyRoleLive() {
+        const u = Auth.user;
+        if (!u?.discordId) return;
+        try {
+            const res = await fetch(apiUrl('/api/check-staff'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: u.discordId })
+            });
+            const d = await res.json();
+            if (!d.success) return;
+            // Sync lokale Session mit Server
+            const serverIsStaff = !!d.isStaff;
+            const serverIsAdmin = !!d.isAdmin;
+            if (Auth.user) {
+                Auth.user.isStaff = serverIsStaff;
+                Auth.user.role = serverIsAdmin ? 'admin' : serverIsStaff ? 'staff' : 'user';
+                Auth.save();
+                this.applyUser();
+            }
+        } catch(e) {}
     },
 
     applyUser() {
@@ -232,7 +256,7 @@ const App = {
 
     async loadOnDuty() {
         try {
-            const res = await fetch(apiUrl('/api/on-duty'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/on-duty', { discordId: Auth.user?.discordId || '' }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const list = document.getElementById('homeOnDutyList');
             const count = document.getElementById('homeOnDutyCount');
@@ -257,7 +281,7 @@ const App = {
 
     async loadStats() {
         try {
-            const res = await fetch(apiUrl('/api/storage'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/storage', { discordId: Auth.user?.discordId || '' }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const grid = document.getElementById('homeStatsGrid');
             if (!d.success) { grid.innerHTML = '<div class="empty-hint">Keine Daten</div>'; return; }
@@ -277,7 +301,7 @@ const App = {
         const u = Auth.user;
         if (!u?.discordId) return;
         try {
-            const res = await fetch(apiUrl('/api/shifts'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/shifts', { discordId: u.discordId }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const mine = d.shifts?.[u.discordId];
             const state = mine?.state || 'off';
@@ -360,7 +384,7 @@ const App = {
         const u = Auth.user;
         if (!u?.discordId) return;
         try {
-            const res = await fetch(apiUrl('/api/streaks'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/streaks', { discordId: u.discordId }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const mine = d.streaks?.[u.discordId];
             const req = d.requirements || { minMs: 600000, minEntries: 5 };
@@ -426,7 +450,7 @@ const App = {
         const list = document.getElementById('modLogList');
         if (!list) return;
         try {
-            const res = await fetch(apiUrl('/api/mod-log', { limit: 30 }), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/mod-log', { limit: 30, discordId: Auth.user?.discordId || '' }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const log = d.log || [];
             if (!log.length) { list.innerHTML = '<div class="empty-hint">Keine Eintraege</div>'; return; }
@@ -460,7 +484,7 @@ const App = {
         const list = document.getElementById('leaderList');
         if (!list) return;
         try {
-            const res = await fetch(apiUrl('/api/shifts'), { headers: { 'x-api-key': CONFIG.API_KEY } });
+            const res = await fetch(apiUrl('/api/shifts', { discordId: Auth.user?.discordId || '' }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const lb = Object.entries(d.leaderboard || {})
                 .map(([id, v]) => ({ id, ...v }))
@@ -990,7 +1014,7 @@ const App = {
 
     async modLoadHistory(userId) {
         try {
-            const res = await fetch(apiUrl('/api/mod-history', { userId }));
+            const res = await fetch(apiUrl('/api/mod-history', { userId, discordId: Auth.user?.discordId || '' }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const data = await res.json();
             const list = document.getElementById('modHistoryList');
             const count = document.getElementById('modHistoryCount');
@@ -1028,7 +1052,7 @@ const App = {
         try {
             const res = await fetch(apiUrl('/api/mod-action'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
                 body: JSON.stringify({
                     userId: String(u.id),
                     username: u.name,
@@ -1038,6 +1062,7 @@ const App = {
                     reason,
                     action,
                     moderator: me.username,
+                    moderatorDiscordId: me.discordId,
                     moderatorAvatar: me.avatar || '',
                 })
             });

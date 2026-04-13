@@ -1089,6 +1089,28 @@ const apiServer = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: "Unauthorized" }));
     }
 
+    // Staff-only GET Endpoints: Caller muss ?discordId=... mitschicken und EN-Team-Rolle haben
+    const staffOnlyPaths = ["/api/mod-log", "/api/on-duty", "/api/shifts", "/api/streaks", "/api/storage", "/api/mod-history"];
+    if (req.method === "GET" && staffOnlyPaths.includes(url.pathname)) {
+        const callerDid = url.searchParams.get("discordId") || url.searchParams.get("callerId");
+        if (!callerDid) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: "discordId required" }));
+        }
+        try {
+            const EN_TEAM_CHECK = "1365083291044282389";
+            const g = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+            const m = await g.members.fetch(callerDid).catch(() => null);
+            if (!m || !m.roles.cache.has(EN_TEAM_CHECK)) {
+                res.writeHead(403);
+                return res.end(JSON.stringify({ error: "Nicht berechtigt (keine EN-Team-Rolle)" }));
+            }
+        } catch (e) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: "Auth-Check fehlgeschlagen" }));
+        }
+    }
+
     // POST /api/verify
     if (req.method === "POST" && url.pathname === "/api/verify") {
         let body = "";
@@ -1126,9 +1148,9 @@ const apiServer = http.createServer(async (req, res) => {
                     const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                     const member = await guild.members.fetch(entry.discordId).catch(() => null);
                     if (member) {
-                        isAdmin = member.permissions.has("Administrator") ||
-                            member.roles.cache.some(r => r.name.toLowerCase().includes("admin"));
-                        isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID) || isAdmin;
+                        // STRIKTER Check: Nur EN-Team-Rolle = Staff. Admin nur wenn Staff + Administrator-Permission.
+                        isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID);
+                        isAdmin = isStaff && member.permissions.has("Administrator");
                     }
                 } catch (_) { }
 
@@ -1511,10 +1533,27 @@ const apiServer = http.createServer(async (req, res) => {
         req.on("data", c => (body += c));
         req.on("end", async () => {
             try {
-                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorAvatar, evidence, notiz } = JSON.parse(body || "{}");
+                const { userId, username, displayName, avatar, created, reason, action, moderator, moderatorDiscordId, moderatorAvatar, evidence, notiz } = JSON.parse(body || "{}");
                 if (!userId || !action) {
                     res.writeHead(400);
                     return res.end(JSON.stringify({ success: false, error: "userId und action erforderlich" }));
+                }
+                // Security: Caller muss EN-Team-Rolle haben
+                if (!moderatorDiscordId) {
+                    res.writeHead(403);
+                    return res.end(JSON.stringify({ success: false, error: "moderatorDiscordId erforderlich" }));
+                }
+                try {
+                    const EN_TEAM = "1365083291044282389";
+                    const gg = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+                    const mm = await gg.members.fetch(moderatorDiscordId).catch(() => null);
+                    if (!mm || !mm.roles.cache.has(EN_TEAM)) {
+                        res.writeHead(403);
+                        return res.end(JSON.stringify({ success: false, error: "Nicht berechtigt (keine EN-Team-Rolle)" }));
+                    }
+                } catch (permErr) {
+                    res.writeHead(403);
+                    return res.end(JSON.stringify({ success: false, error: "Auth-Check fehlgeschlagen" }));
                 }
 
                 const MOD_CHANNEL_ID = "1367243128284905573";
@@ -2120,8 +2159,8 @@ const apiServer = http.createServer(async (req, res) => {
                 const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                 const member = await guild.members.fetch(discordId).catch(() => null);
                 if (member) {
-                    isAdmin = member.permissions.has("Administrator") || member.roles.cache.some(r => r.name.toLowerCase().includes("admin"));
-                    isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID) || isAdmin;
+                    isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID);
+                    isAdmin = isStaff && member.permissions.has("Administrator");
                 }
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, isStaff, isAdmin }));
