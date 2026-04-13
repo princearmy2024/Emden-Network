@@ -1245,6 +1245,7 @@ const Overlay = (() => {
                     displayName: user.displayName, avatar: user.avatar,
                     created: user.created || '', reason,
                     action: modSelectedAction, moderator,
+                    moderatorDiscordId: voiceDiscordId || discordId || '',
                     moderatorAvatar: voiceAvatar || '',
                     evidence: modImageBase64 || null,
                     notiz: notiz || null
