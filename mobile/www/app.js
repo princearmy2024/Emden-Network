@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.8'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.9'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -253,6 +253,7 @@ const App = {
     },
 
     switchModTab(sub) {
+        if (!this._isStaff()) { this.switchTab('home'); return; }
         document.querySelectorAll('.mod-tab').forEach(t => t.classList.toggle('active', t.dataset.modtab === sub));
         document.querySelectorAll('.mod-tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById(`modtab-${sub}`)?.classList.add('active');
@@ -261,6 +262,7 @@ const App = {
     },
 
     showModLog() {
+        if (!this._isStaff()) return;
         this.switchTab('mod');
         this.switchModTab('log');
     },
