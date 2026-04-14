@@ -293,31 +293,55 @@ const WebSocketService = {
             this.socket.on('receive_message', (msg) => {
                 console.log('[Chat] Empfangen:', msg.username, msg.text || msg.message);
                 const me = AuthService.getUser();
+                // Blockierte User: Nachricht komplett droppen
+                if (window.App?._isBlocked(msg.username) && msg.username !== me?.username) return;
+
                 const channel = msg.to || 'general';
                 const saveKey = channel === '@' + me?.username ? '@' + msg.username : channel;
 
                 // Anzeigen wenn im richtigen Chat
                 const current = window.App?.currentChat || 'general';
-                const shouldShow = (channel === 'general' && current === 'general') ||
+                const chatViewActive = App.currentView === 'messages';
+                const shouldShow = chatViewActive && (
+                    (channel === 'general' && current === 'general') ||
                     (channel === '@' + me?.username && current === '@' + msg.username) ||
-                    (channel === current);
+                    (channel === current)
+                );
 
                 if (shouldShow && window.App) {
                     App._displayMessage(msg);
-                    // Read Receipt senden
-                    this.socket.emit('msg_read', { msgId: msg.id, reader: me?.username, sender: msg.username });
+                    // Read Receipt senden (nur wenn nicht eigener Echo)
+                    if (msg.username !== me?.username) {
+                        this.socket.emit('msg_read', { msgId: msg.id, reader: me?.username, sender: msg.username });
+                    }
                 }
 
                 // Immer speichern
                 if (window.App) App._saveChatMessage(msg, saveKey);
 
-                // Sound + Notification
-                if (window.App) App.playBlip(900, 0.06);
-                if (window.App && App.currentView !== 'messages') {
-                    NotificationService.show('Neue Nachricht', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+                // Unread-Count erhoehen wenn nicht im Chat (und kein Self-Echo)
+                if (!shouldShow && msg.username !== me?.username && window.App) {
+                    // Konversations-Key: bei General 'general', sonst '@<sender>'
+                    const convKey = channel === 'general' ? 'general' : '@' + msg.username;
+                    App._unreadCounts[convKey] = (App._unreadCounts[convKey] || 0) + 1;
+                    App._saveSocial();
+                    // User-Liste neu rendern damit Badge sichtbar
+                    try {
+                        const reg = Object.values(UserRegistry.get() || {});
+                        if (reg.length) App.renderFullUserList(reg);
+                    } catch(_) {}
                 }
-                if (!shouldShow && window.App) {
-                    NotificationService.show('PN', `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`, 'info');
+
+                // Sound + Notification (nicht wenn gemuted oder eigener Echo)
+                const muted = window.App?._isMuted(msg.username);
+                const isEcho = msg.username === me?.username;
+                if (window.App && !muted && !isEcho) App.playBlip(900, 0.06);
+                if (!shouldShow && !muted && !isEcho && window.App) {
+                    NotificationService.show(
+                        channel === 'general' ? 'Neue Nachricht' : 'PN',
+                        `${msg.username}: ${(msg.text || msg.message || '').substring(0, 50)}`,
+                        'info'
+                    );
                 }
             });
 
@@ -671,11 +695,96 @@ const App = window.App = {
     currentChat: 'general', // IMMER general — kein PN
     messages: [], // Zentraler Speicher für Filterung
     _clockInterval: null,
+    _unreadCounts: {},      // { 'general': n, '@username': n }
+    _blockedUsers: [],      // ['username', ...]
+    _mutedUsers: [],        // ['username', ...]
+
+    _loadSocial() {
+        try {
+            this._unreadCounts = JSON.parse(localStorage.getItem('en_unread_counts') || '{}');
+            this._blockedUsers = JSON.parse(localStorage.getItem('en_blocked_users') || '[]');
+            this._mutedUsers = JSON.parse(localStorage.getItem('en_muted_users') || '[]');
+        } catch(e) { this._unreadCounts = {}; this._blockedUsers = []; this._mutedUsers = []; }
+    },
+    _saveSocial() {
+        try {
+            localStorage.setItem('en_unread_counts', JSON.stringify(this._unreadCounts));
+            localStorage.setItem('en_blocked_users', JSON.stringify(this._blockedUsers));
+            localStorage.setItem('en_muted_users', JSON.stringify(this._mutedUsers));
+        } catch(e) {}
+    },
+    _isBlocked(username) { return this._blockedUsers.includes(username); },
+    _isMuted(username) { return this._mutedUsers.includes(username); },
+    _toggleBlock(username) {
+        if (this._isBlocked(username)) {
+            this._blockedUsers = this._blockedUsers.filter(u => u !== username);
+        } else {
+            this._blockedUsers.push(username);
+            delete this._unreadCounts['@' + username];
+            if (this.currentChat === '@' + username) this.selectChat('general');
+        }
+        this._saveSocial();
+        const reg = (typeof UserRegistry !== 'undefined') ? Object.values(UserRegistry.get() || {}) : [];
+        if (reg.length) this.renderFullUserList(reg);
+    },
+    _toggleMute(username) {
+        if (this._isMuted(username)) {
+            this._mutedUsers = this._mutedUsers.filter(u => u !== username);
+        } else {
+            this._mutedUsers.push(username);
+        }
+        this._saveSocial();
+        const reg = (typeof UserRegistry !== 'undefined') ? Object.values(UserRegistry.get() || {}) : [];
+        if (reg.length) this.renderFullUserList(reg);
+    },
+    _showUserMenu(ev, username) {
+        document.querySelectorAll('.user-context-menu').forEach(m => m.remove());
+        if (ev.preventDefault) try { ev.preventDefault(); } catch(_) {}
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const menuW = 220, menuH = 180;
+        let x = ev.clientX || vw/2, y = ev.clientY || vh/2;
+        if (x + menuW > vw - 10) x = vw - menuW - 10;
+        if (y + menuH > vh - 10) y = vh - menuH - 10;
+        const blocked = this._isBlocked(username);
+        const muted = this._isMuted(username);
+        const uEsc = escHtml(username);
+        const menu = document.createElement('div');
+        menu.className = 'user-context-menu';
+        menu.style.cssText = `position:fixed; left:${x}px; top:${y}px; z-index:99999;`;
+        menu.innerHTML = `
+            <div class="ucm-header">${uEsc}</div>
+            <button class="ucm-btn" onclick="App._toggleMute('${uEsc}'); App._closeUserMenu();">
+                ${muted ? '🔔 Stummschaltung aufheben' : '🔕 Stummschalten'}
+            </button>
+            <button class="ucm-btn ${blocked ? '' : 'danger'}" onclick="App._toggleBlock('${uEsc}'); App._closeUserMenu();">
+                ${blocked ? '✓ Entblockieren' : '⛔ Blockieren'}
+            </button>
+            <button class="ucm-btn" onclick="App._closeUserMenu();">Abbrechen</button>
+        `;
+        document.body.appendChild(menu);
+        setTimeout(() => {
+            const handler = (e) => {
+                if (!menu.contains(e.target)) {
+                    App._closeUserMenu();
+                    document.removeEventListener('click', handler, true);
+                    document.removeEventListener('contextmenu', handler, true);
+                }
+            };
+            document.addEventListener('click', handler, true);
+            document.addEventListener('contextmenu', handler, true);
+        }, 80);
+    },
+    _closeUserMenu() {
+        document.querySelectorAll('.user-context-menu').forEach(m => m.remove());
+    },
 
     // --- INIT ---
     async init() {
         console.log(`[App] Initialisiere Dashboard v1.6.6...`);
-        
+
+        // Unread-Counts + Block/Mute aus localStorage laden
+        this._loadSocial();
+
         // Background Parallax Effekt für den High-End Look
         this.initBackgroundParallax();
         
@@ -1113,8 +1222,8 @@ const App = window.App = {
         // 2. Registry speichern
         UserRegistry.save(registry);
 
-        // 3. Alle User anzeigen
-        const allMembers = Object.values(registry);
+        // 3. Alle User anzeigen — Blockierte ausblenden
+        const allMembers = Object.values(registry).filter(u => !this._isBlocked(u.username));
 
         // Zähler nur für ECHTE online Leute
         const onlineCount = onlineIds.size;
@@ -1124,8 +1233,11 @@ const App = window.App = {
         setEl('chatOnlineCountBadge', onlineCount);
         setEl('chatHeaderOnlineText', onlineCount + ' online');
 
-        // Sortieren: Online zuerst, dann nach Rang (Admin > Staff > User)
+        // Sortieren: 1. Ungelesene Messages, 2. Online zuerst, 3. Rang
+        const unreadFor = (u) => this._unreadCounts['@' + u.username] || 0;
         const sorted = allMembers.sort((a, b) => {
+            const ua = unreadFor(a), ub = unreadFor(b);
+            if (ua !== ub) return ub - ua;
             const aOn = onlineIds.has(a.discordId);
             const bOn = onlineIds.has(b.discordId);
             if (aOn !== bOn) return aOn ? -1 : 1;
@@ -1156,26 +1268,33 @@ const App = window.App = {
             ? `<div class="ovn-node" style="opacity:0.4"><div class="ovn-info"><div class="ovn-dot"></div><span style="font-size:11px;color:var(--text-muted)">Niemand bekannt</span></div></div>`
             : sorted.map(u => {
                 const isOnline = onlineIds.has(u.discordId);
+                const unread = unreadFor(u);
+                const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread > 99 ? '99+' : unread}</span>` : '';
+                const mutedIcon = this._isMuted(u.username) ? '<span class="muted-icon" title="Stumm">🔕</span>' : '';
+                const unameEsc = escHtml(u.username);
                 return `
-            <div class="ovn-node ${isOnline ? '' : 'offline'} ${App.currentChat === '@' + u.username ? 'active' : ''}"
+            <div class="ovn-node ${isOnline ? '' : 'offline'} ${App.currentChat === '@' + u.username ? 'active' : ''} ${unread > 0 ? 'has-unread' : ''}"
                  style="${isOnline ? '' : 'opacity: 0.55;'} cursor: pointer;"
-                 onclick="App.selectChat('@${u.username}')">
+                 onclick="App.selectChat('@${unameEsc}')"
+                 oncontextmenu="App._showUserMenu(event, '${unameEsc}'); return false;">
                 <div class="ovn-info">
                     ${avatarEl(u, isOnline)}
                     <div style="display:flex;flex-direction:column;min-width:0;">
                         <div style="display:flex;align-items:center;gap:3px;">
-                            <span class="ovn-name">${escHtml(u.username)}</span>
+                            <span class="ovn-name">${unameEsc}</span>
+                            ${mutedIcon}
                         </div>
                     </div>
                 </div>
                 ${badgeEl(u)}
-                
+                ${unreadBadge}
+
                 <!-- Profi-Preview Tooltip -->
                 <div class="ovn-preview">
                     <img src="${u.avatar || u.PFB || 'https://raw.githubusercontent.com/princearmy2024/Emden-Network/main/logo.png'}" class="ovnp-avatar">
-                    <div class="ovnp-name">${escHtml(u.username)}</div>
+                    <div class="ovnp-name">${unameEsc}</div>
                     <div class="ovnp-info">${u.role ? u.role.toUpperCase() : 'USER'} · ${isOnline ? 'LIVE' : 'OFFLINE'}</div>
-                    <div class="ovnp-hint">Privat schreiben 🖱️</div>
+                    <div class="ovnp-hint">Privat schreiben 🖱️ · Rechtsklick: Menu</div>
                 </div>
             </div>`;
             }).join('');
@@ -1270,6 +1389,16 @@ const App = window.App = {
     // --- MESSAGES ---
     selectChat(name) {
         this.currentChat = name;
+
+        // Unread-Count fuer diese Konversation zuruecksetzen
+        if (this._unreadCounts[name] > 0) {
+            this._unreadCounts[name] = 0;
+            this._saveSocial();
+            try {
+                const reg = Object.values(UserRegistry.get() || {});
+                if (reg.length) this.renderFullUserList(reg);
+            } catch(_) {}
+        }
 
         if (this.currentView !== 'messages') {
             this.navigate('messages');

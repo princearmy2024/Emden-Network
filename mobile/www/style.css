@@ -180,6 +180,52 @@ input { font-family: inherit; outline: none; border: none; background: none; col
 }
 .user-role.admin { color: var(--brand); border-color: rgba(0,136,255,0.2); background: rgba(0,136,255,0.08); }
 
+.unread-badge {
+    min-width: 20px; height: 20px; padding: 0 6px;
+    border-radius: 10px;
+    background: #ef4444; color: #fff;
+    font-size: 11px; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: auto;
+    box-shadow: 0 2px 8px rgba(239,68,68,0.35);
+}
+.user-item.has-unread .user-name { font-weight: 700; color: #fff; }
+.user-item.has-unread { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.18); }
+.muted-icon { font-size: 12px; opacity: 0.6; margin-left: 4px; }
+
+/* Context Menu (Long-Press / Right-Click) */
+.user-context-menu {
+    background: rgba(18, 22, 34, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 6px;
+    min-width: 220px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    animation: ucmIn 0.15s ease-out;
+    -webkit-user-select: none; user-select: none;
+}
+@keyframes ucmIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.ucm-header {
+    padding: 10px 12px 8px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ucm-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 12px 14px; margin: 0;
+    background: transparent; border: none; border-radius: 8px;
+    color: #fff; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.ucm-btn:hover, .ucm-btn:active { background: rgba(255,255,255,0.06); }
+.ucm-btn.danger { color: #ef4444; }
+.ucm-btn.danger:hover, .ucm-btn.danger:active { background: rgba(239,68,68,0.12); }
+
 /* ── CHAT PANEL ── */
 .chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .chat-panel.hidden { display: none; }

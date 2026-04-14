@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.61.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.62.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -144,6 +144,48 @@ const App = {
     _typingTimeout: null,
     _users: [],
     _staffVerified: false, // Wird NUR durch erfolgreiches /api/check-staff auf true gesetzt
+    _unreadCounts: {},     // { 'general': n, '@username': n }
+    _blockedUsers: [],     // ['username', ...]
+    _mutedUsers: [],       // ['username', ...]
+
+    _loadSocial() {
+        try {
+            this._unreadCounts = JSON.parse(localStorage.getItem('en_unread_counts') || '{}');
+            this._blockedUsers = JSON.parse(localStorage.getItem('en_blocked_users') || '[]');
+            this._mutedUsers = JSON.parse(localStorage.getItem('en_muted_users') || '[]');
+        } catch(e) {
+            this._unreadCounts = {}; this._blockedUsers = []; this._mutedUsers = [];
+        }
+    },
+    _saveSocial() {
+        try {
+            localStorage.setItem('en_unread_counts', JSON.stringify(this._unreadCounts));
+            localStorage.setItem('en_blocked_users', JSON.stringify(this._blockedUsers));
+            localStorage.setItem('en_muted_users', JSON.stringify(this._mutedUsers));
+        } catch(e) {}
+    },
+    _isBlocked(username) { return this._blockedUsers.includes(username); },
+    _isMuted(username) { return this._mutedUsers.includes(username); },
+    _toggleBlock(username) {
+        if (this._isBlocked(username)) {
+            this._blockedUsers = this._blockedUsers.filter(u => u !== username);
+        } else {
+            this._blockedUsers.push(username);
+            delete this._unreadCounts['@' + username];
+            if (this.currentChat === '@' + username) this.showUserList();
+        }
+        this._saveSocial();
+        if (this._users) this.renderUsers(this._users);
+    },
+    _toggleMute(username) {
+        if (this._isMuted(username)) {
+            this._mutedUsers = this._mutedUsers.filter(u => u !== username);
+        } else {
+            this._mutedUsers.push(username);
+        }
+        this._saveSocial();
+        if (this._users) this.renderUsers(this._users);
+    },
 
     async login() {
         const code = document.getElementById('loginCode').value.trim();
@@ -178,6 +220,7 @@ const App = {
             if (Auth.user.role === 'staff' || Auth.user.role === 'admin') Auth.user.role = 'user';
             Auth.save();
         }
+        this._loadSocial();
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('appScreen').classList.add('active');
         this.applyUser();
@@ -681,8 +724,17 @@ const App = {
         const onlineCount = users.filter(u => u.online).length;
         if (count) count.textContent = onlineCount;
 
-        const sorted = [...users].sort((a, b) => {
+        // Blockierte User komplett ausblenden
+        const visible = users.filter(u => !this._isBlocked(u.username));
+
+        const sorted = [...visible].sort((a, b) => {
+            // 1. Ungelesene Nachrichten zuerst (desc)
+            const ua = this._unreadCounts['@' + a.username] || 0;
+            const ub = this._unreadCounts['@' + b.username] || 0;
+            if (ua !== ub) return ub - ua;
+            // 2. Online vor offline
             if (a.online !== b.online) return a.online ? -1 : 1;
+            // 3. Role rank
             const rank = r => r === 'admin' ? 0 : r === 'staff' ? 1 : 2;
             return rank(a.role) - rank(b.role);
         });
@@ -693,15 +745,97 @@ const App = {
             const avatarInner = u.avatar
                 ? `<img src="${escHtml(u.avatar)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">${initial}</span>`
                 : initial;
-            const roleClass = u.role === 'admin' ? 'admin' : '';
             const roleBadge = u.role === 'admin' ? `<span class="user-role admin">ADMIN</span>` : u.role === 'staff' ? `<span class="user-role">STAFF</span>` : '';
+            const unread = this._unreadCounts['@' + u.username] || 0;
+            const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread > 99 ? '99+' : unread}</span>` : '';
+            const mutedIcon = this._isMuted(u.username) ? '<span class="muted-icon" title="Stumm">🔕</span>' : '';
+            const unameEsc = escHtml(u.username);
+            const avatarEsc = escHtml(u.avatar || '');
 
-            return `<div class="user-item ${isOnline ? '' : 'offline'} ${this.currentChat === '@' + u.username ? 'active' : ''}" onclick="App.openChat('@${escHtml(u.username)}', '${escHtml(u.avatar || '')}')">
+            return `<div class="user-item ${isOnline ? '' : 'offline'} ${this.currentChat === '@' + u.username ? 'active' : ''} ${unread > 0 ? 'has-unread' : ''}"
+                onclick="App.openChat('@${unameEsc}', '${avatarEsc}')"
+                oncontextmenu="App._showUserMenu(event, '${unameEsc}'); return false;"
+                ontouchstart="App._longPressStart(event, '${unameEsc}')"
+                ontouchend="App._longPressEnd(event)"
+                ontouchmove="App._longPressEnd(event)"
+                ontouchcancel="App._longPressEnd(event)">
                 <div class="user-avatar">${avatarInner}<div class="status-dot ${isOnline ? '' : 'offline'}"></div></div>
-                <span class="user-name">${escHtml(u.username)}</span>
+                <span class="user-name">${unameEsc}</span>
+                ${mutedIcon}
                 ${roleBadge}
+                ${unreadBadge}
             </div>`;
         }).join('');
+    },
+
+    // ── Long-Press / Context-Menu ──
+    _longPressStart(ev, username) {
+        this._longPressFired = false;
+        if (this._longPressTimer) clearTimeout(this._longPressTimer);
+        const touch = ev.touches?.[0];
+        const x = touch?.clientX || 0;
+        const y = touch?.clientY || 0;
+        this._longPressTimer = setTimeout(() => {
+            this._longPressFired = true;
+            this._longPressTimer = null;
+            try { if (navigator.vibrate) navigator.vibrate(30); } catch(_) {}
+            this._showUserMenu({ clientX: x, clientY: y }, username);
+        }, 450);
+    },
+    _longPressEnd(ev) {
+        if (this._longPressTimer) { clearTimeout(this._longPressTimer); this._longPressTimer = null; }
+    },
+
+    _showUserMenu(ev, username) {
+        // Existierendes Menu schliessen
+        document.querySelectorAll('.user-context-menu').forEach(m => m.remove());
+
+        if (ev.preventDefault) try { ev.preventDefault(); } catch(_) {}
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const menuW = 220;
+        const menuH = 180;
+        let x = (ev.clientX || vw/2);
+        let y = (ev.clientY || vh/2);
+        if (x + menuW > vw - 10) x = vw - menuW - 10;
+        if (y + menuH > vh - 10) y = vh - menuH - 10;
+        if (y < 10) y = 10;
+
+        const blocked = this._isBlocked(username);
+        const muted = this._isMuted(username);
+        const unameEsc = escHtml(username);
+
+        const menu = document.createElement('div');
+        menu.className = 'user-context-menu';
+        menu.style.cssText = `position:fixed; left:${x}px; top:${y}px; z-index:9999;`;
+        menu.innerHTML = `
+            <div class="ucm-header">${unameEsc}</div>
+            <button class="ucm-btn" onclick="App._toggleMute('${unameEsc}'); App._closeUserMenu();">
+                ${muted ? '🔔 Stummschaltung aufheben' : '🔕 Stummschalten'}
+            </button>
+            <button class="ucm-btn ${blocked ? '' : 'danger'}" onclick="App._toggleBlock('${unameEsc}'); App._closeUserMenu();">
+                ${blocked ? '✓ Entblockieren' : '⛔ Blockieren'}
+            </button>
+            <button class="ucm-btn" onclick="App._closeUserMenu();">Abbrechen</button>
+        `;
+        document.body.appendChild(menu);
+
+        // Schliessen bei Click ausserhalb
+        setTimeout(() => {
+            const handler = (e) => {
+                if (!menu.contains(e.target)) {
+                    this._closeUserMenu();
+                    document.removeEventListener('click', handler, true);
+                    document.removeEventListener('touchstart', handler, true);
+                }
+            };
+            document.addEventListener('click', handler, true);
+            document.addEventListener('touchstart', handler, true);
+        }, 80);
+    },
+    _closeUserMenu() {
+        document.querySelectorAll('.user-context-menu').forEach(m => m.remove());
     },
 
     // ── Chat ──
@@ -717,7 +851,15 @@ const App = {
     },
 
     openChat(name, avatar) {
+        // Wenn ein Long-Press gerade das Menu getriggert hat, den nachfolgenden Click ignorieren
+        if (this._longPressFired) { this._longPressFired = false; return; }
         this.currentChat = name;
+        // Unread-Count fuer diese Konversation zuruecksetzen
+        if (this._unreadCounts[name] > 0) {
+            this._unreadCounts[name] = 0;
+            this._saveSocial();
+            if (this._users) this.renderUsers(this._users);
+        }
         document.getElementById('userListPanel').style.display = 'none';
         document.getElementById('chatPanel').classList.remove('hidden');
         document.getElementById('chatBackBtn').classList.remove('hidden');
@@ -779,33 +921,35 @@ const App = {
     },
 
     receiveMessage(msg) {
+        const myUser = Auth.user?.username;
+        // Blockierte User: Nachricht komplett droppen (kein Display, kein Save, kein Notify)
+        if (msg.username !== myUser && this._isBlocked(msg.username)) return;
+
         const channel = this.currentChat || 'general';
         const from = msg.to || 'general';
-        const myUser = Auth.user?.username;
         const isOwnEcho = msg.username === myUser;
 
         // Bestimme den Konversations-Key
-        // - General: 'general'
-        // - PN von jemandem an mich: '@<sender>' (msg.username)
-        // - Eigene PN an jemanden (echo von Bot): '@<empfaenger>' (msg.to ohne @)
         let convKey;
         if (from === 'general') convKey = 'general';
         else if (isOwnEcho) convKey = from; // '@target'
         else convKey = '@' + msg.username;
 
-        // Chat-View ueberhaupt sichtbar?
         const chatViewActive = document.querySelector('.view.active')?.id === 'view-chat';
         const inCurrentChat  = chatViewActive && channel === convKey;
 
         if (inCurrentChat) {
             this._displayMsg(msg);
-            // Read-Receipt an Sender zuruecksenden (kein Self-Echo)
             if (!isOwnEcho) {
                 try { socket?.emit('msg_read', { msgId: msg.id, reader: myUser, sender: msg.username }); } catch(_) {}
             }
         } else if (!isOwnEcho) {
-            // Notification: User sieht Chat nicht oder ist in anderem Thread
-            this._notify(msg);
+            // Unread-Count fuer diese Konversation erhoehen
+            this._unreadCounts[convKey] = (this._unreadCounts[convKey] || 0) + 1;
+            this._saveSocial();
+            if (this._users) this.renderUsers(this._users);
+            // Gemutete User: kein Ton/Vibration/Notification, nur Badge
+            if (!this._isMuted(msg.username)) this._notify(msg);
         }
         this._saveMsg(msg, convKey);
     },
