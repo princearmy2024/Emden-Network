@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.9'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.61.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -73,6 +73,68 @@ function connectSocket() {
     });
     socket.on('msg_deleted', ({ msgId }) => {
         document.getElementById(msgId)?.remove();
+    });
+
+    // Persoenliche Discord-Mention → Systembenachrichtigung
+    const myDid = Auth.user?.discordId;
+    if (myDid) {
+        socket.on(`dc_mention_${myDid}`, (data) => {
+            App._notifyRaw({
+                title: data.title || 'Discord-Erwaehnung',
+                body: data.message || '',
+                icon: data.authorAvatar,
+                tag: 'en-mention-' + Date.now(),
+            });
+        });
+    }
+
+    // Panic-Alert (alle Staff)
+    socket.on('panic_alert', (data) => {
+        if (!App._isStaff()) return;
+        App._notifyRaw({
+            title: '🚨 PANIC BUTTON',
+            body: `${data.username || 'Unbekannt'} braucht Hilfe!`,
+            icon: data.avatar,
+            tag: 'en-panic-' + Date.now(),
+            requireInteraction: true,
+        });
+    });
+
+    // Neues Ticket (alle Staff)
+    socket.on('overlay_new_ticket', (data) => {
+        if (!App._isStaff()) return;
+        App._notifyRaw({
+            title: '📩 Neues Ticket',
+            body: `${data.channelName || data.ticketId} — ${data.reason || ''}`,
+            tag: 'en-ticket-' + (data.ticketId || Date.now()),
+        });
+    });
+
+    // Support-Warteraum (alle Staff)
+    socket.on('support_waiting', (data) => {
+        if (!App._isStaff()) return;
+        if (data.action !== 'join') return;
+        App._notifyRaw({
+            title: '🎧 Support-Warteraum',
+            body: `${data.username} wartet in ${data.channelName || ''}`,
+            icon: data.avatar,
+            tag: 'en-support-' + (data.userId || Date.now()),
+        });
+    });
+
+    // Streak (eigener)
+    socket.on('streak_complete', (data) => {
+        if (data.discordId !== Auth.user?.discordId) return;
+        App._notifyRaw({
+            title: '🔥 Streak!',
+            body: `${data.streak} Tage in Folge — weiter so!`,
+            tag: 'en-streak-' + Date.now(),
+        });
+    });
+
+    // Shift-Update (fuer Mod-Panel Live-Refresh)
+    socket.on('shift_update', (data) => {
+        App._onShiftUpdate?.(data);
     });
 }
 
@@ -731,11 +793,18 @@ const App = {
         else if (isOwnEcho) convKey = from; // '@target'
         else convKey = '@' + msg.username;
 
-        // Anzeigen wenn aktuell in dieser Konversation
-        if (channel === convKey) {
+        // Chat-View ueberhaupt sichtbar?
+        const chatViewActive = document.querySelector('.view.active')?.id === 'view-chat';
+        const inCurrentChat  = chatViewActive && channel === convKey;
+
+        if (inCurrentChat) {
             this._displayMsg(msg);
+            // Read-Receipt an Sender zuruecksenden (kein Self-Echo)
+            if (!isOwnEcho) {
+                try { socket?.emit('msg_read', { msgId: msg.id, reader: myUser, sender: msg.username }); } catch(_) {}
+            }
         } else if (!isOwnEcho) {
-            // Notification fuer eingehende Nachrichten in anderen Chats
+            // Notification: User sieht Chat nicht oder ist in anderem Thread
             this._notify(msg);
         }
         this._saveMsg(msg, convKey);
@@ -746,14 +815,29 @@ const App = {
         const title = msg.to === 'general' ? '#general' : msg.username;
         const body = (msg.to === 'general' ? msg.username + ': ' : '') + (text.startsWith('data:image') ? '[Bild]' : text.slice(0, 120));
 
+        this._notifyRaw({
+            title,
+            body,
+            icon: msg.avatar,
+            tag: 'en-mobile-' + (msg.id || Date.now()),
+            onClick: () => { try { window.focus(); } catch(_) {} if (msg.to !== 'general') this.openChat('@' + msg.username, msg.avatar); },
+        });
+    },
+
+    // Zentraler Notification-Helper — nutzt Web-Notification API + Vibration + Beep
+    _notifyRaw({ title, body, icon, tag, onClick, requireInteraction }) {
         try {
             if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                const n = new Notification(title, { body, icon: msg.avatar || undefined, tag: 'en-mobile-' + (msg.id || Date.now()) });
-                n.onclick = () => { window.focus(); if (msg.to !== 'general') this.openChat('@' + msg.username, msg.avatar); };
+                const n = new Notification(title || 'Emden Network', {
+                    body: body || '',
+                    icon: icon || undefined,
+                    tag: tag || ('en-' + Date.now()),
+                    requireInteraction: !!requireInteraction,
+                });
+                if (onClick) n.onclick = onClick;
             }
         } catch(e) {}
-
-        try { if (navigator.vibrate) navigator.vibrate(80); } catch(e) {}
+        try { if (navigator.vibrate) navigator.vibrate(requireInteraction ? [120, 60, 120, 60, 120] : 80); } catch(e) {}
         try { this._beep(); } catch(e) {}
     },
 

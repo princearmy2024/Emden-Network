@@ -305,7 +305,7 @@ const WebSocketService = {
                 if (shouldShow && window.App) {
                     App._displayMessage(msg);
                     // Read Receipt senden
-                    this.socket.emit('msg_read', { msgId: msg.id, reader: me?.username });
+                    this.socket.emit('msg_read', { msgId: msg.id, reader: me?.username, sender: msg.username });
                 }
 
                 // Immer speichern

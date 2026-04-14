@@ -2075,6 +2075,11 @@ const apiServer = http.createServer(async (req, res) => {
                         shiftData[id].startedAt = shiftData[id].state === 'active' ? Date.now() : null;
                     }
                     saveShifts();
+                    // Broadcast: alle Clients muessen Shift-Liste neu laden
+                    for (const id of Object.keys(shiftData)) {
+                        const known = allKnownUsers.get(id);
+                        io.emit('shift_update', { discordId: id, state: shiftData[id].state, totalMs: 0, username: known?.username || '?' });
+                    }
                     res.writeHead(200);
                     return res.end(JSON.stringify({ success: true, message: "Alle Shifts zurückgesetzt" }));
                 }
@@ -2098,6 +2103,11 @@ const apiServer = http.createServer(async (req, res) => {
                     if (s.state === 'break') s.breakStartedAt = Date.now();
                 }
                 saveShifts();
+                // Broadcast: alle Clients muessen die neue Zeit sehen
+                const known = allKnownUsers.get(targetDiscordId);
+                let liveTotal = s.savedMs || 0;
+                if (s.state === 'active' && s.startedAt) liveTotal += Date.now() - s.startedAt;
+                io.emit('shift_update', { discordId: targetDiscordId, state: s.state, totalMs: liveTotal, username: known?.username || '?' });
 
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
@@ -2462,11 +2472,12 @@ io.on("connection", (socket) => {
         }
     });
 
-    // Read Receipt
-    socket.on("msg_read", ({ msgId, reader }) => {
-        // Finde den Sender und schicke ihm den Read-Status
+    // Read Receipt — nur an den urspruenglichen Sender (alle seine Geraete), nicht an alle
+    socket.on("msg_read", ({ msgId, reader, sender }) => {
+        if (!sender) return; // Privacy: ohne expliziten Sender nichts broadcasten
         for (const [sid, s] of io.sockets.sockets) {
-            if (sid !== socket.id) {
+            if (sid === socket.id) continue;
+            if (s.chatUsername === sender) {
                 s.emit("msg_status", { id: msgId, status: 'read', reader });
             }
         }
