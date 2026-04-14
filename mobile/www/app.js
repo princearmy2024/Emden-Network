@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.60.7'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.60.8'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -81,6 +81,7 @@ const App = {
     currentChat: 'general',
     _typingTimeout: null,
     _users: [],
+    _staffVerified: false, // Wird NUR durch erfolgreiches /api/check-staff auf true gesetzt
 
     async login() {
         const code = document.getElementById('loginCode').value.trim();
@@ -108,6 +109,13 @@ const App = {
     },
 
     showApp() {
+        // Security: gecachten Staff-Status NIE vertrauen. Erst nach verifyRoleLive() freischalten.
+        this._staffVerified = false;
+        if (Auth.user) {
+            Auth.user.isStaff = false;
+            if (Auth.user.role === 'staff' || Auth.user.role === 'admin') Auth.user.role = 'user';
+            Auth.save();
+        }
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('appScreen').classList.add('active');
         this.applyUser();
@@ -137,7 +145,13 @@ const App = {
                 body: JSON.stringify({ discordId: u.discordId })
             });
             const d = await res.json();
-            if (!d.success) return;
+            if (!d.success) {
+                // Fail-closed: bei unklarer Antwort Staff-Rechte verweigern + aus Mod-View werfen
+                this._staffVerified = false;
+                if (Auth.user) { Auth.user.isStaff = false; Auth.user.role = 'user'; Auth.save(); this.applyUser(); }
+                if (document.querySelector('.view.active')?.id === 'view-mod') this.switchTab('home');
+                return;
+            }
             // Sync lokale Session mit Server
             const serverIsStaff = !!d.isStaff;
             const serverIsAdmin = !!d.isAdmin;
@@ -145,9 +159,20 @@ const App = {
                 Auth.user.isStaff = serverIsStaff;
                 Auth.user.role = serverIsAdmin ? 'admin' : serverIsStaff ? 'staff' : 'user';
                 Auth.save();
+                // Nur jetzt ist Staff-Zugriff erlaubt — Server hat bestaetigt
+                this._staffVerified = serverIsStaff || serverIsAdmin;
                 this.applyUser();
+                // Falls Rolle entzogen wurde waehrend Mod-View offen: sofort rauswerfen
+                if (!serverIsStaff && !serverIsAdmin && document.querySelector('.view.active')?.id === 'view-mod') {
+                    this.switchTab('home');
+                }
             }
-        } catch(e) {}
+        } catch(e) {
+            // Fail-closed bei Netzwerkfehler
+            this._staffVerified = false;
+            if (Auth.user) { Auth.user.isStaff = false; Auth.user.role = 'user'; Auth.save(); this.applyUser(); }
+            if (document.querySelector('.view.active')?.id === 'view-mod') this.switchTab('home');
+        }
     },
 
     applyUser() {
@@ -169,8 +194,8 @@ const App = {
         const roleEl = document.getElementById('settingsRole');
         if (roleEl) roleEl.textContent = u.role === 'admin' ? 'Administrator' : 'Mitglied';
 
-        // Mod-Tab nur fuer Staff/Admin sichtbar machen
-        const isStaff = u.isStaff || u.role === 'staff' || u.role === 'admin';
+        // Mod-Tab nur fuer verifizierte Staff/Admin sichtbar machen (Cache allein reicht nicht)
+        const isStaff = this._staffVerified && (u.isStaff || u.role === 'staff' || u.role === 'admin');
         document.querySelectorAll('.staff-only').forEach(el => {
             if (isStaff) el.classList.remove('hidden');
             else el.classList.add('hidden');
@@ -178,6 +203,7 @@ const App = {
     },
 
     logout() {
+        this._staffVerified = false;
         Auth.clear();
         socket?.disconnect();
         document.getElementById('appScreen').classList.remove('active');
@@ -189,7 +215,18 @@ const App = {
     _tabOrder: ['home', 'chat', 'mod', 'team', 'settings'],
     _currentTabIndex: 0,
 
+    _isStaff() {
+        // HART: Staff-Zugriff NUR nach erfolgreicher Server-Verifikation. Cache allein reicht nie.
+        if (!this._staffVerified) return false;
+        const u = Auth.user;
+        return !!(u && (u.isStaff === true || u.role === 'staff' || u.role === 'admin'));
+    },
+
     switchTab(tab) {
+        // Security-Gate: Mod-View nur fuer verifizierte Staff/Admin
+        if (tab === 'mod' && !this._isStaff()) {
+            tab = 'home';
+        }
         const order = this._tabOrder;
         const newIdx = order.indexOf(tab);
         const direction = newIdx > this._currentTabIndex ? 'right' : (newIdx < this._currentTabIndex ? 'left' : null);
@@ -447,6 +484,7 @@ const App = {
 
     // ── MOD LOG ──
     async loadModLog() {
+        if (!this._isStaff()) return;
         const list = document.getElementById('modLogList');
         if (!list) return;
         try {
@@ -949,6 +987,7 @@ const App = {
     _modSelectedUser: null,
 
     async modSearchUser() {
+        if (!this._isStaff()) { this.switchTab('home'); return; }
         const query = document.getElementById('modSearchInput').value.trim();
         const result = document.getElementById('modSearchResult');
         if (!query) { result.innerHTML = ''; return; }
@@ -1037,6 +1076,7 @@ const App = {
     },
 
     async modSubmit(action) {
+        if (!this._isStaff()) { this._modStatus('error', 'Keine Berechtigung.'); this.switchTab('home'); return; }
         if (!this._modSelectedUser) return;
         const reason = document.getElementById('modReasonInput').value.trim();
         if (!reason) {

@@ -664,8 +664,16 @@ const Overlay = (() => {
         const current = area.querySelectorAll('.notif-card:not(.out)');
         if (current.length >= MAX_NOTIFS) dismiss(current[current.length - 1]);
 
-        const icons   = { ticket: 'ticket', admin: 'shield', announce: 'megaphone' };
-        const icoName = icons[type] || 'megaphone';
+        const icons   = {
+            ticket: 'ticket',
+            admin: 'shield',
+            announce: 'megaphone',
+            mention: 'at-sign',
+            support: 'headphones',
+            streak: 'flame',
+            info: 'info',
+        };
+        const icoName = icons[type] || 'bell';
         const time    = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 
         const el = document.createElement('div');
