@@ -671,6 +671,9 @@ client.on("interactionCreate", async interaction => {
     // 🏆 LEADERBOARD Pagination / Refresh Buttons
     // ============================================
     if (interaction.isButton() && (interaction.customId === 'lb_prev' || interaction.customId === 'lb_next' || interaction.customId === 'lb_refresh')) {
+        // 1) Interaction SOFORT acknowledgen (3s Discord-Deadline) — heavy work danach
+        try { await interaction.deferUpdate(); }
+        catch(e) { console.warn('[Leaderboard] deferUpdate scheiterte:', e.message); return; }
         try {
             const cfg = panelConfig.leaderboard || {};
             const curPage = cfg.currentPage || 0;
@@ -679,15 +682,14 @@ client.on("interactionCreate", async interaction => {
             let newPage = curPage;
             if (interaction.customId === 'lb_next') newPage = Math.min(curPage + 1, totalPages - 1);
             else if (interaction.customId === 'lb_prev') newPage = Math.max(curPage - 1, 0);
-            // lb_refresh: newPage bleibt gleich, Container wird neu gebaut
             panelConfig.leaderboard = { ...cfg, currentPage: newPage };
             savePanelConfig();
             const container = await buildLeaderboardContainer(newPage);
-            if (!container) { await interaction.deferUpdate().catch(() => {}); return; }
-            await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            if (!container) return;
+            // Nach deferUpdate: Nachricht editieren via editReply
+            await interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
         } catch(e) {
-            console.error('[Leaderboard] Button-Fehler:', e.message);
-            await interaction.deferUpdate().catch(() => {});
+            console.error('[Leaderboard] Button-Fehler nach defer:', e.message);
         }
         return;
     }
@@ -897,14 +899,6 @@ client.on("interactionCreate", async interaction => {
             }
 
             const profileUrl = `https://www.roblox.com/users/${robloxUserId}/profile`;
-            const headerSection = new SectionBuilder()
-                .addTextDisplayComponents(
-                    new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName}`)
-                );
-            if (avatar) {
-                headerSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
-            }
-
             const { ButtonBuilder, ButtonStyle } = await import('discord.js');
             const buttonRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -914,8 +908,17 @@ client.on("interactionCreate", async interaction => {
                     .setEmoji({ name: 'roblox', id: '1433535007246516446' })
             );
 
-            const container = new ContainerBuilder()
-                .addSectionComponents(headerSection)
+            // Header — SectionBuilder braucht Accessory, nur bei Avatar. Sonst plain TextDisplay.
+            const container = new ContainerBuilder();
+            if (avatar) {
+                const headerSection = new SectionBuilder()
+                    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName}`))
+                    .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
+                container.addSectionComponents(headerSection);
+            } else {
+                container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName}`));
+            }
+            container
                 .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(
@@ -1068,17 +1071,17 @@ client.on("interactionCreate", async interaction => {
             const profileUrl = `https://www.roblox.com/users/${robloxUserId}/profile`;
             const { ButtonBuilder, ButtonStyle } = await import('discord.js');
 
-            // Header mit Avatar
-            const headerSection = new SectionBuilder()
-                .addTextDisplayComponents(
-                    new TextDisplayBuilder().setContent(`# ${displayName}'s moderations`)
-                );
+            // Header — SectionBuilder braucht Accessory, nur bei Avatar. Sonst plain TextDisplay.
+            const container = new ContainerBuilder();
             if (avatar) {
-                headerSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
+                const headerSection = new SectionBuilder()
+                    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${displayName}'s moderations`))
+                    .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
+                container.addSectionComponents(headerSection);
+            } else {
+                container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${displayName}'s moderations`));
             }
-
-            const container = new ContainerBuilder()
-                .addSectionComponents(headerSection)
+            container
                 .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(
@@ -1839,17 +1842,6 @@ const apiServer = http.createServer(async (req, res) => {
 
                 const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
 
-                // Header Section mit Avatar
-                const headerSection = new SectionBuilder()
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName || username}`)
-                    );
-                if (avatar) {
-                    headerSection.setThumbnailAccessory(
-                        new ThumbnailBuilder().setURL(avatar)
-                    );
-                }
-
                 // Roblox Profil Button mit Custom Emoji
                 const { ButtonBuilder, ButtonStyle } = await import('discord.js');
                 const buttonRow = new ActionRowBuilder().addComponents(
@@ -1860,9 +1852,22 @@ const apiServer = http.createServer(async (req, res) => {
                         .setEmoji({ name: 'roblox', id: '1433535007246516446' })
                 );
 
-                // Container bauen
-                const container = new ContainerBuilder()
-                    .addSectionComponents(headerSection)
+                // Container bauen — SectionBuilder braucht zwingend ein Accessory (Thumbnail),
+                // daher nur nutzen wenn Avatar vorhanden. Sonst plain TextDisplay.
+                const container = new ContainerBuilder();
+                if (avatar) {
+                    const headerSection = new SectionBuilder()
+                        .addTextDisplayComponents(
+                            new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName || username}`)
+                        )
+                        .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar));
+                    container.addSectionComponents(headerSection);
+                } else {
+                    container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`${emoji} **${action}**\n# ${displayName || username}`)
+                    );
+                }
+                container
                     .addSeparatorComponents(
                         new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
                     )
@@ -2877,16 +2882,10 @@ function stateLabel(state) {
 
 // Single Source für Leaderboard-Daten (damit Pagination und Auto-Update dieselben Zeilen haben)
 async function collectLeaderboardRows() {
-    const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+    // Cache-only — startOverlayDataLoop haelt Members aktuell (15s Intervall).
+    // Kein members.fetch() hier: blockt sonst den Interaction-Response und spamt bei grossen Guilds Timeouts.
+    const guild = client.guilds.cache.get(GUILD_ID);
     if (!guild) return null;
-    try {
-        await Promise.race([
-            guild.members.fetch(),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('members_fetch_timeout')), 10000)),
-        ]);
-    } catch(e) {
-        console.warn(`[Leaderboard] members.fetch Warnung: ${e.message} — nutze Cache (${guild.members.cache.size} Member)`);
-    }
     const EN_TEAM_ROLE_ID = "1365083291044282389";
     const enTeamMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.has(EN_TEAM_ROLE_ID));
     const rows = [];

@@ -1,6 +1,6 @@
 {
-    "version": "4.63.2",
+    "version": "4.63.3",
     "releaseDate": "2026-04-18",
-    "notes": "v4.63.2: Mod-Panel Transparenz-Slider wirkt jetzt wirklich (CSS-Spezifitaet-Fix). Leaderboard komplett ueberarbeitet — Pagination mit Vor/Zurueck/Refresh-Buttons, professionelleres Design mit Icons, Podium-Hervorhebung Top 3, Seite-X/Y Indikator, Auto-Update jetzt alle 3s statt 60s. Bot: ON_DUTY-Rolle startet/beendet Shift automatisch ohne dass User in der App klicken muss.",
+    "notes": "v4.63.3: Bot-Fixes — Leaderboard-Buttons antworten jetzt instant (deferUpdate vor Heavy-Work, keine 'Interaktion fehlgeschlagen' mehr). members.fetch Timeout-Spam im Log eliminiert (Cache-only). /moderate + /api/mod-action crashten bei Roblox-Usern ohne Avatar (SectionBuilder ohne Accessory) — jetzt mit Fallback auf TextDisplay.",
     "forceUpdate": true
 }
