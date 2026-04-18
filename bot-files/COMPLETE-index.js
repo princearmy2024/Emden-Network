@@ -262,12 +262,20 @@ function generateSupportCaseId() {
 }
 
 async function postSupportCase(member) {
+    const uname = member.displayName || member.user.username;
+    console.log(`[Support] postSupportCase aufgerufen fuer ${uname} (${member.id}) → Channel ${SUPPORT_LOGS_CHANNEL_ID}, Role-Ping ${SUPPORT_PING_ROLE_ID}`);
+
     // Verhindere doppelte Cases: wenn User schon einen offenen Case hat, nichts tun
-    if (findOpenSupportCase(member.id)) return;
+    const existing = findOpenSupportCase(member.id);
+    if (existing) {
+        console.log(`[Support] SKIP: ${uname} hat schon offenen Case #S-${existing.caseId} (status=${existing.status}). Kein neues Panel.`);
+        return;
+    }
 
     // Cache-first, dann fetch mit Fehler-Logging
     const guild = client.guilds.cache.get(GUILD_ID);
     let logsChannel = guild?.channels?.cache?.get(SUPPORT_LOGS_CHANNEL_ID) || null;
+    if (logsChannel) console.log(`[Support] Logs-Channel im Cache gefunden: #${logsChannel.name} (${logsChannel.id})`);
     if (!logsChannel) {
         try {
             logsChannel = await client.channels.fetch(SUPPORT_LOGS_CHANNEL_ID);
@@ -3381,6 +3389,7 @@ async function checkGithubRelease() {
 
 client.once("ready", async () => {
     console.log(`🤖 ${client.user.tag} ist online!`);
+    console.log(`[Bot-Config] Support-System → Warteraum=${SUPPORT_VOICE_CHANNEL_ID}, Logs=${SUPPORT_LOGS_CHANNEL_ID}, Ping-Rolle=${SUPPORT_PING_ROLE_ID}`);
 
     // === Trident-Einträge importieren (einmalig beim Start) ===
     if (Object.keys(modHistory).length === 0) {
