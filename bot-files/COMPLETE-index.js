@@ -1100,14 +1100,27 @@ const apiServer = http.createServer(async (req, res) => {
         try {
             const EN_TEAM_CHECK = "1365083291044282389";
             const g = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
-            const m = await g.members.fetch(callerDid).catch(() => null);
-            if (!m || !m.roles.cache.has(EN_TEAM_CHECK)) {
+            // Cache-First: verhindert, dass transiente Discord-API-Fehler Staff aussperren
+            let m = g.members.cache.get(callerDid) || null;
+            if (!m) {
+                try { m = await g.members.fetch(callerDid); }
+                catch(fErr) {
+                    if (fErr?.code === 10007) {
+                        res.writeHead(403);
+                        return res.end(JSON.stringify({ error: "Nicht im Server" }));
+                    }
+                    // Transienter Fehler → 503 statt 403, damit Client weiss, dass Retry sinnvoll ist
+                    res.writeHead(503);
+                    return res.end(JSON.stringify({ error: "member_fetch_failed", retry: true }));
+                }
+            }
+            if (!m.roles.cache.has(EN_TEAM_CHECK)) {
                 res.writeHead(403);
                 return res.end(JSON.stringify({ error: "Nicht berechtigt (keine EN-Team-Rolle)" }));
             }
         } catch (e) {
-            res.writeHead(403);
-            return res.end(JSON.stringify({ error: "Auth-Check fehlgeschlagen" }));
+            res.writeHead(503);
+            return res.end(JSON.stringify({ error: "Auth-Check fehlgeschlagen", retry: true }));
         }
     }
 
@@ -1546,14 +1559,26 @@ const apiServer = http.createServer(async (req, res) => {
                 try {
                     const EN_TEAM = "1365083291044282389";
                     const gg = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
-                    const mm = await gg.members.fetch(moderatorDiscordId).catch(() => null);
-                    if (!mm || !mm.roles.cache.has(EN_TEAM)) {
+                    // Cache-First fuer Robustheit gegen Discord-Rate-Limits
+                    let mm = gg.members.cache.get(moderatorDiscordId) || null;
+                    if (!mm) {
+                        try { mm = await gg.members.fetch(moderatorDiscordId); }
+                        catch(fErr) {
+                            if (fErr?.code === 10007) {
+                                res.writeHead(403);
+                                return res.end(JSON.stringify({ success: false, error: "Nicht im Discord-Server" }));
+                            }
+                            res.writeHead(503);
+                            return res.end(JSON.stringify({ success: false, error: "member_fetch_failed", retry: true }));
+                        }
+                    }
+                    if (!mm.roles.cache.has(EN_TEAM)) {
                         res.writeHead(403);
                         return res.end(JSON.stringify({ success: false, error: "Nicht berechtigt (keine EN-Team-Rolle)" }));
                     }
                 } catch (permErr) {
-                    res.writeHead(403);
-                    return res.end(JSON.stringify({ success: false, error: "Auth-Check fehlgeschlagen" }));
+                    res.writeHead(503);
+                    return res.end(JSON.stringify({ success: false, error: "Auth-Check fehlgeschlagen", retry: true }));
                 }
 
                 const MOD_CHANNEL_ID = "1367243128284905573";
@@ -2164,17 +2189,38 @@ const apiServer = http.createServer(async (req, res) => {
         let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
+                if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ success: false, error: "discordId erforderlich" })); }
                 const EN_TEAM_ROLE_ID = "1365083291044282389";
-                let isStaff = false, isAdmin = false;
-                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
-                const member = await guild.members.fetch(discordId).catch(() => null);
-                if (member) {
-                    isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID);
-                    isAdmin = isStaff && member.permissions.has("Administrator");
+                let guild = null;
+                try {
+                    guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+                } catch(gErr) {
+                    res.writeHead(503);
+                    return res.end(JSON.stringify({ success: false, error: "guild_fetch_failed" }));
                 }
+                if (!guild) { res.writeHead(503); return res.end(JSON.stringify({ success: false, error: "guild_unavailable" })); }
+
+                // Cache-First: vermeidet unnoetige Discord-API-Calls und ist robust gegen Rate-Limits
+                let member = guild.members.cache.get(discordId) || null;
+                if (!member) {
+                    try { member = await guild.members.fetch(discordId); }
+                    catch(fErr) {
+                        // 10007 = Unknown Member → User ist wirklich nicht im Server (kein Fehler, nur kein Staff)
+                        const code = fErr?.code;
+                        if (code === 10007) {
+                            res.writeHead(200);
+                            return res.end(JSON.stringify({ success: true, isStaff: false, isAdmin: false }));
+                        }
+                        // Andere Fehler (Rate-Limit, Timeout, etc.) → Client soll retryen
+                        res.writeHead(503);
+                        return res.end(JSON.stringify({ success: false, error: "member_fetch_failed", code: code || 'unknown' }));
+                    }
+                }
+                const isStaff = member.roles.cache.has(EN_TEAM_ROLE_ID);
+                const isAdmin = isStaff && member.permissions.has("Administrator");
                 res.writeHead(200);
                 return res.end(JSON.stringify({ success: true, isStaff, isAdmin }));
-            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
+            } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ success: false, error: e.message })); }
         }); return;
     }
 

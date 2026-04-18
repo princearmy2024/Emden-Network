@@ -739,12 +739,6 @@ const Overlay = (() => {
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape' && cmdVisible) toggleCmd();
             if (e.key === 'Enter'  && cmdVisible) execCmd();
-
-            // F4 = Debug: Spiel-Erkennung simulieren
-            if (e.key === 'F4') {
-                e.preventDefault();
-                setGameRunning(!isGameRunning);
-            }
         });
     }
 
@@ -912,13 +906,22 @@ const Overlay = (() => {
         }
 
         try {
-            const res = await fetch(API_URL + '/api/mod-log?limit=15', { headers: { 'x-api-key': API_KEY } });
+            const res = await fetch(API_URL + '/api/mod-log?limit=15&discordId=' + encodeURIComponent(discordId), { headers: { 'x-api-key': API_KEY } });
             const data = await res.json();
             if (data.success && data.log?.length) {
                 _modHistoryCache = data.log;
                 renderModHistory(container, data.log);
+            } else if (data.success) {
+                container.innerHTML = `<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Letzte Einträge</div>
+                    <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.2);font-size:10px;">Keine Einträge vorhanden</div>`;
             }
-        } catch(e) {}
+        } catch(e) {
+            console.warn('[Mod-History] Fehler beim Laden:', e);
+            if (!_modHistoryCache) {
+                container.innerHTML = `<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Letzte Einträge</div>
+                    <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.2);font-size:10px;">Verbindungsfehler — erneut versuchen</div>`;
+            }
+        }
     }
 
     function renderModHistory(container, entries) {
@@ -1088,7 +1091,7 @@ const Overlay = (() => {
         const historyList = document.getElementById('modHistoryList');
         historyEl.style.display = 'none';
         try {
-            const histRes = await fetch(API_URL + '/api/mod-history?userId=' + id, {
+            const histRes = await fetch(API_URL + '/api/mod-history?userId=' + id + '&discordId=' + encodeURIComponent(discordId), {
                 headers: { 'x-api-key': API_KEY }
             });
             const histData = await histRes.json();
@@ -1113,8 +1116,22 @@ const Overlay = (() => {
                     </div>`;
                 }).join('');
                 historyEl.style.display = 'flex';
+            } else if (histData.success && histData.count === 0) {
+                historyTitle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 0 Einträge`;
+                historyList.innerHTML = `<div style="padding:16px;text-align:center;font-size:11px;color:rgba(255,255,255,0.3);">Keine vorherigen Einträge</div>`;
+                historyEl.style.display = 'flex';
+            } else {
+                console.warn('[Mod-History] API-Fehler:', histData.error || 'Unbekannt');
+                historyTitle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ? Einträge`;
+                historyList.innerHTML = `<div style="padding:16px;text-align:center;font-size:11px;color:#ff6b6b;">Fehler: ${esc(histData.error || 'Laden fehlgeschlagen')}</div>`;
+                historyEl.style.display = 'flex';
             }
-        } catch(e) {}
+        } catch(e) {
+            console.warn('[Mod-History] Exception:', e);
+            historyTitle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ? Einträge`;
+            historyList.innerHTML = `<div style="padding:16px;text-align:center;font-size:11px;color:#ff6b6b;">Verbindungsfehler</div>`;
+            historyEl.style.display = 'flex';
+        }
 
         // Discord-Lookup
         const discordInfo = document.getElementById('modDiscordInfo');

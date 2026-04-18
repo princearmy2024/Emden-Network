@@ -1,6 +1,6 @@
 {
-    "version": "4.50.2",
-    "releaseDate": "2026-04-08",
-    "notes": "v4.50.2: Panic Accept sichtbar fuer ALLE — Alert schliesst bei allen, Notification wer hilft wem.",
+    "version": "4.62.1",
+    "releaseDate": "2026-04-18",
+    "notes": "v4.62.1: Mod-Eintragungs-Fix — Overlay Eintrags-Zaehler/Historie laden wieder, Mobile Staff-Gate mit Retry (dein Freund fliegt nicht mehr raus), Bot Cache-First fuer Discord-Member-Checks (kein Silent-Fail mehr bei Rate-Limits), F4-Debug-Kollision entfernt.",
     "forceUpdate": true
 }

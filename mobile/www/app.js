@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.62.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.62.1'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -243,40 +243,51 @@ const App = {
     async verifyRoleLive() {
         const u = Auth.user;
         if (!u?.discordId) return;
-        try {
-            const res = await fetch(apiUrl('/api/check-staff'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: u.discordId })
-            });
-            const d = await res.json();
-            if (!d.success) {
-                // Fail-closed: bei unklarer Antwort Staff-Rechte verweigern + aus Mod-View werfen
-                this._staffVerified = false;
-                if (Auth.user) { Auth.user.isStaff = false; Auth.user.role = 'user'; Auth.save(); this.applyUser(); }
-                if (document.querySelector('.view.active')?.id === 'view-mod') this.switchTab('home');
-                return;
+
+        // Retry bei transienten Fehlern (Discord-Lag, Netz-Hickup), damit Staff nicht stumm rausfliegen
+        const backoffs = [0, 800, 2000];
+        let lastError = null;
+        let d = null;
+        for (let i = 0; i < backoffs.length; i++) {
+            if (backoffs[i] > 0) await new Promise(r => setTimeout(r, backoffs[i]));
+            try {
+                const res = await fetch(apiUrl('/api/check-staff'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                    body: JSON.stringify({ discordId: u.discordId })
+                });
+                d = await res.json();
+                if (d && d.success) { lastError = null; break; }
+                lastError = d?.error || 'unknown';
+            } catch(e) {
+                lastError = e.message || 'network';
+                d = null;
             }
-            // Sync lokale Session mit Server
-            const serverIsStaff = !!d.isStaff;
-            const serverIsAdmin = !!d.isAdmin;
-            if (Auth.user) {
-                Auth.user.isStaff = serverIsStaff;
-                Auth.user.role = serverIsAdmin ? 'admin' : serverIsStaff ? 'staff' : 'user';
-                Auth.save();
-                // Nur jetzt ist Staff-Zugriff erlaubt — Server hat bestaetigt
-                this._staffVerified = serverIsStaff || serverIsAdmin;
-                this.applyUser();
-                // Falls Rolle entzogen wurde waehrend Mod-View offen: sofort rauswerfen
-                if (!serverIsStaff && !serverIsAdmin && document.querySelector('.view.active')?.id === 'view-mod') {
-                    this.switchTab('home');
-                }
-            }
-        } catch(e) {
-            // Fail-closed bei Netzwerkfehler
+        }
+
+        if (!d || !d.success) {
+            // Alle Retries erschoepft — Fail-closed, aber mit sichtbarem Status damit User weiss warum
             this._staffVerified = false;
             if (Auth.user) { Auth.user.isStaff = false; Auth.user.role = 'user'; Auth.save(); this.applyUser(); }
-            if (document.querySelector('.view.active')?.id === 'view-mod') this.switchTab('home');
+            if (document.querySelector('.view.active')?.id === 'view-mod') {
+                this._modStatus && this._modStatus('error', `Staff-Check fehlgeschlagen (${lastError}). Tippe nochmal auf Mod-Tab.`);
+                this.switchTab('home');
+            }
+            return;
+        }
+
+        // Sync lokale Session mit Server
+        const serverIsStaff = !!d.isStaff;
+        const serverIsAdmin = !!d.isAdmin;
+        if (Auth.user) {
+            Auth.user.isStaff = serverIsStaff;
+            Auth.user.role = serverIsAdmin ? 'admin' : serverIsStaff ? 'staff' : 'user';
+            Auth.save();
+            this._staffVerified = serverIsStaff || serverIsAdmin;
+            this.applyUser();
+            if (!serverIsStaff && !serverIsAdmin && document.querySelector('.view.active')?.id === 'view-mod') {
+                this.switchTab('home');
+            }
         }
     },
 
