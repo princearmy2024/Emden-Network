@@ -36,8 +36,8 @@ const PANEL_CONFIG_FILE = path.join(path.resolve(), "data", "panelConfig.json");
 
 // Support-Case-System (Voice-Warteraum → Discord-Panel → Take-Over Button)
 const SUPPORT_VOICE_CHANNEL_ID = "1365102454550695936"; // Warteraum — Join triggert Case
-const SUPPORT_LOGS_CHANNEL_ID = "1495127620730360073";  // Channel wo Case-Panels gepostet werden
-const SUPPORT_PING_ROLE_ID = "1383433388173820027";     // Voice-Support-Rolle — wird bei neuem Case gepingt
+const SUPPORT_LOGS_CHANNEL_ID = "1383433388173820027";  // Voice-Logs Channel (Case-Panels werden hier gepostet)
+const SUPPORT_PING_ROLE_ID = null;                      // Optional: Rollen-ID fuer Ping bei neuem Case (oder null = kein Ping)
 const SUPPORT_CASES_FILE = path.join(path.resolve(), "data", "supportCases.json");
 const SUPPORT_REENTRY_COOLDOWN_MS = 30 * 60 * 1000; // Nach Case-Close 30min Block vom Warteraum
 
@@ -290,9 +290,10 @@ async function postSupportCase(member) {
     const username = member.displayName || member.user.username;
 
     const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    const pingPrefix = SUPPORT_PING_ROLE_ID ? `<@&${SUPPORT_PING_ROLE_ID}>\n` : '';
     const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-            `<@&${SUPPORT_PING_ROLE_ID}>\n## 🟢 Ein neuer Support Fall\n<@${member.id}> braucht Hilfe!`
+            `${pingPrefix}## 🟢 Ein neuer Support Fall\n<@${member.id}> braucht Hilfe!`
         ))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
@@ -314,7 +315,7 @@ async function postSupportCase(member) {
         const msg = await logsChannel.send({
             components: [container],
             flags: MessageFlags.IsComponentsV2,
-            allowedMentions: { roles: [SUPPORT_PING_ROLE_ID] }
+            allowedMentions: SUPPORT_PING_ROLE_ID ? { roles: [SUPPORT_PING_ROLE_ID] } : { parse: [] }
         });
         supportCases[caseId] = {
             caseId, userId: member.id, username,
