@@ -1,6 +1,6 @@
 {
-    "version": "4.63.3",
+    "version": "4.63.4",
     "releaseDate": "2026-04-18",
-    "notes": "v4.63.3: Bot-Fixes — Leaderboard-Buttons antworten jetzt instant (deferUpdate vor Heavy-Work, keine 'Interaktion fehlgeschlagen' mehr). members.fetch Timeout-Spam im Log eliminiert (Cache-only). /moderate + /api/mod-action crashten bei Roblox-Usern ohne Avatar (SectionBuilder ohne Accessory) — jetzt mit Fallback auf TextDisplay.",
+    "notes": "v4.63.4: Support-Case-System — User joint Warteraum 1365102454550695936 → Bot postet Case-Panel in 1495127620730360073 mit Uebernehmen-Button. Staff klickt → User wird zu Staff-Voice gemoved (egal wo Staff gerade ist). Nach Case-Ende 30min Cooldown-Block auf den Warteraum.",
     "forceUpdate": true
 }

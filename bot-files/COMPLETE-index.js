@@ -34,6 +34,12 @@ const LEADERBOARD_UPDATE_INTERVAL_MS = 3 * 1000; // 3s = liveartig und rate-limi
 const LEADERBOARD_PAGE_SIZE = 10;
 const PANEL_CONFIG_FILE = path.join(path.resolve(), "data", "panelConfig.json");
 
+// Support-Case-System (Voice-Warteraum → Discord-Panel → Take-Over Button)
+const SUPPORT_VOICE_CHANNEL_ID = "1365102454550695936"; // Warteraum — Join triggert Case
+const SUPPORT_LOGS_CHANNEL_ID = "1495127620730360073";  // Channel wo Case-Panels gepostet werden
+const SUPPORT_CASES_FILE = path.join(path.resolve(), "data", "supportCases.json");
+const SUPPORT_REENTRY_COOLDOWN_MS = 30 * 60 * 1000; // Nach Case-Close 30min Block vom Warteraum
+
 // === Roblox OAuth2 Config ===
 const ROBLOX_CLIENT_ID = process.env.ROBLOX_CLIENT_ID || '';
 const ROBLOX_CLIENT_SECRET = process.env.ROBLOX_CLIENT_SECRET || '';
@@ -231,6 +237,143 @@ function savePanelConfig() {
         if (!fs.existsSync(path.dirname(PANEL_CONFIG_FILE))) fs.mkdirSync(path.dirname(PANEL_CONFIG_FILE), { recursive: true });
         fs.writeFileSync(PANEL_CONFIG_FILE, JSON.stringify(panelConfig, null, 2));
     } catch(e) {}
+}
+
+// === Support-Case Storage + Helper ===
+let supportCases = {}; // caseId → { userId, createdAt, channelId, messageId, status, takenBy, takenByName, takenAt, handlingChannelId, closedAt }
+if (fs.existsSync(SUPPORT_CASES_FILE)) {
+    try { supportCases = JSON.parse(fs.readFileSync(SUPPORT_CASES_FILE, "utf-8")); } catch(e) {}
+}
+function saveSupportCases() {
+    try {
+        if (!fs.existsSync(path.dirname(SUPPORT_CASES_FILE))) fs.mkdirSync(path.dirname(SUPPORT_CASES_FILE), { recursive: true });
+        fs.writeFileSync(SUPPORT_CASES_FILE, JSON.stringify(supportCases, null, 2));
+    } catch(e) {}
+}
+function findOpenSupportCase(userId) {
+    for (const c of Object.values(supportCases)) {
+        if (c.userId === userId && (c.status === 'open' || c.status === 'taken')) return c;
+    }
+    return null;
+}
+function generateSupportCaseId() {
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+async function postSupportCase(member) {
+    // Verhindere doppelte Cases: wenn User schon einen offenen Case hat, nichts tun
+    if (findOpenSupportCase(member.id)) return;
+    const logsChannel = await client.channels.fetch(SUPPORT_LOGS_CHANNEL_ID).catch(() => null);
+    if (!logsChannel) { console.warn('[Support] Logs-Channel nicht erreichbar:', SUPPORT_LOGS_CHANNEL_ID); return; }
+
+    const caseId = generateSupportCaseId();
+    const now = Date.now();
+    const username = member.displayName || member.user.username;
+
+    const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## 🟢 Ein neuer Support Fall\n<@${member.id}> braucht Hilfe!`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `**CaseID** · \`#S-${caseId}\`\n` +
+            `**Erstellt am** · <t:${Math.floor(now/1000)}:F>`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`sup_take_${caseId}`)
+                    .setLabel('Übernehmen')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('✅'),
+            )
+        );
+
+    try {
+        const msg = await logsChannel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        supportCases[caseId] = {
+            caseId, userId: member.id, username,
+            createdAt: now, channelId: logsChannel.id, messageId: msg.id,
+            status: 'open', takenBy: null, takenByName: null, takenAt: null,
+            handlingChannelId: null, closedAt: null,
+        };
+        saveSupportCases();
+        console.log(`[Support] Case #S-${caseId} erstellt fuer ${username}`);
+    } catch(e) {
+        console.error('[Support] Konnte Case-Nachricht nicht senden:', e.message);
+    }
+}
+
+async function rebuildSupportCaseMessage(caseId) {
+    const sCase = supportCases[caseId];
+    if (!sCase) return;
+    const channel = await client.channels.fetch(sCase.channelId).catch(() => null);
+    if (!channel) return;
+    const msg = await channel.messages.fetch(sCase.messageId).catch(() => null);
+    if (!msg) return;
+
+    const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    let headerEmoji = '🟢', statusText = 'OFFEN';
+    if (sCase.status === 'taken')  { headerEmoji = '🔵'; statusText = 'UEBERNOMMEN'; }
+    if (sCase.status === 'closed') { headerEmoji = '⚫'; statusText = 'GESCHLOSSEN'; }
+
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## ${headerEmoji} Support Fall · ${statusText}\n<@${sCase.userId}> braucht Hilfe!`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `**CaseID** · \`#S-${sCase.caseId}\`\n` +
+            `**Erstellt am** · <t:${Math.floor(sCase.createdAt/1000)}:F>` +
+            (sCase.takenBy ? `\n**Uebernommen von** · <@${sCase.takenBy}> <t:${Math.floor(sCase.takenAt/1000)}:R>` : '') +
+            (sCase.handlingChannelId ? `\n**Gespraechsraum** · <#${sCase.handlingChannelId}>` : '') +
+            (sCase.closedAt ? `\n**Beendet** · <t:${Math.floor(sCase.closedAt/1000)}:R>` : '')
+        ));
+
+    if (sCase.status === 'open') {
+        container
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addActionRowComponents(
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`sup_take_${sCase.caseId}`)
+                        .setLabel('Übernehmen')
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji('✅')
+                )
+            );
+    }
+    await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 }).catch(e => console.warn('[Support] rebuildCaseMessage edit fehlgeschlagen:', e.message));
+}
+
+async function closeSupportCase(sCase, { applyBlock = true } = {}) {
+    if (!sCase || sCase.status === 'closed') return;
+    sCase.status = 'closed';
+    sCase.closedAt = Date.now();
+    saveSupportCases();
+    await rebuildSupportCaseMessage(sCase.caseId);
+
+    if (!applyBlock) return;
+    // Permission-Overwrite: User darf SUPPORT_VOICE_CHANNEL_ID fuer X Minuten nicht mehr betreten
+    try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        const supportChan = guild?.channels?.cache?.get(SUPPORT_VOICE_CHANNEL_ID);
+        if (!supportChan) return;
+        await supportChan.permissionOverwrites.edit(sCase.userId, { Connect: false }, { reason: `Support-Case #S-${sCase.caseId} beendet — Cooldown` });
+        console.log(`[Support] ${sCase.userId} geblockt in Warteraum fuer ${SUPPORT_REENTRY_COOLDOWN_MS/60000}min`);
+        setTimeout(async () => {
+            try {
+                const ch = guild?.channels?.cache?.get(SUPPORT_VOICE_CHANNEL_ID);
+                if (!ch) return;
+                await ch.permissionOverwrites.delete(sCase.userId, 'Support-Cooldown abgelaufen').catch(() => {});
+                console.log(`[Support] ${sCase.userId} wieder zugelassen (Cooldown abgelaufen)`);
+            } catch(_) {}
+        }, SUPPORT_REENTRY_COOLDOWN_MS);
+    } catch(e) {
+        console.warn('[Support] Block-Overwrite fehlgeschlagen:', e.message);
+    }
 }
 
 // === Daily Streak System ===
@@ -663,6 +806,52 @@ client.on("interactionCreate", async interaction => {
             } catch(e) {
                 return interaction.respond([]).catch(() => {});
             }
+        }
+        return;
+    }
+
+    // ============================================
+    // 🆘 SUPPORT Take-Over Button
+    // ============================================
+    if (interaction.isButton() && interaction.customId.startsWith('sup_take_')) {
+        const caseId = interaction.customId.replace('sup_take_', '');
+        const sCase = supportCases[caseId];
+        try {
+            if (!sCase) return interaction.reply({ content: '❌ Case nicht gefunden.', flags: MessageFlags.Ephemeral });
+            if (sCase.status !== 'open') {
+                return interaction.reply({
+                    content: sCase.status === 'taken'
+                        ? `ℹ️ Case bereits uebernommen von <@${sCase.takenBy}>.`
+                        : '❌ Case bereits geschlossen.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const guild = interaction.guild;
+            const staff = await guild.members.fetch(interaction.user.id);
+            const EN_TEAM = "1365083291044282389";
+            if (!staff.roles.cache.has(EN_TEAM)) {
+                return interaction.reply({ content: '❌ Nur EN-Team kann Cases uebernehmen.', flags: MessageFlags.Ephemeral });
+            }
+            const staffVoice = staff.voice.channel;
+            if (!staffVoice) {
+                return interaction.reply({ content: '❌ Du musst selbst in einem Voice-Channel sein, damit der User zu dir gemoved werden kann.', flags: MessageFlags.Ephemeral });
+            }
+            const userMember = await guild.members.fetch(sCase.userId).catch(() => null);
+            if (!userMember) return interaction.reply({ content: '❌ User ist nicht mehr im Server.', flags: MessageFlags.Ephemeral });
+            if (!userMember.voice.channel) return interaction.reply({ content: '❌ User ist nicht mehr im Voice-Channel.', flags: MessageFlags.Ephemeral });
+
+            await userMember.voice.setChannel(staffVoice, `Support #S-${caseId} von ${staff.displayName || staff.user.username}`);
+            sCase.status = 'taken';
+            sCase.takenBy = staff.id;
+            sCase.takenByName = staff.displayName || staff.user.username;
+            sCase.takenAt = Date.now();
+            sCase.handlingChannelId = staffVoice.id;
+            saveSupportCases();
+            await rebuildSupportCaseMessage(caseId);
+            return interaction.reply({ content: `✅ **${userMember.displayName || userMember.user.username}** wurde zu dir in <#${staffVoice.id}> gemoved.`, flags: MessageFlags.Ephemeral });
+        } catch(e) {
+            console.error('[Support] Uebernehmen-Fehler:', e);
+            try { await interaction.reply({ content: `❌ Fehler: ${e.message}`, flags: MessageFlags.Ephemeral }); } catch(_) {}
         }
         return;
     }
@@ -3383,6 +3572,30 @@ const SUPPORT_WAITING_CATEGORY = "Support channel"; // Name der Kategorie
 let supportWaitingUsers = [];
 
 client.on("voiceStateUpdate", (oldState, newState) => {
+    // ─── SUPPORT-CASE SYSTEM ────────────────────────────────────────
+    // User joint den spezifischen Warteraum → Case-Panel posten
+    if (newState.channelId === SUPPORT_VOICE_CHANNEL_ID && oldState.channelId !== SUPPORT_VOICE_CHANNEL_ID) {
+        const m = newState.member;
+        if (m && !m.user.bot) {
+            postSupportCase(m).catch(e => console.warn('[Support] postSupportCase Fehler:', e.message));
+        }
+    }
+    // User mit uebernommenem Case verlaesst Voice (kicked / left) → Case schliessen + Cooldown-Block
+    if (oldState.channelId && !newState.channelId) {
+        const openCase = findOpenSupportCase(oldState.id);
+        if (openCase && openCase.status === 'taken') {
+            closeSupportCase(openCase, { applyBlock: true }).catch(e => console.warn('[Support] closeCase Fehler:', e.message));
+        }
+    }
+    // User verlaesst Warteraum ohne dass Case uebernommen wurde → abbrechen ohne Block
+    if (oldState.channelId === SUPPORT_VOICE_CHANNEL_ID && newState.channelId !== SUPPORT_VOICE_CHANNEL_ID) {
+        const openCase = findOpenSupportCase(oldState.id);
+        if (openCase && openCase.status === 'open') {
+            closeSupportCase(openCase, { applyBlock: false }).catch(() => {});
+        }
+    }
+
+    // ─── LEGACY support_waiting (Dashboard-Notification) ────────────
     // Prüfe ob jemand einen Support-Warteraum betritt/verlässt
     const channel = newState.channel || oldState.channel;
     if (!channel) return;
