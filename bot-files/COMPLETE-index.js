@@ -27,6 +27,12 @@ const API_PORT = process.env.SERVER_PORT || process.env.PORT || 5009;
 const API_SECRET = process.env.API_SECRET || "emden-super-secret-key-2026";
 const STATUS_UPDATE_INTERVAL = 60 * 1000;
 
+// Owner-Whitelist fuer geschuetzte Commands (z.B. /leaderboard-init)
+const OWNER_IDS = ["832520997311479809", "1051180937855119441", "415890114389082124"];
+const LEADERBOARD_DEFAULT_CHANNEL_ID = "1495104816962080941";
+const LEADERBOARD_UPDATE_INTERVAL_MS = 60 * 1000;
+const PANEL_CONFIG_FILE = path.join(path.resolve(), "data", "panelConfig.json");
+
 // === Roblox OAuth2 Config ===
 const ROBLOX_CLIENT_ID = process.env.ROBLOX_CLIENT_ID || '';
 const ROBLOX_CLIENT_SECRET = process.env.ROBLOX_CLIENT_SECRET || '';
@@ -105,14 +111,66 @@ function saveLeaderboard() {
     } catch(e) {}
 }
 function getShift(discordId) {
-    if (!shiftData[discordId]) shiftData[discordId] = { state: 'off', savedMs: 0, startedAt: null };
-    return shiftData[discordId];
+    if (!shiftData[discordId]) shiftData[discordId] = { state: 'off', savedMs: 0, startedAt: null, breakMs: 0, breakStartedAt: null, pauseHistory: [], lastTransitionAt: 0 };
+    // Migration fuer alte Datensaetze ohne neue Felder
+    const s = shiftData[discordId];
+    if (s.breakMs === undefined) s.breakMs = 0;
+    if (s.breakStartedAt === undefined) s.breakStartedAt = null;
+    if (!Array.isArray(s.pauseHistory)) s.pauseHistory = [];
+    if (s.lastTransitionAt === undefined) s.lastTransitionAt = 0;
+    return s;
 }
 function getShiftTotalMs(discordId) {
     const s = getShift(discordId);
     let total = s.savedMs || 0;
     if (s.state === 'active' && s.startedAt) total += Date.now() - s.startedAt;
     return total;
+}
+function getShiftBreakTotalMs(discordId) {
+    const s = getShift(discordId);
+    let total = s.breakMs || 0;
+    if (s.state === 'break' && s.breakStartedAt) total += Date.now() - s.breakStartedAt;
+    return total;
+}
+// Single Source of Truth: Voller Snapshot fuer Broadcasts + API Responses
+function buildShiftSnapshot(discordId) {
+    const s = getShift(discordId);
+    const known = allKnownUsers.get(discordId);
+    return {
+        discordId,
+        state: s.state || 'off',
+        savedMs: s.savedMs || 0,
+        breakMs: s.breakMs || 0,
+        startedAt: s.startedAt || null,       // absolute Unix-TS, null wenn nicht active
+        breakStartedAt: s.breakStartedAt || null,
+        totalMs: getShiftTotalMs(discordId),
+        totalBreakMs: getShiftBreakTotalMs(discordId),
+        pauseCount: (s.pauseHistory || []).length,
+        serverNow: Date.now(),
+        username: known?.username || s.username || '?',
+        avatar: known?.avatar || s.avatar || '',
+    };
+}
+// Mutex: Zustandswechsel dicht hintereinander ablehnen (verhindert Race + Timing-Exploits)
+const SHIFT_TRANSITION_COOLDOWN_MS = 400;
+function canTransitionShift(discordId) {
+    const s = getShift(discordId);
+    const now = Date.now();
+    if (now - (s.lastTransitionAt || 0) < SHIFT_TRANSITION_COOLDOWN_MS) return false;
+    s.lastTransitionAt = now;
+    return true;
+}
+
+// === Panel-Config (persistent Message-IDs fuer Live-Panels) ===
+let panelConfig = {};
+if (fs.existsSync(PANEL_CONFIG_FILE)) {
+    try { panelConfig = JSON.parse(fs.readFileSync(PANEL_CONFIG_FILE, "utf-8")); } catch(e) {}
+}
+function savePanelConfig() {
+    try {
+        if (!fs.existsSync(path.dirname(PANEL_CONFIG_FILE))) fs.mkdirSync(path.dirname(PANEL_CONFIG_FILE), { recursive: true });
+        fs.writeFileSync(PANEL_CONFIG_FILE, JSON.stringify(panelConfig, null, 2));
+    } catch(e) {}
 }
 
 // === Daily Streak System ===
@@ -263,10 +321,14 @@ const moderationsCommand = new SlashCommandBuilder()
     .setDescription("Zeige alle Moderations-Eintraege eines Users")
     .addStringOption(opt => opt.setName("user").setDescription("Roblox Benutzername oder User-ID").setRequired(true).setAutocomplete(true));
 
+const leaderboardInitCommand = new SlashCommandBuilder()
+    .setName("leaderboard-init")
+    .setDescription("Erstellt das Live-Shift-Leaderboard-Panel (nur Owner)");
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -1003,6 +1065,28 @@ client.on("interactionCreate", async interaction => {
             });
         } catch(e) {
             console.error('[Moderations CMD] Fehler:', e);
+            const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
+        }
+        return;
+    }
+
+    // /leaderboard-init — Erstellt oder repariert das Live-Shift-Leaderboard (nur Owner)
+    if (interaction.commandName === "leaderboard-init") {
+        try {
+            if (!OWNER_IDS.includes(interaction.user.id)) {
+                return interaction.reply({ content: "❌ Dieser Command ist nur fuer Bot-Owner.", ephemeral: true });
+            }
+            await interaction.deferReply({ ephemeral: true });
+            const channelId = interaction.channelId || LEADERBOARD_DEFAULT_CHANNEL_ID;
+            const result = await ensureLeaderboardPanel(channelId, { force: true });
+            if (result.ok) {
+                return interaction.editReply({ content: `✅ Live-Leaderboard-Panel aktiv in <#${channelId}>. Wird jede Minute aktualisiert.` });
+            }
+            return interaction.editReply({ content: `❌ Konnte Panel nicht erstellen: ${result.error || 'unknown'}` });
+        } catch(e) {
+            console.error('[Leaderboard] Init-Fehler:', e);
             const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
             if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
             else await interaction.reply(reply).catch(() => {});
@@ -1963,22 +2047,17 @@ const apiServer = http.createServer(async (req, res) => {
     // GET /api/shifts — Alle Shifts + Leaderboard
     if (req.method === "GET" && url.pathname === "/api/shifts") {
         const shifts = {};
-        for (const [id, s] of Object.entries(shiftData)) {
-            let totalMs = s.savedMs || 0;
-            if (s.state === 'active' && s.startedAt) totalMs += Date.now() - s.startedAt;
-            let totalBreakMs = s.breakMs || 0;
-            if (s.state === 'break' && s.breakStartedAt) totalBreakMs += Date.now() - s.breakStartedAt;
-            const known = allKnownUsers.get(id);
-            shifts[id] = { ...s, totalMs, totalBreakMs, username: known?.username || '?', avatar: known?.avatar || '' };
+        for (const id of Object.keys(shiftData)) {
+            shifts[id] = buildShiftSnapshot(id);
         }
-        res.writeHead(200);
         // Leaderboard Usernames korrigieren (alte Einträge haben '?')
         const enrichedLb = {};
         for (const [id, lb] of Object.entries(shiftLeaderboard)) {
             const known = allKnownUsers.get(id);
             enrichedLb[id] = { ...lb, username: known?.username || lb.username || '?', avatar: known?.avatar || lb.avatar || '' };
         }
-        return res.end(JSON.stringify({ success: true, shifts, leaderboard: enrichedLb }));
+        res.writeHead(200);
+        return res.end(JSON.stringify({ success: true, shifts, leaderboard: enrichedLb, serverNow: Date.now() }));
     }
 
     // POST /api/shift/start — On Duty starten
@@ -1987,18 +2066,29 @@ const apiServer = http.createServer(async (req, res) => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
+                if (!canTransitionShift(discordId)) {
+                    res.writeHead(429);
+                    return res.end(JSON.stringify({ success: false, error: "Zu schnell — kurz warten." }));
+                }
                 const s = getShift(discordId);
-                if (s.state === 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Bereits aktiv" })); }
-                // Track break time if resuming from break
+                if (s.state === 'active') {
+                    res.writeHead(200);
+                    return res.end(JSON.stringify({ success: true, shift: buildShiftSnapshot(discordId), message: "Bereits aktiv" }));
+                }
+                const now = Date.now();
+                // Pause beenden: Zeit in breakMs + pauseHistory persistieren
                 if (s.state === 'break' && s.breakStartedAt) {
-                    s.breakMs = (s.breakMs || 0) + (Date.now() - s.breakStartedAt);
+                    const dur = Math.max(0, now - s.breakStartedAt);
+                    s.breakMs = (s.breakMs || 0) + dur;
+                    s.pauseHistory.push({ start: s.breakStartedAt, end: now, durationMs: dur });
+                    if (s.pauseHistory.length > 200) s.pauseHistory = s.pauseHistory.slice(-200);
                 }
                 s.state = 'active';
-                s.startedAt = Date.now();
+                s.startedAt = now;
                 s.breakStartedAt = null;
                 saveShifts();
-                const known = allKnownUsers.get(discordId);
-                io.emit('shift_update', { discordId, state: 'active', totalMs: s.savedMs || 0, username: known?.username || '?' });
+                const snapshot = buildShiftSnapshot(discordId);
+                io.emit('shift_update', snapshot);
                 // On Duty Rolle geben
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID);
@@ -2010,7 +2100,7 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 } catch(e) {}
                 res.writeHead(200);
-                return res.end(JSON.stringify({ success: true }));
+                return res.end(JSON.stringify({ success: true, shift: snapshot }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
         }); return;
     }
@@ -2021,17 +2111,25 @@ const apiServer = http.createServer(async (req, res) => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
+                if (!canTransitionShift(discordId)) {
+                    res.writeHead(429);
+                    return res.end(JSON.stringify({ success: false, error: "Zu schnell — kurz warten." }));
+                }
                 const s = getShift(discordId);
-                if (s.state !== 'active') { res.writeHead(200); return res.end(JSON.stringify({ success: true, message: "Nicht aktiv" })); }
-                if (s.startedAt) s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
+                if (s.state !== 'active') {
+                    res.writeHead(200);
+                    return res.end(JSON.stringify({ success: true, shift: buildShiftSnapshot(discordId), message: "Nicht aktiv" }));
+                }
+                const now = Date.now();
+                if (s.startedAt) s.savedMs = (s.savedMs || 0) + Math.max(0, now - s.startedAt);
                 s.state = 'break';
                 s.startedAt = null;
-                s.breakStartedAt = Date.now();
+                s.breakStartedAt = now;
                 saveShifts();
-                const known = allKnownUsers.get(discordId);
-                io.emit('shift_update', { discordId, state: 'break', totalMs: s.savedMs || 0, username: known?.username || '?' });
+                const snapshot = buildShiftSnapshot(discordId);
+                io.emit('shift_update', snapshot);
                 res.writeHead(200);
-                return res.end(JSON.stringify({ success: true }));
+                return res.end(JSON.stringify({ success: true, shift: snapshot }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
         }); return;
     }
@@ -2042,12 +2140,22 @@ const apiServer = http.createServer(async (req, res) => {
             try {
                 const { discordId } = JSON.parse(body || "{}");
                 if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: "discordId required" })); }
-                const s = getShift(discordId);
-                // Save any remaining active time
-                if (s.state === 'active' && s.startedAt) {
-                    s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt);
+                if (!canTransitionShift(discordId)) {
+                    res.writeHead(429);
+                    return res.end(JSON.stringify({ success: false, error: "Zu schnell — kurz warten." }));
                 }
-                // Update leaderboard (permanent, survives reset-all)
+                const s = getShift(discordId);
+                const now = Date.now();
+                // Laufende Zeit finalisieren
+                if (s.state === 'active' && s.startedAt) {
+                    s.savedMs = (s.savedMs || 0) + Math.max(0, now - s.startedAt);
+                }
+                if (s.state === 'break' && s.breakStartedAt) {
+                    const dur = Math.max(0, now - s.breakStartedAt);
+                    s.breakMs = (s.breakMs || 0) + dur;
+                    s.pauseHistory.push({ start: s.breakStartedAt, end: now, durationMs: dur });
+                    if (s.pauseHistory.length > 200) s.pauseHistory = s.pauseHistory.slice(-200);
+                }
                 const known = allKnownUsers.get(discordId);
                 if (!shiftLeaderboard[discordId]) shiftLeaderboard[discordId] = { totalMs: 0, username: '', avatar: '' };
                 shiftLeaderboard[discordId].totalMs += s.savedMs || 0;
@@ -2055,7 +2163,6 @@ const apiServer = http.createServer(async (req, res) => {
                 shiftLeaderboard[discordId].avatar = known?.avatar || shiftLeaderboard[discordId].avatar || '';
                 saveLeaderboard();
 
-                // Streak: Zeit hinzufügen
                 const streakUp = addStreakTime(discordId, s.savedMs || 0);
                 if (streakUp) {
                     const st = getStreak(discordId);
@@ -2064,10 +2171,11 @@ const apiServer = http.createServer(async (req, res) => {
 
                 s.state = 'off';
                 s.startedAt = null;
-                // savedMs bleibt erhalten — User kann weiter machen
+                s.breakStartedAt = null;
+                // savedMs + breakMs bleiben erhalten — User kann weiter machen / Lead sieht Daten
                 saveShifts();
-                io.emit('shift_update', { discordId, state: 'off', totalMs: 0, username: known?.username || '?' });
-                // On Duty Rolle entfernen
+                const snapshot = buildShiftSnapshot(discordId);
+                io.emit('shift_update', snapshot);
                 try {
                     const guild = client.guilds.cache.get(GUILD_ID);
                     if (guild) {
@@ -2078,7 +2186,7 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 } catch(e) {}
                 res.writeHead(200);
-                return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
+                return res.end(JSON.stringify({ success: true, shift: snapshot, savedMs: s.savedMs }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
         }); return;
     }
@@ -2097,13 +2205,14 @@ const apiServer = http.createServer(async (req, res) => {
                     // Reset ALL shifts to 0 (leaderboard stays!)
                     for (const id of Object.keys(shiftData)) {
                         shiftData[id].savedMs = 0;
+                        shiftData[id].breakMs = 0;
+                        shiftData[id].pauseHistory = [];
                         shiftData[id].startedAt = shiftData[id].state === 'active' ? Date.now() : null;
+                        shiftData[id].breakStartedAt = shiftData[id].state === 'break' ? Date.now() : null;
                     }
                     saveShifts();
-                    // Broadcast: alle Clients muessen Shift-Liste neu laden
                     for (const id of Object.keys(shiftData)) {
-                        const known = allKnownUsers.get(id);
-                        io.emit('shift_update', { discordId: id, state: shiftData[id].state, totalMs: 0, username: known?.username || '?' });
+                        io.emit('shift_update', buildShiftSnapshot(id));
                     }
                     res.writeHead(200);
                     return res.end(JSON.stringify({ success: true, message: "Alle Shifts zurückgesetzt" }));
@@ -2128,14 +2237,11 @@ const apiServer = http.createServer(async (req, res) => {
                     if (s.state === 'break') s.breakStartedAt = Date.now();
                 }
                 saveShifts();
-                // Broadcast: alle Clients muessen die neue Zeit sehen
-                const known = allKnownUsers.get(targetDiscordId);
-                let liveTotal = s.savedMs || 0;
-                if (s.state === 'active' && s.startedAt) liveTotal += Date.now() - s.startedAt;
-                io.emit('shift_update', { discordId: targetDiscordId, state: s.state, totalMs: liveTotal, username: known?.username || '?' });
+                const snapshot = buildShiftSnapshot(targetDiscordId);
+                io.emit('shift_update', snapshot);
 
                 res.writeHead(200);
-                return res.end(JSON.stringify({ success: true, savedMs: s.savedMs }));
+                return res.end(JSON.stringify({ success: true, shift: snapshot, savedMs: s.savedMs }));
             } catch(e) { res.writeHead(500); return res.end(JSON.stringify({ error: e.message })); }
         }); return;
     }
@@ -2662,6 +2768,143 @@ async function updateBotStatus(ci) {
 }
 
 // ================================================================
+// 🏆 LIVE SHIFT LEADERBOARD — Components V2 Panel, Single-Message-Edit
+// ================================================================
+function formatShiftDuration(ms) {
+    if (!ms || ms < 0) ms = 0;
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m`;
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${s}s`;
+}
+
+function stateLabel(state) {
+    if (state === 'active') return '🟢 On Duty';
+    if (state === 'break')  return '🟡 Pause';
+    return '⚫ Off Duty';
+}
+
+async function buildLeaderboardContainer() {
+    // Alle EN-Team-Mitglieder holen + Shift-Daten joinen
+    const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+    if (!guild) return null;
+    await guild.members.fetch().catch(() => {});
+    const EN_TEAM_ROLE_ID = "1365083291044282389";
+    const enTeamMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.has(EN_TEAM_ROLE_ID));
+
+    const rows = [];
+    for (const [, member] of enTeamMembers) {
+        const snap = buildShiftSnapshot(member.id);
+        rows.push({
+            discordId: member.id,
+            username: member.displayName || member.user.username,
+            state: snap.state,
+            activeMs: snap.totalMs,
+            breakMs: snap.totalBreakMs,
+            pauseCount: snap.pauseCount,
+        });
+    }
+    // Sortierung: nach activeMs desc, bei Gleichstand alphabetisch
+    rows.sort((a, b) => (b.activeMs - a.activeMs) || a.username.localeCompare(b.username));
+
+    const top = rows.slice(0, 15);
+    const activeCount = rows.filter(r => r.state === 'active').length;
+    const pauseCount  = rows.filter(r => r.state === 'break').length;
+    const totalMsSum  = rows.reduce((sum, r) => sum + r.activeMs, 0);
+
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# 🏆 EN-Team Shift-Leaderboard`))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `**🟢 On Duty** · ${activeCount}  ·  **🟡 Pause** · ${pauseCount}  ·  **Team** · ${rows.length}\n` +
+            `**Gesamtzeit** · ${formatShiftDuration(totalMsSum)}`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
+    if (top.length === 0) {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Noch keine Shift-Daten vorhanden.`));
+    } else {
+        // Podium: Top 3 prominent; Rest als kompakte Liste
+        const podium = top.slice(0, 3);
+        const rest = top.slice(3);
+        const rankEmoji = (i) => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+
+        for (let i = 0; i < podium.length; i++) {
+            const r = podium[i];
+            const pauseInfo = r.breakMs > 0 ? ` · 🟡 ${formatShiftDuration(r.breakMs)}` : '';
+            const line =
+                `${rankEmoji(i)} **${r.username}** ${stateLabel(r.state)}\n` +
+                `⏱ \`${formatShiftDuration(r.activeMs)}\`${pauseInfo}`;
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(line));
+            if (i < podium.length - 1) {
+                container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+            }
+        }
+
+        if (rest.length > 0) {
+            container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+            const listLines = rest.map((r, i) => {
+                const rank = i + 4;
+                const pauseInfo = r.breakMs > 0 ? ` · 🟡 ${formatShiftDuration(r.breakMs)}` : '';
+                return `\`#${String(rank).padStart(2,' ')}\` ${stateLabel(r.state).split(' ')[0]} **${r.username}** · \`${formatShiftDuration(r.activeMs)}\`${pauseInfo}`;
+            }).join('\n');
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(listLines));
+        }
+
+        if (rows.length > top.length) {
+            container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ... und ${rows.length - top.length} weitere Team-Mitglieder`));
+        }
+    }
+
+    container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# 🔄 Live · Aktualisiert <t:${Math.floor(Date.now()/1000)}:R>`));
+
+    return container;
+}
+
+async function ensureLeaderboardPanel(fallbackChannelId = LEADERBOARD_DEFAULT_CHANNEL_ID, opts = {}) {
+    try {
+        const cfg = panelConfig.leaderboard || {};
+        const channelId = opts.force ? fallbackChannelId : (cfg.channelId || fallbackChannelId);
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel) return { ok: false, error: 'channel_not_found' };
+
+        const container = await buildLeaderboardContainer();
+        if (!container) return { ok: false, error: 'guild_unavailable' };
+
+        // Existierende Message bearbeiten falls moeglich
+        if (cfg.messageId && !opts.force) {
+            try {
+                const msg = await channel.messages.fetch(cfg.messageId);
+                await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
+                return { ok: true, action: 'edited', messageId: msg.id };
+            } catch(e) {
+                // Message weg → neu posten
+                console.warn('[Leaderboard] Nachricht nicht mehr erreichbar, erstelle neu:', e.message);
+            }
+        }
+        // Neu posten
+        const newMsg = await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        panelConfig.leaderboard = { channelId: channel.id, messageId: newMsg.id, createdAt: Date.now() };
+        savePanelConfig();
+        return { ok: true, action: 'created', messageId: newMsg.id };
+    } catch(e) {
+        console.error('[Leaderboard] ensure failed:', e.message);
+        return { ok: false, error: e.message };
+    }
+}
+
+function startLeaderboardLoop() {
+    setInterval(async () => {
+        if (!panelConfig.leaderboard?.messageId) return; // Panel wurde nie initialisiert
+        await ensureLeaderboardPanel().catch(e => console.warn('[Leaderboard] Update-Fehler:', e.message));
+    }, LEADERBOARD_UPDATE_INTERVAL_MS);
+}
+
+// ================================================================
 // 🚀 GITHUB RELEASE MONITOR (Components V2 — direkt via Bot)
 // ================================================================
 const GITHUB_OWNER = 'princearmy2024';
@@ -2880,6 +3123,15 @@ client.once("ready", async () => {
 
     await checkGithubRelease();
     setInterval(checkGithubRelease, 5 * 60 * 1000);
+
+    // Live-Shift-Leaderboard: falls Panel jemals initialisiert → alle 60s aktualisieren
+    startLeaderboardLoop();
+    if (panelConfig.leaderboard?.messageId) {
+        setTimeout(() => ensureLeaderboardPanel().catch(() => {}), 3000);
+        console.log(`[Leaderboard] Live-Panel aktiv: Kanal ${panelConfig.leaderboard.channelId}, Msg ${panelConfig.leaderboard.messageId}`);
+    } else {
+        console.log('[Leaderboard] Kein Panel initialisiert. Owner kann /leaderboard-init ausfuehren.');
+    }
 });
 
 // ================================================================

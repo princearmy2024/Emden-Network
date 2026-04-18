@@ -1373,6 +1373,7 @@ const Overlay = (() => {
             if (saved.shimmerEnabled !== undefined) el('settShimmerEnabled').checked = saved.shimmerEnabled;
             if (saved.logoOpacity) el('settLogoOpacity').value = saved.logoOpacity;
             if (saved.wmOpacity) el('settWmOpacity').value = saved.wmOpacity;
+            if (saved.modPanelOpacity) { const mp = el('settModPanelOpacity'); if (mp) mp.value = saved.modPanelOpacity; }
             if (saved.color) {
                 currentColor = saved.color;
                 document.querySelectorAll('.settings-color-opt').forEach(o => o.classList.toggle('active', o.dataset.color === saved.color));
@@ -1390,6 +1391,7 @@ const Overlay = (() => {
                 shimmerEnabled: document.getElementById('settShimmerEnabled').checked,
                 logoOpacity: document.getElementById('settLogoOpacity').value,
                 wmOpacity: document.getElementById('settWmOpacity').value,
+                modPanelOpacity: document.getElementById('settModPanelOpacity')?.value || 92,
                 color: currentColor,
             };
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
@@ -1403,11 +1405,14 @@ const Overlay = (() => {
         const shimmerOn = document.getElementById('settShimmerEnabled').checked;
         const logoOp = parseInt(document.getElementById('settLogoOpacity').value);
         const wmOp = parseInt(document.getElementById('settWmOpacity').value);
+        const mpOp = parseInt(document.getElementById('settModPanelOpacity')?.value || '92');
 
         // Update value displays
         document.getElementById('settFadeStrVal').textContent = fadeStr + '%';
         document.getElementById('settLogoVal').textContent = logoOp + '%';
         document.getElementById('settWmVal').textContent = wmOp + '%';
+        const mpVal = document.getElementById('settModPanelOpacityVal');
+        if (mpVal) mpVal.textContent = mpOp + '%';
 
         // Toggle classes
         document.body.classList.toggle('no-fade', !fadeOn);
@@ -1420,6 +1425,9 @@ const Overlay = (() => {
         document.documentElement.style.setProperty('--panel-solid', c.solid + (str * 0.95).toFixed(2) + ')');
         document.documentElement.style.setProperty('--panel-mid', c.mid + (str * 0.6).toFixed(2) + ')');
         document.documentElement.style.setProperty('--panel-fade', c.fade + (str * 0.2).toFixed(2) + ')');
+
+        // Mod-Panel Alpha: wirkt auf #mod-slide-bg + .mod-detail
+        document.documentElement.style.setProperty('--mod-panel-alpha', (mpOp / 100).toFixed(3));
 
         // Logo opacity
         const logoImg = document.getElementById('logo-img');
@@ -1447,6 +1455,8 @@ const Overlay = (() => {
         document.getElementById('settShimmerEnabled').checked = true;
         document.getElementById('settLogoOpacity').value = 70;
         document.getElementById('settWmOpacity').value = 4;
+        const mp = document.getElementById('settModPanelOpacity');
+        if (mp) mp.value = 92;
         document.querySelectorAll('.settings-color-opt').forEach(o => o.classList.toggle('active', o.dataset.color === 'default'));
         applySetting();
     }
@@ -1911,52 +1921,45 @@ function showOverlayModNotif(entry) {
 // OVERLAY SHIFT CONTROL
 // ══════════════════════════════════════════════
 const OverlayShift = {
-    _state: 'off',
-    _savedMs: 0,
-    _startedAt: null,
+    _shift: null,       // Server-Snapshot: {state, savedMs, breakMs, startedAt, breakStartedAt, ...}
     _tickInterval: null,
 
     async _apiCall(endpoint) {
         const session = JSON.parse(localStorage.getItem('en_session') || 'null');
         const discordId = session?.user?.discordId;
-        if (!discordId) return;
+        if (!discordId) return null;
         try {
-            await fetch(`${OVL_CONFIG.API_URL}/api/shift/${endpoint}`, {
+            const res = await fetch(`${OVL_CONFIG.API_URL}/api/shift/${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
                 body: JSON.stringify({ discordId }),
             });
-        } catch(e) {}
+            const data = await res.json();
+            if (data?.success && data.shift) {
+                this._shift = data.shift;
+                this._resyncTick();
+                this._updateUI();
+            }
+            return data;
+        } catch(e) { return null; }
     },
 
-    async start() {
-        // Nur API aufrufen — shift_update Event kommt via WebSocket zurück
-        await this._apiCall('start');
-    },
-
-    async pause() {
-        await this._apiCall('pause');
-    },
-
-    async end() {
-        await this._apiCall('end');
-    },
+    start() { return this._apiCall('start'); },
+    pause() { return this._apiCall('pause'); },
+    end()   { return this._apiCall('end');   },
 
     _syncFromServer(data) {
-        const state = typeof data === 'string' ? data : data.state;
-        this._state = state;
-        if (typeof data === 'object' && data.totalMs !== undefined) {
-            this._savedMs = data.totalMs || 0;
-        }
-        if (state === 'active') {
-            // totalMs enthält alles bis jetzt — Timer zählt ab hier weiter
-            this._startedAt = Date.now();
-            this._startTick();
-        } else {
-            this._startedAt = null;
-            this._stopTick();
-        }
+        // Nur eigene Snapshots akzeptieren (socket filtert discordId schon upstream)
+        if (!data || typeof data !== 'object') return;
+        this._shift = data;
+        this._resyncTick();
         this._updateUI();
+    },
+
+    _resyncTick() {
+        const state = this._shift?.state || 'off';
+        if (state === 'off') { this._stopTick(); }
+        else { this._startTick(); }
     },
 
     _startTick() {
@@ -1965,13 +1968,24 @@ const OverlayShift = {
     },
     _stopTick() { if (this._tickInterval) { clearInterval(this._tickInterval); this._tickInterval = null; } },
 
-    _updateUI() {
-        let total = this._savedMs;
-        if (this._state === 'active' && this._startedAt) total += Date.now() - this._startedAt;
+    _liveTotals() {
+        const s = this._shift;
+        if (!s) return { activeMs: 0, breakMs: 0 };
+        const now = Date.now();
+        let activeMs = s.savedMs || 0;
+        if (s.state === 'active' && s.startedAt) activeMs += Math.max(0, now - s.startedAt);
+        let breakMs = s.breakMs || 0;
+        if (s.state === 'break' && s.breakStartedAt) breakMs += Math.max(0, now - s.breakStartedAt);
+        return { activeMs, breakMs };
+    },
 
-        const h = Math.floor(total / 3600000);
-        const m = Math.floor((total % 3600000) / 60000);
-        const s = Math.floor((total % 60000) / 1000);
+    _updateUI() {
+        const state = this._shift?.state || 'off';
+        const { activeMs, breakMs } = this._liveTotals();
+
+        const h = Math.floor(activeMs / 3600000);
+        const m = Math.floor((activeMs % 3600000) / 60000);
+        const s = Math.floor((activeMs % 60000) / 1000);
         const timeStr = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
         const timer = document.getElementById('ovShiftTimer');
@@ -1981,10 +1995,42 @@ const OverlayShift = {
         const btnEnd = document.getElementById('ovBtnEnd');
 
         if (timer) timer.textContent = timeStr;
-        if (label) label.textContent = this._state === 'active' ? 'On Duty' : this._state === 'break' ? 'Pause' : 'Off Duty';
-        if (btnStart) btnStart.disabled = this._state === 'active';
-        if (btnPause) btnPause.disabled = this._state !== 'active';
-        if (btnEnd) btnEnd.disabled = this._state === 'off';
+        if (label) label.textContent = state === 'active' ? 'On Duty' : state === 'break' ? 'Pause' : 'Off Duty';
+        if (btnStart) btnStart.disabled = state === 'active';
+        if (btnPause) btnPause.disabled = state !== 'active';
+        if (btnEnd) btnEnd.disabled = state === 'off';
+
+        this._renderPauseSubTimer(state, breakMs);
+    },
+
+    _renderPauseSubTimer(state, breakMs) {
+        const timer = document.getElementById('ovShiftTimer');
+        if (!timer) return;
+        let sub = document.getElementById('ovShiftPauseSub');
+        if (state !== 'break') {
+            if (sub) { sub.classList.remove('visible'); setTimeout(() => sub?.remove(), 400); }
+            return;
+        }
+        if (!sub) {
+            sub = document.createElement('div');
+            sub.id = 'ovShiftPauseSub';
+            sub.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;padding:3px 9px;width:fit-content;font-size:10px;font-weight:500;color:rgba(255,255,255,0.88);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;letter-spacing:0.02em;opacity:0;max-height:0;overflow:hidden;transform:translateY(-4px);transition:opacity 0.35s ease, max-height 0.35s ease, transform 0.35s ease, margin-top 0.35s ease;';
+            sub.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(255,255,255,0.75);flex-shrink:0;animation:ov-pause-pulse 2.4s ease-in-out infinite;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span style="color:rgba(255,255,255,0.55);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;font-size:9px;">Pause</span><span class="ov-pause-time" style="color:#fff;font-family:ui-monospace,monospace;font-weight:600;">0 s</span>';
+            timer.insertAdjacentElement('afterend', sub);
+            // Sicherstellen dass Keyframe-Animation existiert
+            if (!document.getElementById('ov-pause-keyframes')) {
+                const st = document.createElement('style');
+                st.id = 'ov-pause-keyframes';
+                st.textContent = '@keyframes ov-pause-pulse{0%,100%{opacity:0.55}50%{opacity:1}} #ovShiftPauseSub.visible{opacity:1;max-height:40px;transform:translateY(0);margin-top:6px;}';
+                document.head.appendChild(st);
+            }
+            requestAnimationFrame(() => sub.classList.add('visible'));
+        }
+        const mins = Math.floor(breakMs / 60000);
+        const secs = Math.floor((breakMs % 60000) / 1000);
+        const timeStr = mins >= 1 ? `${mins} Min ${String(secs).padStart(2,'0')} s` : `${secs} s`;
+        const t = sub.querySelector('.ov-pause-time');
+        if (t) t.textContent = timeStr;
     },
 
     async loadFromServer() {
@@ -1992,20 +2038,13 @@ const OverlayShift = {
         const discordId = session?.user?.discordId;
         if (!discordId) return;
         try {
-            const res = await fetch(`${OVL_CONFIG.API_URL}/api/shifts`, {
+            const res = await fetch(`${OVL_CONFIG.API_URL}/api/shifts?discordId=${encodeURIComponent(discordId)}`, {
                 headers: { 'x-api-key': 'emden-super-secret-key-2026' },
             });
             const data = await res.json();
             if (data.success && data.shifts[discordId]) {
-                const s = data.shifts[discordId];
-                this._state = s.state || 'off';
-                // totalMs ist vom Server berechnet (savedMs + laufende Zeit)
-                this._savedMs = s.totalMs || s.savedMs || 0;
-                // startedAt auf JETZT setzen, da savedMs bereits die volle Zeit enthält
-                this._startedAt = s.state === 'active' ? Date.now() : null;
-                // savedMs ist jetzt totalMs, startedAt ist jetzt — Timer zählt ab hier weiter
-                if (this._state === 'active') this._startTick();
-                else this._stopTick();
+                this._shift = data.shifts[discordId];
+                this._resyncTick();
                 this._updateUI();
             }
         } catch(e) {}

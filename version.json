@@ -1,6 +1,6 @@
 {
-    "version": "4.62.1",
+    "version": "4.63.0",
     "releaseDate": "2026-04-18",
-    "notes": "v4.62.1: Mod-Eintragungs-Fix — Overlay Eintrags-Zaehler/Historie laden wieder, Mobile Staff-Gate mit Retry (dein Freund fliegt nicht mehr raus), Bot Cache-First fuer Discord-Member-Checks (kein Silent-Fail mehr bei Rate-Limits), F4-Debug-Kollision entfernt.",
+    "notes": "v4.63.0: Shift-Time Refactor (Server als Source-of-Truth, kein Drift/Bug-Use mehr) + Pause-Sub-Timer mit sanfter Animation + Live Discord Shift-Leaderboard V2 Panel (Owner-Only /leaderboard-init, Auto-Edit jede Minute, Krone fuer Platz 1) + Mod-Detail-View Background-Fix + Mod-Panel Transparenz-Slider in Overlay-Settings.",
     "forceUpdate": true
 }

@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.62.1'; // Stand: 18.04.2026
+let CURRENT_VERSION = '4.63.0'; // Stand: 18.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -281,11 +281,16 @@ const WebSocketService = {
                 NotificationService.show('🔥 Streak!', `${data.username} hat Streak ${data.streak}!`, 'success');
             });
 
-            // Live Shift-Updates
+            // Live Shift-Updates — Server ist Single Source of Truth
             this.socket.on('shift_update', (data) => {
-                if (window.ModPanel && App.currentView === 'moderation') {
-                    ModPanel.loadShifts();
-                    ModPanel.loadStaff();
+                if (!window.ModPanel) return;
+                if (data && data.discordId) {
+                    ModPanel._shifts[data.discordId] = data;
+                    if (App.currentView === 'moderation') {
+                        ModPanel._updateShiftUI();
+                        ModPanel.renderLeaderboard();
+                        ModPanel.loadStaff();
+                    }
                 }
             });
 
@@ -4636,17 +4641,30 @@ const ModPanel = {
         return me ? this._shifts[me] : null;
     },
 
+    _liveTotals(s) {
+        if (!s) return { activeMs: 0, breakMs: 0 };
+        const now = Date.now();
+        let activeMs = s.savedMs || 0;
+        if (s.state === 'active' && s.startedAt) activeMs += Math.max(0, now - s.startedAt);
+        let breakMs = s.breakMs || 0;
+        if (s.state === 'break' && s.breakStartedAt) breakMs += Math.max(0, now - s.breakStartedAt);
+        return { activeMs, breakMs };
+    },
+
     _updateShiftUI() {
         const s = this._getMyShift();
         const state = s?.state || 'off';
-        const totalMs = s ? (s.totalMs || 0) : 0;
+        const { activeMs, breakMs } = this._liveTotals(s);
         const goalMs = 8 * 3600000;
-        const pct = Math.min(100, (totalMs / goalMs) * 100);
+        const pct = Math.min(100, (activeMs / goalMs) * 100);
 
         const timerEl = document.getElementById('modShiftTimer');
         const barEl = document.getElementById('modShiftBar');
-        if (timerEl) timerEl.textContent = this._formatMs(totalMs);
+        if (timerEl) timerEl.textContent = this._formatMs(activeMs);
         if (barEl) barEl.style.width = pct + '%';
+
+        // Pause-Unter-Timer: faded weiß, erscheint nur wenn state='break'
+        this._renderPauseSubTimer(state, breakMs);
 
         const btnStart = document.getElementById('modBtnStart');
         const btnPause = document.getElementById('modBtnPause');
@@ -4656,50 +4674,63 @@ const ModPanel = {
         if (btnEnd) btnEnd.disabled = state === 'off';
     },
 
+    _renderPauseSubTimer(state, breakMs) {
+        const timerEl = document.getElementById('modShiftTimer');
+        if (!timerEl) return;
+        let sub = document.getElementById('modShiftPauseSub');
+        if (state !== 'break') {
+            if (sub) { sub.classList.remove('visible'); setTimeout(() => sub?.remove(), 400); }
+            return;
+        }
+        if (!sub) {
+            sub = document.createElement('div');
+            sub.id = 'modShiftPauseSub';
+            sub.className = 'mod-shift-pause-sub';
+            sub.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="mod-shift-pause-label">Pause</span><span class="mod-shift-pause-time">0:00</span>';
+            timerEl.insertAdjacentElement('afterend', sub);
+            requestAnimationFrame(() => sub.classList.add('visible'));
+        }
+        const mins = Math.floor(breakMs / 60000);
+        const secs = Math.floor((breakMs % 60000) / 1000);
+        const timeStr = mins >= 1 ? `${mins} Min ${String(secs).padStart(2,'0')} s` : `${secs} s`;
+        const timeEl = sub.querySelector('.mod-shift-pause-time');
+        if (timeEl) timeEl.textContent = timeStr;
+    },
+
     _startShiftTicker() {
         if (this._shiftInterval) clearInterval(this._shiftInterval);
-        this._shiftInterval = setInterval(() => {
-            const s = this._getMyShift();
-            if (!s || s.state !== 'active') return;
-            let total = s.savedMs || 0;
-            if (s.startedAt) total += Date.now() - s.startedAt;
-            s.totalMs = total;
+        this._shiftInterval = setInterval(() => this._updateShiftUI(), 1000);
+    },
+
+    async _shiftTransition(endpoint, successMsg) {
+        const me = AuthService.session?.user?.discordId;
+        if (!me) return;
+        const btnIds = ['modBtnStart', 'modBtnPause', 'modBtnEnd'];
+        btnIds.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/api/shift/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ discordId: me })
+            });
+            const data = await res.json();
+            if (data.success && data.shift) {
+                // Server-Wahrheit direkt uebernehmen, UI reagiert auf shift_update ohnehin
+                this._shifts[me] = data.shift;
+                this._updateShiftUI();
+                if (successMsg) App.showNotification('Shift', successMsg, 'success');
+            } else {
+                App.showNotification('Shift', data.error || 'Nicht moeglich.', 'error');
+                this._updateShiftUI();
+            }
+        } catch(e) {
+            App.showNotification('Shift', 'Server nicht erreichbar.', 'error');
             this._updateShiftUI();
-        }, 1000);
+        }
     },
-
-    async shiftStart() {
-        const me = AuthService.session?.user?.discordId;
-        if (!me) return;
-        await fetch(`${CONFIG.API_URL}/api/shift/start`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
-        if (!this._shifts[me]) this._shifts[me] = { state: 'off', savedMs: 0, startedAt: null, totalMs: 0 };
-        this._shifts[me].state = 'active';
-        this._shifts[me].startedAt = Date.now();
-        this._updateShiftUI();
-        App.showNotification('Shift', 'On Duty gestartet!', 'success');
-    },
-
-    async shiftPause() {
-        const me = AuthService.session?.user?.discordId;
-        if (!me) return;
-        await fetch(`${CONFIG.API_URL}/api/shift/pause`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
-        const s = this._shifts[me];
-        if (s?.startedAt) { s.savedMs = (s.savedMs || 0) + (Date.now() - s.startedAt); s.totalMs = s.savedMs; }
-        if (s) { s.state = 'break'; s.startedAt = null; }
-        this._updateShiftUI();
-        App.showNotification('Shift', 'Pause gestartet.', 'info');
-    },
-
-    async shiftEnd() {
-        const me = AuthService.session?.user?.discordId;
-        if (!me) return;
-        await fetch(`${CONFIG.API_URL}/api/shift/end`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY }, body: JSON.stringify({ discordId: me }) }).catch(() => {});
-        const s = this._shifts[me];
-        if (s) { s.state = 'off'; s.startedAt = null; }
-        this._updateShiftUI();
-        App.showNotification('Shift', 'Shift beendet. Zeit gespeichert.', 'info');
-        this.loadShifts();
-    },
+    shiftStart() { return this._shiftTransition('start', 'On Duty gestartet!'); },
+    shiftPause() { return this._shiftTransition('pause', 'Pause gestartet.'); },
+    shiftEnd()   { return this._shiftTransition('end',   'Shift beendet.'); },
 
     async resetAll() {
         if (!this._isLead || !confirm('Alle Shift-Zeiten auf 0 zurücksetzen? (Rangliste bleibt erhalten)')) return;

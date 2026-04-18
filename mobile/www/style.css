@@ -779,6 +779,48 @@ input { font-family: inherit; outline: none; border: none; background: none; col
     font-family: var(--font-mono);
     color: var(--text);
 }
+.home-shift-pause-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    margin-left: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateY(-3px) scale(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    vertical-align: middle;
+}
+.home-shift-pause-sub.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+.home-shift-pause-sub svg {
+    color: rgba(255,255,255,0.7);
+    animation: home-pause-pulse 2.4s ease-in-out infinite;
+}
+.home-shift-pause-sub span:not(.home-shift-pause-time) {
+    color: rgba(255,255,255,0.55);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 9px;
+}
+.home-shift-pause-sub .home-shift-pause-time {
+    color: #fff;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 10px;
+}
+@keyframes home-pause-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1;    }
+}
 .section-refresh {
     width: 30px; height: 30px;
     border-radius: 8px;

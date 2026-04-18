@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.62.1'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.63.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -132,8 +132,9 @@ function connectSocket() {
         });
     });
 
-    // Shift-Update (fuer Mod-Panel Live-Refresh)
+    // Shift-Update (Server = Source of Truth) — Home-Timer direkt aus Snapshot syncen
     socket.on('shift_update', (data) => {
+        App._applyShiftUpdate?.(data);
         App._onShiftUpdate?.(data);
     });
 }
@@ -452,6 +453,8 @@ const App = {
         }
     },
 
+    _myShift: null,
+
     async loadMyShift() {
         const u = Auth.user;
         if (!u?.discordId) return;
@@ -459,24 +462,59 @@ const App = {
             const res = await fetch(apiUrl('/api/shifts', { discordId: u.discordId }), { headers: { 'x-api-key': CONFIG.API_KEY } });
             const d = await res.json();
             const mine = d.shifts?.[u.discordId];
-            const state = mine?.state || 'off';
-            const stateEl = document.getElementById('homeShiftState');
-            const labels = { off: 'Off Duty', active: 'Im Dienst', break: 'Pause' };
-            if (stateEl) stateEl.textContent = labels[state] || 'Off Duty';
-
-            this._homeShiftBase = mine?.savedMs || 0;
-            this._homeShiftStart = state === 'active' && mine?.startedAt ? mine.startedAt : null;
+            if (mine) this._myShift = mine;
+            this._renderShiftUI();
             this._startShiftTimer();
-
-            const sBtn = document.getElementById('shiftBtnStart');
-            const pBtn = document.getElementById('shiftBtnPause');
-            const eBtn = document.getElementById('shiftBtnEnd');
-            if (sBtn && pBtn && eBtn) {
-                sBtn.disabled = state === 'active';
-                pBtn.disabled = state !== 'active';
-                eBtn.disabled = state === 'off' && !mine?.savedMs;
-            }
         } catch(e) {}
+    },
+
+    _applyShiftUpdate(snapshot) {
+        if (!snapshot || !snapshot.discordId) return;
+        const u = Auth.user;
+        if (snapshot.discordId !== u?.discordId) return;
+        this._myShift = snapshot;
+        this._renderShiftUI();
+        this._startShiftTimer();
+    },
+
+    _liveShiftMs(s) {
+        if (!s) return { activeMs: 0, breakMs: 0 };
+        const now = Date.now();
+        let activeMs = s.savedMs || 0;
+        if (s.state === 'active' && s.startedAt) activeMs += Math.max(0, now - s.startedAt);
+        let breakMs = s.breakMs || 0;
+        if (s.state === 'break' && s.breakStartedAt) breakMs += Math.max(0, now - s.breakStartedAt);
+        return { activeMs, breakMs };
+    },
+
+    _renderShiftUI() {
+        const s = this._myShift;
+        const state = s?.state || 'off';
+        const stateEl = document.getElementById('homeShiftState');
+        const labels = { off: 'Off Duty', active: 'Im Dienst', break: 'Pause' };
+        if (stateEl) stateEl.textContent = labels[state] || 'Off Duty';
+
+        const sBtn = document.getElementById('shiftBtnStart');
+        const pBtn = document.getElementById('shiftBtnPause');
+        const eBtn = document.getElementById('shiftBtnEnd');
+        if (sBtn) sBtn.disabled = state === 'active';
+        if (pBtn) pBtn.disabled = state !== 'active';
+        if (eBtn) eBtn.disabled = state === 'off' && !(s?.savedMs);
+
+        // Pause-Sub-Timer einblenden
+        const timerEl = document.getElementById('homeShiftTimer');
+        if (!timerEl) return;
+        let sub = document.getElementById('homeShiftPauseSub');
+        if (state !== 'break') {
+            if (sub) { sub.classList.remove('visible'); setTimeout(() => sub?.remove(), 400); }
+        } else if (!sub) {
+            sub = document.createElement('div');
+            sub.id = 'homeShiftPauseSub';
+            sub.className = 'home-shift-pause-sub';
+            sub.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Pause</span><span class="home-shift-pause-time">0 s</span>';
+            timerEl.insertAdjacentElement('afterend', sub);
+            requestAnimationFrame(() => sub.classList.add('visible'));
+        }
     },
 
     _startShiftTimer() {
@@ -484,56 +522,51 @@ const App = {
         const el = document.getElementById('homeShiftTimer');
         if (!el) return;
         const tick = () => {
-            let ms = this._homeShiftBase || 0;
-            if (this._homeShiftStart) ms += Date.now() - this._homeShiftStart;
-            const s = Math.floor(ms / 1000);
-            const h = String(Math.floor(s / 3600)).padStart(2, '0');
-            const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
-            const sec = String(s % 60).padStart(2, '0');
-            el.textContent = `${h}:${m}:${sec}`;
+            const s = this._myShift;
+            const { activeMs, breakMs } = this._liveShiftMs(s);
+            const sec = Math.floor(activeMs / 1000);
+            const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+            const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+            const ss = String(sec % 60).padStart(2, '0');
+            el.textContent = `${h}:${m}:${ss}`;
+            const subTime = document.querySelector('#homeShiftPauseSub .home-shift-pause-time');
+            if (subTime) {
+                const bm = Math.floor(breakMs / 60000);
+                const bs = Math.floor((breakMs % 60000) / 1000);
+                subTime.textContent = bm >= 1 ? `${bm} Min ${String(bs).padStart(2,'0')} s` : `${bs} s`;
+            }
         };
         tick();
         this._homeTimer = setInterval(tick, 1000);
     },
 
-    async shiftStart() {
+    async _shiftCall(endpoint, label) {
         const u = Auth.user;
         if (!u?.discordId) return;
+        const btns = ['shiftBtnStart','shiftBtnPause','shiftBtnEnd'];
+        btns.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
         try {
-            await fetch(apiUrl('/api/shift/start'), {
+            const res = await fetch(apiUrl(`/api/shift/${endpoint}`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
                 body: JSON.stringify({ discordId: u.discordId })
             });
-            this.loadMyShift();
-        } catch(e) {}
+            const data = await res.json();
+            if (data.success && data.shift) {
+                this._myShift = data.shift;
+                this._renderShiftUI();
+                this._startShiftTimer();
+            } else {
+                this._renderShiftUI();
+                if (data.error) try { window.Capacitor?.Plugins?.Haptics?.notification({ type: 'WARNING' }); } catch(_) {}
+            }
+        } catch(e) {
+            this._renderShiftUI();
+        }
     },
-
-    async shiftPause() {
-        const u = Auth.user;
-        if (!u?.discordId) return;
-        try {
-            await fetch(apiUrl('/api/shift/pause'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: u.discordId })
-            });
-            this.loadMyShift();
-        } catch(e) {}
-    },
-
-    async shiftEnd() {
-        const u = Auth.user;
-        if (!u?.discordId) return;
-        try {
-            await fetch(apiUrl('/api/shift/end'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
-                body: JSON.stringify({ discordId: u.discordId })
-            });
-            this.loadMyShift();
-        } catch(e) {}
-    },
+    shiftStart() { return this._shiftCall('start', 'Start'); },
+    shiftPause() { return this._shiftCall('pause', 'Pause'); },
+    shiftEnd()   { return this._shiftCall('end',   'End');   },
 
     async loadMyStreak() {
         const u = Auth.user;

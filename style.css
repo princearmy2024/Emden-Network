@@ -3297,6 +3297,54 @@ body.has-custom-bg .gif-picker-panel {
     font-size: 13px;
     color: var(--text-muted);
 }
+.mod-shift-pause-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    padding: 4px 10px;
+    width: fit-content;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.35s ease, max-height 0.35s ease, transform 0.35s ease, margin-top 0.35s ease;
+    overflow: hidden;
+    pointer-events: none;
+}
+.mod-shift-pause-sub.visible {
+    opacity: 1;
+    max-height: 40px;
+    transform: translateY(0);
+    margin-top: 6px;
+}
+.mod-shift-pause-sub svg {
+    color: rgba(255,255,255,0.7);
+    flex-shrink: 0;
+    animation: mod-pause-icon-pulse 2.4s ease-in-out infinite;
+}
+.mod-shift-pause-sub .mod-shift-pause-label {
+    color: rgba(255,255,255,0.6);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 10px;
+}
+.mod-shift-pause-sub .mod-shift-pause-time {
+    color: #fff;
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+@keyframes mod-pause-icon-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1;    }
+}
 .mod-shift-buttons {
     display: flex;
     flex-direction: column;
