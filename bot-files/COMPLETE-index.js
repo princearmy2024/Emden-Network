@@ -264,7 +264,25 @@ function generateSupportCaseId() {
 async function postSupportCase(member) {
     // Verhindere doppelte Cases: wenn User schon einen offenen Case hat, nichts tun
     if (findOpenSupportCase(member.id)) return;
-    const logsChannel = await client.channels.fetch(SUPPORT_LOGS_CHANNEL_ID).catch(() => null);
+
+    // Cache-first, dann fetch mit Fehler-Logging
+    const guild = client.guilds.cache.get(GUILD_ID);
+    let logsChannel = guild?.channels?.cache?.get(SUPPORT_LOGS_CHANNEL_ID) || null;
+    if (!logsChannel) {
+        try {
+            logsChannel = await client.channels.fetch(SUPPORT_LOGS_CHANNEL_ID);
+        } catch(fetchErr) {
+            console.warn(`[Support] Logs-Channel ${SUPPORT_LOGS_CHANNEL_ID} nicht erreichbar — Discord-Fehler:`, fetchErr.code || 'unknown', '·', fetchErr.message);
+            // Diagnostik: welche Channels sieht der Bot ueberhaupt im Haupt-Guild?
+            if (guild) {
+                const visibleChannels = guild.channels.cache.filter(c => c.type === 0).size; // GuildText
+                console.warn(`[Support] Bot sieht ${visibleChannels} Text-Channels im Guild ${guild.name} (${guild.id}). Channel fehlt oder Bot hat keine View-Permission.`);
+            } else {
+                console.warn(`[Support] Guild ${GUILD_ID} ist gar nicht im Bot-Cache — schwerwiegendes Problem.`);
+            }
+            return;
+        }
+    }
     if (!logsChannel) { console.warn('[Support] Logs-Channel nicht erreichbar:', SUPPORT_LOGS_CHANNEL_ID); return; }
 
     const caseId = generateSupportCaseId();
