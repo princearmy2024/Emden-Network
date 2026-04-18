@@ -1074,22 +1074,26 @@ client.on("interactionCreate", async interaction => {
 
     // /leaderboard-init — Erstellt oder repariert das Live-Shift-Leaderboard (nur Owner)
     if (interaction.commandName === "leaderboard-init") {
+        console.log(`[Leaderboard] /leaderboard-init aufgerufen von ${interaction.user.id} (${interaction.user.username}) in Channel ${interaction.channelId}`);
         try {
             if (!OWNER_IDS.includes(interaction.user.id)) {
-                return interaction.reply({ content: "❌ Dieser Command ist nur fuer Bot-Owner.", ephemeral: true });
+                console.log(`[Leaderboard] Ablehnung: ${interaction.user.id} nicht in OWNER_IDS`);
+                return interaction.reply({ content: "❌ Dieser Command ist nur fuer Bot-Owner.", flags: MessageFlags.Ephemeral });
             }
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            console.log('[Leaderboard] Deferred — starte Panel-Erstellung...');
             const channelId = interaction.channelId || LEADERBOARD_DEFAULT_CHANNEL_ID;
             const result = await ensureLeaderboardPanel(channelId, { force: true });
+            console.log('[Leaderboard] Panel-Ergebnis:', result);
             if (result.ok) {
-                return interaction.editReply({ content: `✅ Live-Leaderboard-Panel aktiv in <#${channelId}>. Wird jede Minute aktualisiert.` });
+                return interaction.editReply({ content: `✅ Live-Leaderboard-Panel aktiv in <#${channelId}>. Wird jede Minute aktualisiert. (Action: ${result.action}, Msg: ${result.messageId})` });
             }
             return interaction.editReply({ content: `❌ Konnte Panel nicht erstellen: ${result.error || 'unknown'}` });
         } catch(e) {
-            console.error('[Leaderboard] Init-Fehler:', e);
-            const reply = { content: '❌ Fehler: ' + e.message, ephemeral: true };
-            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
-            else await interaction.reply(reply).catch(() => {});
+            console.error('[Leaderboard] Init-Fehler:', e.message, e.stack);
+            const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
+            if (interaction.deferred) await interaction.editReply({ content: reply.content }).catch(err => console.error('[Leaderboard] editReply scheiterte:', err.message));
+            else await interaction.reply(reply).catch(err => console.error('[Leaderboard] reply scheiterte:', err.message));
         }
         return;
     }
@@ -2787,12 +2791,21 @@ function stateLabel(state) {
 }
 
 async function buildLeaderboardContainer() {
-    // Alle EN-Team-Mitglieder holen + Shift-Daten joinen
+    console.log('[Leaderboard] buildLeaderboardContainer gestartet...');
     const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
-    if (!guild) return null;
-    await guild.members.fetch().catch(() => {});
+    if (!guild) { console.warn('[Leaderboard] Guild nicht erreichbar'); return null; }
+    // Members.fetch mit 10s Timeout — wenn Discord nicht antwortet nutzen wir Cache
+    try {
+        await Promise.race([
+            guild.members.fetch(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('members_fetch_timeout')), 10000)),
+        ]);
+    } catch(e) {
+        console.warn(`[Leaderboard] guild.members.fetch Warnung: ${e.message} — nutze vorhandenen Cache (${guild.members.cache.size} Member)`);
+    }
     const EN_TEAM_ROLE_ID = "1365083291044282389";
     const enTeamMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.has(EN_TEAM_ROLE_ID));
+    console.log(`[Leaderboard] ${enTeamMembers.size} EN-Team Member gefunden (von ${guild.members.cache.size} im Cache)`);
 
     const rows = [];
     for (const [, member] of enTeamMembers) {
@@ -2869,30 +2882,38 @@ async function ensureLeaderboardPanel(fallbackChannelId = LEADERBOARD_DEFAULT_CH
     try {
         const cfg = panelConfig.leaderboard || {};
         const channelId = opts.force ? fallbackChannelId : (cfg.channelId || fallbackChannelId);
-        const channel = await client.channels.fetch(channelId).catch(() => null);
-        if (!channel) return { ok: false, error: 'channel_not_found' };
+        console.log(`[Leaderboard] ensureLeaderboardPanel: channelId=${channelId}, force=${!!opts.force}, existing msgId=${cfg.messageId || 'none'}`);
+        const channel = await client.channels.fetch(channelId).catch(err => { console.warn('[Leaderboard] Channel-Fetch-Fehler:', err.message); return null; });
+        if (!channel) { console.warn('[Leaderboard] Channel nicht gefunden'); return { ok: false, error: 'channel_not_found' }; }
 
         const container = await buildLeaderboardContainer();
         if (!container) return { ok: false, error: 'guild_unavailable' };
+        console.log('[Leaderboard] Container gebaut — sende/edite Nachricht...');
 
         // Existierende Message bearbeiten falls moeglich
         if (cfg.messageId && !opts.force) {
             try {
                 const msg = await channel.messages.fetch(cfg.messageId);
                 await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
+                console.log(`[Leaderboard] Nachricht ${msg.id} editiert.`);
                 return { ok: true, action: 'edited', messageId: msg.id };
             } catch(e) {
-                // Message weg → neu posten
-                console.warn('[Leaderboard] Nachricht nicht mehr erreichbar, erstelle neu:', e.message);
+                console.warn('[Leaderboard] Edit scheiterte, poste neu:', e.message);
             }
         }
         // Neu posten
-        const newMsg = await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
-        panelConfig.leaderboard = { channelId: channel.id, messageId: newMsg.id, createdAt: Date.now() };
-        savePanelConfig();
-        return { ok: true, action: 'created', messageId: newMsg.id };
+        try {
+            const newMsg = await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            panelConfig.leaderboard = { channelId: channel.id, messageId: newMsg.id, createdAt: Date.now() };
+            savePanelConfig();
+            console.log(`[Leaderboard] Neue Nachricht ${newMsg.id} gepostet in ${channel.id}.`);
+            return { ok: true, action: 'created', messageId: newMsg.id };
+        } catch(sendErr) {
+            console.error('[Leaderboard] channel.send FEHLER:', sendErr.message, sendErr.code);
+            return { ok: false, error: `send_failed: ${sendErr.message}` };
+        }
     } catch(e) {
-        console.error('[Leaderboard] ensure failed:', e.message);
+        console.error('[Leaderboard] ensure failed:', e.message, e.stack);
         return { ok: false, error: e.message };
     }
 }
