@@ -380,10 +380,12 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
   pointer-events: auto;
 }
 
+/* Default auf :root damit der Settings-Slider via documentElement.style.setProperty wirkt */
+:root { --mod-panel-alpha: 0.92; }
+
 /* Gradient background for the slide panel — Alpha-Multiplier via CSS-Variable (Settings-Slider) */
 #mod-slide-bg {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  --mod-panel-alpha: 0.92;
   background: linear-gradient(to left,
     rgba(8, 10, 22, calc(var(--mod-panel-alpha) * 1.03)) 0%,
     rgba(10, 16, 35, calc(var(--mod-panel-alpha) * 0.96)) 60%,
@@ -585,7 +587,6 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
 .mod-detail {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   z-index: 10; display: flex; flex-direction: column;
-  --mod-panel-alpha: 0.92;
   background: linear-gradient(to left,
     rgba(8, 10, 22, calc(var(--mod-panel-alpha) * 1.03)) 0%,
     rgba(10, 16, 35, calc(var(--mod-panel-alpha) * 0.96)) 60%,

@@ -30,7 +30,8 @@ const STATUS_UPDATE_INTERVAL = 60 * 1000;
 // Owner-Whitelist fuer geschuetzte Commands (z.B. /leaderboard-init)
 const OWNER_IDS = ["832520997311479809", "1051180937855119441", "415890114389082124"];
 const LEADERBOARD_DEFAULT_CHANNEL_ID = "1495104816962080941";
-const LEADERBOARD_UPDATE_INTERVAL_MS = 60 * 1000;
+const LEADERBOARD_UPDATE_INTERVAL_MS = 3 * 1000; // 3s = liveartig und rate-limit-sicher (Discord erlaubt ~5 Edits / 5s pro Message)
+const LEADERBOARD_PAGE_SIZE = 10;
 const PANEL_CONFIG_FILE = path.join(path.resolve(), "data", "panelConfig.json");
 
 // === Roblox OAuth2 Config ===
@@ -159,6 +160,65 @@ function canTransitionShift(discordId) {
     if (now - (s.lastTransitionAt || 0) < SHIFT_TRANSITION_COOLDOWN_MS) return false;
     s.lastTransitionAt = now;
     return true;
+}
+
+// Sync Shift-State zur ON_DUTY-Rolle:
+//   Rolle da + state='off' → auto-start
+//   Keine Rolle + state!='off' → auto-end (Leaderboard + Streak aktualisieren)
+// Wird aufgerufen beim guildMemberUpdate-Event + beim Bot-Start fuer alle Mitglieder
+async function syncShiftFromRole(member) {
+    if (!member || member.user?.bot) return;
+    const discordId = member.id;
+    const hasRole = member.roles.cache.has(ON_DUTY_ROLE_ID);
+    const s = getShift(discordId);
+    const now = Date.now();
+
+    if (hasRole && s.state === 'off') {
+        // Rolle da, aber nicht im Shift → auto-start
+        s.state = 'active';
+        s.startedAt = now;
+        s.breakStartedAt = null;
+        saveShifts();
+        io.emit('shift_update', buildShiftSnapshot(discordId));
+        console.log(`[Shift] Auto-Start fuer ${member.displayName || discordId} (hat ON_DUTY Rolle)`);
+        return 'started';
+    }
+
+    if (!hasRole && s.state !== 'off') {
+        // Keine Rolle mehr → finalisiere laufende Zeit + beende Shift
+        if (s.state === 'active' && s.startedAt) {
+            s.savedMs = (s.savedMs || 0) + Math.max(0, now - s.startedAt);
+        }
+        if (s.state === 'break' && s.breakStartedAt) {
+            const dur = Math.max(0, now - s.breakStartedAt);
+            s.breakMs = (s.breakMs || 0) + dur;
+            s.pauseHistory.push({ start: s.breakStartedAt, end: now, durationMs: dur });
+            if (s.pauseHistory.length > 200) s.pauseHistory = s.pauseHistory.slice(-200);
+        }
+        // Leaderboard aktualisieren (permanent)
+        const known = allKnownUsers.get(discordId);
+        if (!shiftLeaderboard[discordId]) shiftLeaderboard[discordId] = { totalMs: 0, username: '', avatar: '' };
+        shiftLeaderboard[discordId].totalMs += s.savedMs || 0;
+        if (known) {
+            shiftLeaderboard[discordId].username = known.username || shiftLeaderboard[discordId].username || '?';
+            shiftLeaderboard[discordId].avatar = known.avatar || shiftLeaderboard[discordId].avatar || '';
+        }
+        saveLeaderboard();
+        // Streak-Zeit gutschreiben
+        const streakUp = addStreakTime(discordId, s.savedMs || 0);
+        if (streakUp) {
+            const st = getStreak(discordId);
+            io.emit('streak_complete', { discordId, streak: st.streak, bestStreak: st.bestStreak, username: known?.username || '?' });
+        }
+        s.state = 'off';
+        s.startedAt = null;
+        s.breakStartedAt = null;
+        saveShifts();
+        io.emit('shift_update', buildShiftSnapshot(discordId));
+        console.log(`[Shift] Auto-End fuer ${member.displayName || discordId} (ON_DUTY Rolle verloren)`);
+        return 'ended';
+    }
+    return null;
 }
 
 // === Panel-Config (persistent Message-IDs fuer Live-Panels) ===
@@ -603,6 +663,31 @@ client.on("interactionCreate", async interaction => {
             } catch(e) {
                 return interaction.respond([]).catch(() => {});
             }
+        }
+        return;
+    }
+
+    // ============================================
+    // 🏆 LEADERBOARD Pagination / Refresh Buttons
+    // ============================================
+    if (interaction.isButton() && (interaction.customId === 'lb_prev' || interaction.customId === 'lb_next' || interaction.customId === 'lb_refresh')) {
+        try {
+            const cfg = panelConfig.leaderboard || {};
+            const curPage = cfg.currentPage || 0;
+            const rows = await collectLeaderboardRows();
+            const totalPages = Math.max(1, Math.ceil((rows?.length || 0) / LEADERBOARD_PAGE_SIZE));
+            let newPage = curPage;
+            if (interaction.customId === 'lb_next') newPage = Math.min(curPage + 1, totalPages - 1);
+            else if (interaction.customId === 'lb_prev') newPage = Math.max(curPage - 1, 0);
+            // lb_refresh: newPage bleibt gleich, Container wird neu gebaut
+            panelConfig.leaderboard = { ...cfg, currentPage: newPage };
+            savePanelConfig();
+            const container = await buildLeaderboardContainer(newPage);
+            if (!container) { await interaction.deferUpdate().catch(() => {}); return; }
+            await interaction.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        } catch(e) {
+            console.error('[Leaderboard] Button-Fehler:', e.message);
+            await interaction.deferUpdate().catch(() => {});
         }
         return;
     }
@@ -2790,23 +2875,20 @@ function stateLabel(state) {
     return '⚫ Off Duty';
 }
 
-async function buildLeaderboardContainer() {
-    console.log('[Leaderboard] buildLeaderboardContainer gestartet...');
+// Single Source für Leaderboard-Daten (damit Pagination und Auto-Update dieselben Zeilen haben)
+async function collectLeaderboardRows() {
     const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
-    if (!guild) { console.warn('[Leaderboard] Guild nicht erreichbar'); return null; }
-    // Members.fetch mit 10s Timeout — wenn Discord nicht antwortet nutzen wir Cache
+    if (!guild) return null;
     try {
         await Promise.race([
             guild.members.fetch(),
             new Promise((_, rej) => setTimeout(() => rej(new Error('members_fetch_timeout')), 10000)),
         ]);
     } catch(e) {
-        console.warn(`[Leaderboard] guild.members.fetch Warnung: ${e.message} — nutze vorhandenen Cache (${guild.members.cache.size} Member)`);
+        console.warn(`[Leaderboard] members.fetch Warnung: ${e.message} — nutze Cache (${guild.members.cache.size} Member)`);
     }
     const EN_TEAM_ROLE_ID = "1365083291044282389";
     const enTeamMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.has(EN_TEAM_ROLE_ID));
-    console.log(`[Leaderboard] ${enTeamMembers.size} EN-Team Member gefunden (von ${guild.members.cache.size} im Cache)`);
-
     const rows = [];
     for (const [, member] of enTeamMembers) {
         const snap = buildShiftSnapshot(member.id);
@@ -2819,61 +2901,114 @@ async function buildLeaderboardContainer() {
             pauseCount: snap.pauseCount,
         });
     }
-    // Sortierung: nach activeMs desc, bei Gleichstand alphabetisch
     rows.sort((a, b) => (b.activeMs - a.activeMs) || a.username.localeCompare(b.username));
+    return rows;
+}
 
-    const top = rows.slice(0, 15);
+async function buildLeaderboardContainer(page = 0) {
+    const rows = await collectLeaderboardRows();
+    if (!rows) return null;
+
     const activeCount = rows.filter(r => r.state === 'active').length;
     const pauseCount  = rows.filter(r => r.state === 'break').length;
+    const offCount    = rows.filter(r => r.state === 'off').length;
     const totalMsSum  = rows.reduce((sum, r) => sum + r.activeMs, 0);
+    const totalPages  = Math.max(1, Math.ceil(rows.length / LEADERBOARD_PAGE_SIZE));
+    const curPage     = Math.min(Math.max(0, page | 0), totalPages - 1);
 
     const container = new ContainerBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# 🏆 EN-Team Shift-Leaderboard`))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# 🏆  EN-Team · Shift-Leaderboard`))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-            `**🟢 On Duty** · ${activeCount}  ·  **🟡 Pause** · ${pauseCount}  ·  **Team** · ${rows.length}\n` +
-            `**Gesamtzeit** · ${formatShiftDuration(totalMsSum)}`
+            `<:Moderation:1489312529254449353> **Im Dienst** · \`${activeCount}\` ` +
+            `· ⏸️ **Pause** · \`${pauseCount}\` ` +
+            `· 💤 **Off** · \`${offCount}\` ` +
+            `· 👥 **Team** · \`${rows.length}\`\n` +
+            `⌛ **Gesamtzeit** · \`${formatShiftDuration(totalMsSum)}\``
         ))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
 
-    if (top.length === 0) {
+    if (rows.length === 0) {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Noch keine Shift-Daten vorhanden.`));
     } else {
-        // Podium: Top 3 prominent; Rest als kompakte Liste
-        const podium = top.slice(0, 3);
-        const rest = top.slice(3);
-        const rankEmoji = (i) => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-
-        for (let i = 0; i < podium.length; i++) {
-            const r = podium[i];
-            const pauseInfo = r.breakMs > 0 ? ` · 🟡 ${formatShiftDuration(r.breakMs)}` : '';
-            const line =
-                `${rankEmoji(i)} **${r.username}** ${stateLabel(r.state)}\n` +
-                `⏱ \`${formatShiftDuration(r.activeMs)}\`${pauseInfo}`;
-            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(line));
-            if (i < podium.length - 1) {
-                container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+        // Podium (Seite 1): Top 3 hervorgehoben
+        // Ab Seite 2: nur die Liste
+        if (curPage === 0) {
+            const podium = rows.slice(0, 3);
+            const rankEmoji = (i) => i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+            const rankLabel = (i) => i === 0 ? 'Platz 1' : i === 1 ? 'Platz 2' : i === 2 ? 'Platz 3' : `Platz ${i+1}`;
+            for (let i = 0; i < podium.length; i++) {
+                const r = podium[i];
+                const pauseLine = r.breakMs > 0 ? `  ·  ⏸️ \`${formatShiftDuration(r.breakMs)}\`` : '';
+                container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                    `${rankEmoji(i)}  **${rankLabel(i)}** · ${r.username}  ${stateLabel(r.state)}\n` +
+                    `⏱ \`${formatShiftDuration(r.activeMs)}\`${pauseLine}`
+                ));
+                if (i < podium.length - 1) {
+                    container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+                }
             }
-        }
-
-        if (rest.length > 0) {
             container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
-            const listLines = rest.map((r, i) => {
-                const rank = i + 4;
-                const pauseInfo = r.breakMs > 0 ? ` · 🟡 ${formatShiftDuration(r.breakMs)}` : '';
-                return `\`#${String(rank).padStart(2,' ')}\` ${stateLabel(r.state).split(' ')[0]} **${r.username}** · \`${formatShiftDuration(r.activeMs)}\`${pauseInfo}`;
-            }).join('\n');
-            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(listLines));
         }
 
-        if (rows.length > top.length) {
-            container.addSeparatorComponents(new SeparatorBuilder().setDivider(false).setSpacing(SeparatorSpacingSize.Small));
-            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ... und ${rows.length - top.length} weitere Team-Mitglieder`));
+        // Listen-Seite: pageSlice = Rest ab Rang 4 (auf Seite 1), oder alle 10 (auf Seite 2+)
+        let sliceStart, sliceEnd, startRank;
+        if (curPage === 0) {
+            // Seite 1: zeige Rang 4..10 (7 Eintraege nach Podium)
+            sliceStart = 3;
+            sliceEnd = Math.min(LEADERBOARD_PAGE_SIZE, rows.length);
+            startRank = 4;
+        } else {
+            sliceStart = curPage * LEADERBOARD_PAGE_SIZE;
+            sliceEnd = Math.min(sliceStart + LEADERBOARD_PAGE_SIZE, rows.length);
+            startRank = sliceStart + 1;
+        }
+        const pageRows = rows.slice(sliceStart, sliceEnd);
+        if (pageRows.length > 0) {
+            const lines = pageRows.map((r, i) => {
+                const rank = startRank + i;
+                const stateIcon = r.state === 'active' ? '🟢' : r.state === 'break' ? '🟡' : '⚫';
+                const pauseInfo = r.breakMs > 0 ? `  ·  ⏸️ \`${formatShiftDuration(r.breakMs)}\`` : '';
+                return `\`#${String(rank).padStart(2,' ')}\`  ${stateIcon}  **${r.username}**  ·  \`${formatShiftDuration(r.activeMs)}\`${pauseInfo}`;
+            }).join('\n');
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
         }
     }
 
+    // Pagination nur wenn mehr als 1 Seite
+    if (totalPages > 1) {
+        const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+        const navRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('lb_prev')
+                .setLabel('Zurueck')
+                .setEmoji('◀')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(curPage === 0),
+            new ButtonBuilder()
+                .setCustomId('lb_page_indicator')
+                .setLabel(`Seite ${curPage + 1} / ${totalPages}`)
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true),
+            new ButtonBuilder()
+                .setCustomId('lb_next')
+                .setLabel('Weiter')
+                .setEmoji('▶')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(curPage >= totalPages - 1),
+            new ButtonBuilder()
+                .setCustomId('lb_refresh')
+                .setEmoji('🔄')
+                .setStyle(ButtonStyle.Primary),
+        );
+        container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+        container.addActionRowComponents(navRow);
+    }
+
     container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large));
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# 🔄 Live · Aktualisiert <t:${Math.floor(Date.now()/1000)}:R>`));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        `-# 🔄 Live · alle ${Math.round(LEADERBOARD_UPDATE_INTERVAL_MS/1000)}s aktualisiert  ·  Stand <t:${Math.floor(Date.now()/1000)}:T>`
+    ));
 
     return container;
 }
@@ -2882,29 +3017,25 @@ async function ensureLeaderboardPanel(fallbackChannelId = LEADERBOARD_DEFAULT_CH
     try {
         const cfg = panelConfig.leaderboard || {};
         const channelId = opts.force ? fallbackChannelId : (cfg.channelId || fallbackChannelId);
-        console.log(`[Leaderboard] ensureLeaderboardPanel: channelId=${channelId}, force=${!!opts.force}, existing msgId=${cfg.messageId || 'none'}`);
+        const page = cfg.currentPage || 0;
         const channel = await client.channels.fetch(channelId).catch(err => { console.warn('[Leaderboard] Channel-Fetch-Fehler:', err.message); return null; });
-        if (!channel) { console.warn('[Leaderboard] Channel nicht gefunden'); return { ok: false, error: 'channel_not_found' }; }
+        if (!channel) { return { ok: false, error: 'channel_not_found' }; }
 
-        const container = await buildLeaderboardContainer();
+        const container = await buildLeaderboardContainer(page);
         if (!container) return { ok: false, error: 'guild_unavailable' };
-        console.log('[Leaderboard] Container gebaut — sende/edite Nachricht...');
 
-        // Existierende Message bearbeiten falls moeglich
         if (cfg.messageId && !opts.force) {
             try {
                 const msg = await channel.messages.fetch(cfg.messageId);
                 await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 });
-                console.log(`[Leaderboard] Nachricht ${msg.id} editiert.`);
                 return { ok: true, action: 'edited', messageId: msg.id };
             } catch(e) {
                 console.warn('[Leaderboard] Edit scheiterte, poste neu:', e.message);
             }
         }
-        // Neu posten
         try {
             const newMsg = await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
-            panelConfig.leaderboard = { channelId: channel.id, messageId: newMsg.id, createdAt: Date.now() };
+            panelConfig.leaderboard = { channelId: channel.id, messageId: newMsg.id, createdAt: Date.now(), currentPage: page };
             savePanelConfig();
             console.log(`[Leaderboard] Neue Nachricht ${newMsg.id} gepostet in ${channel.id}.`);
             return { ok: true, action: 'created', messageId: newMsg.id };
@@ -3118,29 +3249,42 @@ client.once("ready", async () => {
     setInterval(() => updateStreakProtection(), 30 * 60 * 1000);
     startOverlayDataLoop();
 
-    // Auto-Start: Alle mit On Duty Rolle bekommen aktiven Shift
+    // Auto-Sync Shifts zur ON_DUTY-Rolle — beim Start einmal alle Member durchgehen
+    // (faengt auch Role-Changes ab die waehrend Bot-Downtime passiert sind)
     try {
         const guild = client.guilds.cache.get(GUILD_ID);
         if (guild) {
             await guild.members.fetch().catch(() => {});
+            let started = 0, ended = 0;
+            // 1) Alle mit Rolle → auto-start falls off
             const role = guild.roles.cache.get(ON_DUTY_ROLE_ID);
             if (role) {
-                let autoStarted = 0;
                 for (const [, member] of role.members) {
-                    const s = getShift(member.id);
-                    if (s.state !== 'active') {
-                        s.state = 'active';
-                        s.startedAt = Date.now();
-                        autoStarted++;
-                    }
-                }
-                if (autoStarted > 0) {
-                    saveShifts();
-                    console.log(`[Shift] ${autoStarted} On-Duty Member automatisch gestartet.`);
+                    const r = await syncShiftFromRole(member);
+                    if (r === 'started') started++;
                 }
             }
+            // 2) Alle die Shift haben aber keine Rolle (mehr) → auto-end
+            for (const [id, s] of Object.entries(shiftData)) {
+                if (s.state === 'off') continue;
+                const m = guild.members.cache.get(id);
+                if (!m || !m.roles.cache.has(ON_DUTY_ROLE_ID)) {
+                    if (m) {
+                        const r = await syncShiftFromRole(m);
+                        if (r === 'ended') ended++;
+                    } else {
+                        // User gar nicht mehr im Server → Shift sauber beenden
+                        const now = Date.now();
+                        if (s.state === 'active' && s.startedAt) s.savedMs = (s.savedMs || 0) + Math.max(0, now - s.startedAt);
+                        s.state = 'off'; s.startedAt = null; s.breakStartedAt = null;
+                        ended++;
+                    }
+                }
+            }
+            if (started || ended) saveShifts();
+            console.log(`[Shift] Role-Sync beim Start: ${started} gestartet, ${ended} beendet.`);
         }
-    } catch(e) { console.error('[Shift] Auto-Start Fehler:', e.message); }
+    } catch(e) { console.error('[Shift] Role-Sync Fehler:', e.message); }
 
     await checkGithubRelease();
     setInterval(checkGithubRelease, 5 * 60 * 1000);
@@ -3152,6 +3296,22 @@ client.once("ready", async () => {
         console.log(`[Leaderboard] Live-Panel aktiv: Kanal ${panelConfig.leaderboard.channelId}, Msg ${panelConfig.leaderboard.messageId}`);
     } else {
         console.log('[Leaderboard] Kein Panel initialisiert. Owner kann /leaderboard-init ausfuehren.');
+    }
+});
+
+// ================================================================
+// 🎯 ON_DUTY ROLLE → SHIFT AUTO-SYNC
+// Sobald jemand die Rolle bekommt/verliert, wird die Shift entsprechend gestartet/beendet
+// ================================================================
+client.on("guildMemberUpdate", async (oldMember, newMember) => {
+    if (newMember.guild.id !== GUILD_ID) return;
+    const hadRole = oldMember.roles.cache.has(ON_DUTY_ROLE_ID);
+    const hasRole = newMember.roles.cache.has(ON_DUTY_ROLE_ID);
+    if (hadRole === hasRole) return; // Kein Wechsel der relevanten Rolle
+    try {
+        await syncShiftFromRole(newMember);
+    } catch(e) {
+        console.error('[Shift] guildMemberUpdate Sync-Fehler:', e.message);
     }
 });
 

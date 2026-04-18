@@ -1,6 +1,6 @@
 {
-    "version": "4.63.1",
+    "version": "4.63.2",
     "releaseDate": "2026-04-18",
-    "notes": "v4.63.1: Pause-Sub-Timer Layout-Fix (Desktop + Overlay) — jetzt in eigener Zeile unter dem Haupttimer statt daneben gequetscht + Pause-Nummer #N direkt im Ingame-Overlay sichtbar + Bot-Leaderboard Diagnostik-Logs.",
+    "notes": "v4.63.2: Mod-Panel Transparenz-Slider wirkt jetzt wirklich (CSS-Spezifitaet-Fix). Leaderboard komplett ueberarbeitet — Pagination mit Vor/Zurueck/Refresh-Buttons, professionelleres Design mit Icons, Podium-Hervorhebung Top 3, Seite-X/Y Indikator, Auto-Update jetzt alle 3s statt 60s. Bot: ON_DUTY-Rolle startet/beendet Shift automatisch ohne dass User in der App klicken muss.",
     "forceUpdate": true
 }
