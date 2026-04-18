@@ -3341,6 +3341,15 @@ body.has-custom-bg .gif-picker-panel {
     font-family: var(--font-mono);
     font-weight: 600;
 }
+.mod-shift-pause-sub .mod-shift-pause-sep {
+    color: rgba(255,255,255,0.25);
+}
+.mod-shift-pause-sub .mod-shift-pause-num {
+    color: rgba(255,255,255,0.6);
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 10px;
+}
 @keyframes mod-pause-icon-pulse {
     0%, 100% { opacity: 0.55; }
     50%      { opacity: 1;    }

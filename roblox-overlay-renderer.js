@@ -2006,6 +2006,10 @@ const OverlayShift = {
     _renderPauseSubTimer(state, breakMs) {
         const timer = document.getElementById('ovShiftTimer');
         if (!timer) return;
+        // Anker: panel-info-card (die Card die State + Timer enthaelt) — dadurch landet der Sub-Timer UNTER der Card, nicht daneben
+        const anchor = timer.closest('.panel-info-card') || timer;
+        // pauseCount vom Server zaehlt beendete Pausen — die laufende Pause ist #(count+1)
+        const pauseNumber = (this._shift?.pauseCount || 0) + (state === 'break' ? 1 : 0);
         let sub = document.getElementById('ovShiftPauseSub');
         if (state !== 'break') {
             if (sub) { sub.classList.remove('visible'); setTimeout(() => sub?.remove(), 400); }
@@ -2014,10 +2018,9 @@ const OverlayShift = {
         if (!sub) {
             sub = document.createElement('div');
             sub.id = 'ovShiftPauseSub';
-            sub.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;padding:3px 9px;width:fit-content;font-size:10px;font-weight:500;color:rgba(255,255,255,0.88);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;letter-spacing:0.02em;opacity:0;max-height:0;overflow:hidden;transform:translateY(-4px);transition:opacity 0.35s ease, max-height 0.35s ease, transform 0.35s ease, margin-top 0.35s ease;';
-            sub.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(255,255,255,0.75);flex-shrink:0;animation:ov-pause-pulse 2.4s ease-in-out infinite;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span style="color:rgba(255,255,255,0.55);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;font-size:9px;">Pause</span><span class="ov-pause-time" style="color:#fff;font-family:ui-monospace,monospace;font-weight:600;">0 s</span>';
-            timer.insertAdjacentElement('afterend', sub);
-            // Sicherstellen dass Keyframe-Animation existiert
+            sub.style.cssText = 'display:flex;align-items:center;gap:7px;margin-top:0;padding:5px 10px;width:fit-content;font-size:10px;font-weight:500;color:rgba(255,255,255,0.88);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;letter-spacing:0.02em;opacity:0;max-height:0;overflow:hidden;transform:translateY(-4px);transition:opacity 0.35s ease, max-height 0.35s ease, transform 0.35s ease, margin-top 0.35s ease;';
+            sub.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(255,255,255,0.75);flex-shrink:0;animation:ov-pause-pulse 2.4s ease-in-out infinite;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span style="color:rgba(255,255,255,0.55);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;font-size:9px;">Pause</span><span class="ov-pause-time" style="color:#fff;font-family:ui-monospace,monospace;font-weight:600;">0 s</span><span class="ov-pause-count-sep" style="color:rgba(255,255,255,0.2);">·</span><span class="ov-pause-count" style="color:rgba(255,255,255,0.65);font-weight:500;">#0</span>';
+            anchor.insertAdjacentElement('afterend', sub);
             if (!document.getElementById('ov-pause-keyframes')) {
                 const st = document.createElement('style');
                 st.id = 'ov-pause-keyframes';
@@ -2031,6 +2034,8 @@ const OverlayShift = {
         const timeStr = mins >= 1 ? `${mins} Min ${String(secs).padStart(2,'0')} s` : `${secs} s`;
         const t = sub.querySelector('.ov-pause-time');
         if (t) t.textContent = timeStr;
+        const c = sub.querySelector('.ov-pause-count');
+        if (c) c.textContent = `#${pauseNumber}`;
     },
 
     async loadFromServer() {

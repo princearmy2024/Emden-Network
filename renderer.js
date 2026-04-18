@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.63.0'; // Stand: 18.04.2026
+let CURRENT_VERSION = '4.63.1'; // Stand: 18.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -4677,6 +4677,10 @@ const ModPanel = {
     _renderPauseSubTimer(state, breakMs) {
         const timerEl = document.getElementById('modShiftTimer');
         if (!timerEl) return;
+        const timeRow = timerEl.closest('.mod-shift-time-row');
+        const anchor = timeRow || timerEl;
+        const me = this._getMyShift();
+        const pauseNumber = (me?.pauseCount || 0) + (state === 'break' ? 1 : 0);
         let sub = document.getElementById('modShiftPauseSub');
         if (state !== 'break') {
             if (sub) { sub.classList.remove('visible'); setTimeout(() => sub?.remove(), 400); }
@@ -4686,8 +4690,8 @@ const ModPanel = {
             sub = document.createElement('div');
             sub.id = 'modShiftPauseSub';
             sub.className = 'mod-shift-pause-sub';
-            sub.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="mod-shift-pause-label">Pause</span><span class="mod-shift-pause-time">0:00</span>';
-            timerEl.insertAdjacentElement('afterend', sub);
+            sub.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="mod-shift-pause-label">Pause</span><span class="mod-shift-pause-time">0 s</span><span class="mod-shift-pause-sep">·</span><span class="mod-shift-pause-num">#0</span>';
+            anchor.insertAdjacentElement('afterend', sub);
             requestAnimationFrame(() => sub.classList.add('visible'));
         }
         const mins = Math.floor(breakMs / 60000);
@@ -4695,6 +4699,8 @@ const ModPanel = {
         const timeStr = mins >= 1 ? `${mins} Min ${String(secs).padStart(2,'0')} s` : `${secs} s`;
         const timeEl = sub.querySelector('.mod-shift-pause-time');
         if (timeEl) timeEl.textContent = timeStr;
+        const numEl = sub.querySelector('.mod-shift-pause-num');
+        if (numEl) numEl.textContent = `#${pauseNumber}`;
     },
 
     _startShiftTicker() {

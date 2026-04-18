@@ -1,6 +1,6 @@
 {
-    "version": "4.63.0",
+    "version": "4.63.1",
     "releaseDate": "2026-04-18",
-    "notes": "v4.63.0: Shift-Time Refactor (Server als Source-of-Truth, kein Drift/Bug-Use mehr) + Pause-Sub-Timer mit sanfter Animation + Live Discord Shift-Leaderboard V2 Panel (Owner-Only /leaderboard-init, Auto-Edit jede Minute, Krone fuer Platz 1) + Mod-Detail-View Background-Fix + Mod-Panel Transparenz-Slider in Overlay-Settings.",
+    "notes": "v4.63.1: Pause-Sub-Timer Layout-Fix (Desktop + Overlay) — jetzt in eigener Zeile unter dem Haupttimer statt daneben gequetscht + Pause-Nummer #N direkt im Ingame-Overlay sichtbar + Bot-Leaderboard Diagnostik-Logs.",
     "forceUpdate": true
 }
