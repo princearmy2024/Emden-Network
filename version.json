@@ -1,6 +1,6 @@
 {
-    "version": "4.64.3",
+    "version": "4.65.0",
     "releaseDate": "2026-04-19",
-    "notes": "v4.64.3: Shader Performance + mehr Optionen. 4 neue Presets (Golden Hour/Night/Vivid/Moody). Capture-Framerate auf 60-144fps hochgedreht. Uniform-Locations gecacht (massiv weniger GPU-Calls pro Frame). 2D-Canvas-Bridge mit desynchronized=true (low-latency). tasklist statt wmic fuer Roblox-Detection (schneller Alt-Tab). Permission-Check-Handler dazu. Bessere Fehler-Meldungen.",
+    "notes": "v4.65.0: Shader Stack komplett entfernt. Der gesamte Shader-Post-Processing Stack (In-Game Canvas, Stream-Fenster, Presets, Auto-Atmosphere) ist raus — bugte zu stark und hat das Intro kaputt gemacht. Overlay ist wieder im urspruenglichen Zustand. Build-Groesse kleiner.",
     "forceUpdate": false
 }

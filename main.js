@@ -21,7 +21,6 @@ const { spawn } = require('child_process');
 let mainWindow;
 let overlayWindow;
 let robloxOverlayWin = null;
-let shaderStreamWin = null; // Separates "Emden Network Shader" Fenster fuer Discord/OBS
 let globalPTTActive  = false; // Verhindert doppeltes Feuern
 
 function createOverlayWindow() {
@@ -521,20 +520,6 @@ function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
     robloxOverlayWin.webContents.on('did-finish-load', () => {
         robloxOverlayWin.webContents.setAudioMuted(false);
     });
-    // Desktop-Capture Permission (fuer Shader-Stack getUserMedia)
-    robloxOverlayWin.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
-        if (wc === robloxOverlayWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
-            cb(true);
-            return;
-        }
-        cb(false);
-    });
-    robloxOverlayWin.webContents.session.setPermissionCheckHandler((wc, permission) => {
-        if (wc === robloxOverlayWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
-            return true;
-        }
-        return false;
-    });
     const adminFlag = isAdmin ? '1' : '0';
     const staffFlag = isStaff ? '1' : '0';
     robloxOverlayWin.loadFile('roblox-overlay.html', {
@@ -562,7 +547,7 @@ const OverlayState = {
     showTimeout: null,
     hideTimeout: null,
     SHOW_DELAY: 4000,  // 4s stabil aktiv bevor Overlay erscheint
-    HIDE_DELAY: 50,    // 50ms — sehr schnell wegen Shader-Canvas Alt-Tab Fix
+    HIDE_DELAY: 800,   // 0.8s bevor Overlay verschwindet
 
     start() {
         if (this.checkInterval) return;
@@ -580,12 +565,12 @@ const OverlayState = {
                 // Fallback: Einfach prüfen ob Roblox-Prozess existiert UND unser Overlay nicht fokussiert ist
             });
 
-            // Schnell: tasklist statt wmic (kein PowerShell-Overhead, nativer Binary)
-            exec('tasklist /FI "IMAGENAME eq RobloxPlayerBeta.exe" /NH /FO CSV',
-                { timeout: 800, windowsHide: true }, (err, stdout) => {
+            // Sicherer Check: tasklist + aktives Fenster Titel via wmic
+            exec('wmic process where "name=\'RobloxPlayerBeta.exe\'" get ProcessId /format:list',
+                { timeout: 1500, windowsHide: true }, (err, stdout) => {
                 if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
 
-                const robloxRunning = (stdout || '').includes('RobloxPlayerBeta.exe');
+                const robloxRunning = (stdout || '').includes('ProcessId=');
 
                 // Prüfe ob unser eigenes Hauptfenster fokussiert ist
                 const ourAppFocused = mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused();
@@ -595,7 +580,7 @@ const OverlayState = {
 
                 this._handleStateChange(robloxShouldShow);
             });
-        }, 250);
+        }, 2000);
     },
 
     stop() {
@@ -1017,15 +1002,6 @@ app.whenReady().then(() => {
         globalShortcut.register('Control+4', modPanelHandler);
     }
 
-    // ==========================================
-    // SHIFT+F6: Shader instant pause/resume (Alt-Tab Escape)
-    // ==========================================
-    globalShortcut.register('Shift+F6', () => {
-        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
-            robloxOverlayWin.webContents.send('shader-toggle-pause');
-        }
-    });
-
     app.on('activate', () => {
         // macOS: Klick auf Dock-Icon stellt Fenster wieder her
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1047,110 +1023,8 @@ app.on('before-quit', () => {
     try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
     try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.destroy(); robloxOverlayWin = null; } } catch(_) {}
     try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.destroy(); overlayWindow = null; } } catch(_) {}
-    try { if (shaderStreamWin && !shaderStreamWin.isDestroyed()) { shaderStreamWin.destroy(); shaderStreamWin = null; } } catch(_) {}
     // Alle uebrigen Fenster zerstoeren
     BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch(_) {} });
-});
-
-// ================================================================
-// SHADER STACK
-// - In-Overlay Rendering (Canvas im Roblox-Overlay selbst)
-// - Optionales "Emden Network Shader" Fenster fuer Discord/OBS
-// ================================================================
-ipcMain.handle('shader-list-sources', async () => {
-    try {
-        const sources = await desktopCapturer.getSources({
-            types: ['window', 'screen'],
-            thumbnailSize: { width: 320, height: 180 },
-            fetchWindowIcons: false,
-        });
-        const mapped = sources.map(s => ({
-            id: s.id,
-            name: s.name,
-            displayId: s.display_id || '',
-            thumbnailDataUrl: s.thumbnail?.toDataURL() || '',
-        }));
-        console.log(`[Shader] list-sources: ${mapped.length} sources gefunden`);
-        return mapped;
-    } catch (e) {
-        console.error('[Shader] list-sources FAILED:', e.message, e.stack);
-        // Return error info so renderer can display it
-        return { __error: e.message || 'Unknown error' };
-    }
-});
-
-function createShaderStreamWindow() {
-    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) return shaderStreamWin;
-    shaderStreamWin = new BrowserWindow({
-        width: 1280,
-        height: 720,
-        minWidth: 640,
-        minHeight: 360,
-        title: 'Emden Network Shader',
-        backgroundColor: '#000000',
-        show: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-            backgroundThrottling: false,
-        },
-    });
-    shaderStreamWin.setMenu(null);
-    shaderStreamWin.setTitle('Emden Network Shader');
-    shaderStreamWin.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
-        if (wc === shaderStreamWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
-            cb(true);
-            return;
-        }
-        cb(false);
-    });
-    shaderStreamWin.loadFile(path.join('shader-stack', 'shader-window.html'));
-    shaderStreamWin.once('ready-to-show', () => {
-        shaderStreamWin.setTitle('Emden Network Shader');
-        shaderStreamWin.show();
-    });
-    shaderStreamWin.on('closed', () => { shaderStreamWin = null; });
-    return shaderStreamWin;
-}
-
-ipcMain.on('shader-stream-open', (event, payload = {}) => {
-    const { sourceId, settings, renderMode, autoAtmosphere } = payload;
-    const w = createShaderStreamWindow();
-    const send = () => {
-        if (!w || w.isDestroyed()) return;
-        w.webContents.send('shader:stream-meta', { renderMode, autoAtmosphere });
-        if (settings) w.webContents.send('shader:stream-settings', settings);
-        if (sourceId) w.webContents.send('shader:stream-source', sourceId);
-    };
-    if (w.webContents.isLoading()) {
-        w.webContents.once('did-finish-load', send);
-    } else {
-        send();
-    }
-});
-
-ipcMain.on('shader-stream-close', () => {
-    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
-        try { shaderStreamWin.webContents.send('shader:stream-stop'); } catch (_) {}
-        shaderStreamWin.close();
-    }
-});
-
-ipcMain.on('shader-stream-settings', (event, settings) => {
-    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
-        shaderStreamWin.webContents.send('shader:stream-settings', settings || {});
-    }
-});
-
-ipcMain.on('shader-stream-meta', (event, meta) => {
-    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
-        shaderStreamWin.webContents.send('shader:stream-meta', meta || {});
-    }
-});
-
-ipcMain.on('shader-stream-ready', () => {
-    console.log('[Shader-Stream] Window ready');
 });
 
 app.on('will-quit', () => {

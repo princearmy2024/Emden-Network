@@ -92,23 +92,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dashboardReady: () => ipcRenderer.send('dashboard-ready'),
     takeScreenshot: () => ipcRenderer.send('take-screenshot'),
     onScreenshotTaken: (cb) => ipcRenderer.on('screenshot-taken', (event, data) => cb(data)),
-
-    // ── SHADER STACK ──────────────────────────────────────────────
-    shaderListSources: () => ipcRenderer.invoke('shader-list-sources'),
-
-    // Stream-Fenster (von overlay-Renderer aus gesteuert)
-    shaderStreamOpen: (payload) => ipcRenderer.send('shader-stream-open', payload),
-    shaderStreamClose: () => ipcRenderer.send('shader-stream-close'),
-    shaderStreamSettings: (settings) => ipcRenderer.send('shader-stream-settings', settings),
-    shaderStreamMeta: (meta) => ipcRenderer.send('shader-stream-meta', meta),
-
-    // Listener im Stream-Fenster (shader-window.html)
-    onShaderStreamSource:   (cb) => ipcRenderer.on('shader:stream-source',   (event, id)  => cb(id)),
-    onShaderStreamSettings: (cb) => ipcRenderer.on('shader:stream-settings', (event, s)   => cb(s)),
-    onShaderStreamMeta:     (cb) => ipcRenderer.on('shader:stream-meta',     (event, m)   => cb(m)),
-    onShaderStreamStop:     (cb) => ipcRenderer.on('shader:stream-stop',     ()           => cb()),
-    shaderStreamReady:      () => ipcRenderer.send('shader-stream-ready'),
-
-    // Shift+F6 -> Shader pause/resume (vom Main-Prozess via globalShortcut)
-    onShaderTogglePause: (cb) => ipcRenderer.on('shader-toggle-pause', () => cb()),
 });
