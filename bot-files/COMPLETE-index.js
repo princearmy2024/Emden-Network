@@ -39,7 +39,7 @@ const SUPPORT_VOICE_CHANNEL_ID = "1365102454550695936"; // Warteraum — Join tr
 const SUPPORT_LOGS_CHANNEL_ID = "1383433388173820027";  // Voice-Logs Channel (Case-Panels werden hier gepostet)
 const SUPPORT_PING_ROLE_ID = "1367924090513526874";     // Voice-Support-Rolle — wird bei neuem Case gepingt
 const SUPPORT_CASES_FILE = path.join(path.resolve(), "data", "supportCases.json");
-const SUPPORT_REENTRY_COOLDOWN_MS = 30 * 60 * 1000; // Nach Case-Close 30min Block vom Warteraum
+const SUPPORT_REENTRY_COOLDOWN_MS = 2 * 60 * 1000; // Nach Case-Close 2min Block vom Warteraum
 
 // === Roblox OAuth2 Config ===
 const ROBLOX_CLIENT_ID = process.env.ROBLOX_CLIENT_ID || '';
