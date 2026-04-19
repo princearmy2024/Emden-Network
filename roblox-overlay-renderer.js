@@ -2058,6 +2058,243 @@ const OverlayShift = {
 
 window.OverlayShift = OverlayShift;
 
+// ════════════════════════════════════════════════════════════════
+// SHADER STACK CONTROL — Overlay settings panel → main process IPC
+// ════════════════════════════════════════════════════════════════
+const ShaderCtrl = (() => {
+    const STORAGE_KEY = 'shader-stack-settings';
+    const PRESETS = {
+        realism: {
+            enabled: true,
+            exposure: 100, saturation: 105, contrast: 108,
+            bloom: 45, ssao: 35, sharpen: 40,
+            ca: 25, vignette: 35, grain: 25,
+        },
+        cinematic: {
+            enabled: true,
+            exposure: 95, saturation: 95, contrast: 120,
+            bloom: 70, ssao: 50, sharpen: 30,
+            ca: 60, vignette: 60, grain: 40,
+        },
+        film: {
+            enabled: true,
+            exposure: 90, saturation: 85, contrast: 115,
+            bloom: 55, ssao: 40, sharpen: 25,
+            ca: 80, vignette: 70, grain: 70,
+        },
+        clean: {
+            enabled: true,
+            exposure: 100, saturation: 100, contrast: 100,
+            bloom: 20, ssao: 20, sharpen: 50,
+            ca: 0, vignette: 15, grain: 5,
+        },
+    };
+
+    let selectedSourceId = null;
+    let activePreset = 'realism';
+    let running = false;
+
+    function statusEl() { return document.getElementById('shaderStatus'); }
+    function setStatus(text, cls) {
+        const el = statusEl();
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'shader-status' + (cls ? ' ' + cls : '');
+    }
+
+    function id(x) { return document.getElementById(x); }
+
+    async function pickSource() {
+        const list = id('shaderSourceList');
+        const btn  = id('shaderBtnSource');
+        if (!window.electronAPI?.shaderListSources) {
+            setStatus('electronAPI fehlt – App neu starten?', 'err');
+            return;
+        }
+        if (list.classList.contains('show')) {
+            list.classList.remove('show');
+            return;
+        }
+        setStatus('Lade Fenster-Liste...');
+        btn.disabled = true;
+        try {
+            const sources = await window.electronAPI.shaderListSources();
+            btn.disabled = false;
+            if (!sources || sources.length === 0) {
+                setStatus('Keine Fenster gefunden.', 'err');
+                return;
+            }
+            // Sort: Roblox first, then windows, then screens
+            sources.sort((a, b) => {
+                const ra = /roblox/i.test(a.name) ? 0 : (/screen/i.test(a.id) ? 2 : 1);
+                const rb = /roblox/i.test(b.name) ? 0 : (/screen/i.test(b.id) ? 2 : 1);
+                return ra - rb;
+            });
+            list.innerHTML = sources.map(s => `
+                <div class="shader-source-item" data-id="${s.id}" data-name="${(s.name || '').replace(/"/g, '&quot;')}">
+                    <img src="${s.thumbnailDataUrl}" alt="">
+                    <div class="nm">${(s.name || '').replace(/</g, '&lt;')}</div>
+                </div>
+            `).join('');
+            list.classList.add('show');
+            list.querySelectorAll('.shader-source-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    selectedSourceId = item.dataset.id;
+                    const nm = item.dataset.name;
+                    setStatus('Quelle: ' + nm, 'ok');
+                    list.classList.remove('show');
+                    const startBtn = id('shaderBtnStart');
+                    if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = '1'; }
+                });
+            });
+        } catch (e) {
+            btn.disabled = false;
+            setStatus('Fehler: ' + (e.message || e), 'err');
+        }
+    }
+
+    function start() {
+        if (!selectedSourceId) {
+            setStatus('Erst Quelle wählen!', 'err');
+            return;
+        }
+        window.electronAPI?.shaderOpen(selectedSourceId);
+        running = true;
+        const pane = id('shaderSettingsPane');
+        if (pane) pane.classList.remove('disabled');
+        setStatus('Shader läuft – in OBS "Fensteraufnahme" wählen.', 'ok');
+        // Send initial settings after a short delay so window is ready
+        setTimeout(apply, 600);
+    }
+
+    function stop() {
+        window.electronAPI?.shaderClose();
+        running = false;
+        const pane = id('shaderSettingsPane');
+        if (pane) pane.classList.add('disabled');
+        setStatus('Shader gestoppt.');
+    }
+
+    function readUI() {
+        return {
+            enabled: id('shaderEnabled')?.checked ?? true,
+            exposure: +id('shaderExposure').value,
+            saturation: +id('shaderSaturation').value,
+            contrast: +id('shaderContrast').value,
+            bloom: +id('shaderBloom').value,
+            ssao: +id('shaderSSAO').value,
+            sharpen: +id('shaderSharpen').value,
+            ca: +id('shaderCA').value,
+            vignette: +id('shaderVignette').value,
+            grain: +id('shaderGrain').value,
+        };
+    }
+
+    function writeUI(p) {
+        if (p.enabled != null && id('shaderEnabled')) id('shaderEnabled').checked = !!p.enabled;
+        const setRange = (inp, valLbl, val, suffix = '%') => {
+            const el = id(inp), l = id(valLbl);
+            if (el) el.value = val;
+            if (l) l.textContent = val + suffix;
+        };
+        setRange('shaderExposure', 'shaderExposureVal', p.exposure);
+        setRange('shaderSaturation', 'shaderSaturationVal', p.saturation);
+        setRange('shaderContrast', 'shaderContrastVal', p.contrast);
+        setRange('shaderBloom', 'shaderBloomVal', p.bloom);
+        setRange('shaderSSAO', 'shaderSSAOVal', p.ssao);
+        setRange('shaderSharpen', 'shaderSharpenVal', p.sharpen);
+        setRange('shaderCA', 'shaderCAVal', p.ca);
+        setRange('shaderVignette', 'shaderVignetteVal', p.vignette);
+        setRange('shaderGrain', 'shaderGrainVal', p.grain);
+    }
+
+    function updateLabels() {
+        const ui = readUI();
+        const suffix = (k, v) => v + '%';
+        id('shaderExposureVal').textContent = ui.exposure + '%';
+        id('shaderSaturationVal').textContent = ui.saturation + '%';
+        id('shaderContrastVal').textContent = ui.contrast + '%';
+        id('shaderBloomVal').textContent = ui.bloom + '%';
+        id('shaderSSAOVal').textContent = ui.ssao + '%';
+        id('shaderSharpenVal').textContent = ui.sharpen + '%';
+        id('shaderCAVal').textContent = ui.ca + '%';
+        id('shaderVignetteVal').textContent = ui.vignette + '%';
+        id('shaderGrainVal').textContent = ui.grain + '%';
+    }
+
+    // Convert UI percentages -> pipeline settings
+    function toPipeline(ui) {
+        return {
+            enabled: ui.enabled,
+            exposure: ui.exposure / 100,
+            saturation: ui.saturation / 100,
+            contrast: ui.contrast / 100,
+            bloomIntensity: ui.bloom / 100,
+            ssaoIntensity: ui.ssao / 100,
+            sharpness: ui.sharpen / 100,
+            chromaticAberration: (ui.ca / 100) * 0.01, // 0..0.02
+            vignette: ui.vignette / 100,
+            grain: (ui.grain / 100) * 0.1, // 0..0.1 cap — full 1.0 would be noise-only
+        };
+    }
+
+    function apply() {
+        updateLabels();
+        const ui = readUI();
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ preset: activePreset, ui })); } catch (_) {}
+        if (!running) return;
+        window.electronAPI?.shaderUpdateSettings(toPipeline(ui));
+    }
+
+    function setPreset(name, chip) {
+        const p = PRESETS[name];
+        if (!p) return;
+        activePreset = name;
+        writeUI(p);
+        document.querySelectorAll('.shader-preset-chip').forEach(c => c.classList.remove('active'));
+        if (chip) chip.classList.add('active');
+        else document.querySelector(`.shader-preset-chip[data-preset="${name}"]`)?.classList.add('active');
+        apply();
+    }
+
+    function resetPreset() {
+        setPreset(activePreset);
+    }
+
+    function init() {
+        // Restore previous settings
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const saved = JSON.parse(raw);
+                if (saved.preset && PRESETS[saved.preset]) activePreset = saved.preset;
+                if (saved.ui) writeUI(saved.ui);
+                else writeUI(PRESETS[activePreset]);
+                document.querySelector(`.shader-preset-chip[data-preset="${activePreset}"]`)?.classList.add('active');
+            } else {
+                writeUI(PRESETS.realism);
+            }
+        } catch (_) {
+            writeUI(PRESETS.realism);
+        }
+        updateLabels();
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+
+    return { pickSource, start, stop, apply, setPreset, resetPreset };
+})();
+
+// Expose shader control as Overlay.shader* so inline onclick handlers work
+Object.assign(Overlay, {
+    shaderPickSource: () => ShaderCtrl.pickSource(),
+    shaderStart: () => ShaderCtrl.start(),
+    shaderStop: () => ShaderCtrl.stop(),
+    shaderApply: () => ShaderCtrl.apply(),
+    shaderSetPreset: (name, el) => ShaderCtrl.setPreset(name, el),
+    shaderResetPreset: () => ShaderCtrl.resetPreset(),
+});
+
 window.addEventListener('DOMContentLoaded', () => {
     Overlay.init();
     // Load shift state after a short delay (socket needs to connect first)

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Emden Network — Shader Stack</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        width: 100%; height: 100%;
+        background: #0a0a0f;
+        overflow: hidden;
+        font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #e0e0ea;
+    }
+    #wrap {
+        position: relative;
+        width: 100%; height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #shader-canvas {
+        width: 100%; height: 100%;
+        object-fit: contain;
+        display: block;
+        background: #000;
+    }
+    #status {
+        position: absolute;
+        top: 12px; left: 12px;
+        background: rgba(0,0,0,.7);
+        backdrop-filter: blur(8px);
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 12px;
+        border: 1px solid rgba(255,255,255,.1);
+        pointer-events: none;
+        opacity: .85;
+        transition: opacity .4s;
+        max-width: 520px;
+    }
+    #status.hide { opacity: 0; }
+    #status .dot {
+        display: inline-block;
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #ff5252;
+        margin-right: 8px;
+        vertical-align: middle;
+        box-shadow: 0 0 8px currentColor;
+    }
+    #status.live .dot { background: #4DA6FF; }
+    #status.err .dot { background: #ffb347; }
+    #overlay-hint {
+        position: absolute;
+        bottom: 12px; left: 12px;
+        background: rgba(0,0,0,.55);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        opacity: .6;
+        pointer-events: none;
+    }
+    #err {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        text-align: center;
+        font-size: 14px;
+        color: #ffb347;
+    }
+    #err.show { display: flex; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+    <canvas id="shader-canvas"></canvas>
+    <div id="status"><span class="dot"></span><span id="status-text">Warte auf Quelle...</span></div>
+    <div id="overlay-hint">OBS: "Fensteraufnahme" → dieses Fenster</div>
+    <div id="err"><div><div style="font-size:32px;margin-bottom:8px;">⚠️</div><div id="err-text"></div></div></div>
+</div>
+
+<script src="shaders.js"></script>
+<script src="shader-pipeline.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('status-text');
+    const errEl = document.getElementById('err');
+    const errText = document.getElementById('err-text');
+    const canvas = document.getElementById('shader-canvas');
+
+    let pipeline = null;
+    let mediaStream = null;
+    let videoEl = null;
+    let rafId = 0;
+    let currentSourceId = null;
+
+    function setStatus(text, cls) {
+        statusText.textContent = text;
+        statusEl.className = cls || '';
+        if (cls === 'live') {
+            setTimeout(() => statusEl.classList.add('hide'), 3000);
+        } else {
+            statusEl.classList.remove('hide');
+        }
+    }
+
+    function showError(msg) {
+        errEl.classList.add('show');
+        errText.textContent = msg;
+    }
+
+    function hideError() {
+        errEl.classList.remove('show');
+    }
+
+    async function attachSource(sourceId) {
+        stopCapture();
+        try {
+            setStatus('Verbinde mit Quelle...', 'live');
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceId,
+                        minWidth:  640, maxWidth:  3840,
+                        minHeight: 360, maxHeight: 2160,
+                        minFrameRate: 30, maxFrameRate: 60,
+                    },
+                },
+            });
+
+            videoEl = document.createElement('video');
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.srcObject = mediaStream;
+            await videoEl.play();
+            currentSourceId = sourceId;
+
+            if (!pipeline) pipeline = new window.ShaderPipeline(canvas);
+            hideError();
+            setStatus('LIVE — ' + videoEl.videoWidth + 'x' + videoEl.videoHeight, 'live');
+            startLoop();
+        } catch (e) {
+            console.error('[Shader] Quelle fehlgeschlagen:', e);
+            showError('Quelle konnte nicht geöffnet werden: ' + (e.message || e));
+            setStatus('Fehler', 'err');
+        }
+    }
+
+    function stopCapture() {
+        cancelAnimationFrame(rafId);
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            mediaStream = null;
+        }
+        if (videoEl) {
+            videoEl.srcObject = null;
+            videoEl = null;
+        }
+    }
+
+    function startLoop() {
+        const tick = () => {
+            if (videoEl && videoEl.readyState >= 2 && pipeline) {
+                try {
+                    pipeline.render(videoEl);
+                } catch (e) {
+                    console.error('[Shader] Render:', e);
+                }
+            }
+            rafId = requestAnimationFrame(tick);
+        };
+        tick();
+    }
+
+    // IPC from main: set source, update settings
+    window.electronAPI?.onShaderSetSource?.((sourceId) => {
+        console.log('[Shader] onShaderSetSource', sourceId);
+        attachSource(sourceId);
+    });
+
+    window.electronAPI?.onShaderSettings?.((settings) => {
+        if (pipeline) pipeline.setSettings(settings);
+    });
+
+    window.electronAPI?.onShaderStop?.(() => {
+        stopCapture();
+        setStatus('Gestoppt');
+    });
+
+    window.addEventListener('beforeunload', stopCapture);
+
+    // Signal to main we are ready
+    window.electronAPI?.shaderWindowReady?.();
+    setStatus('Bereit — wähle eine Quelle im Overlay');
+})();
+</script>
+</body>
+</html>
