@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.65.0'; // Stand: 19.04.2026
+let CURRENT_VERSION = '4.65.1'; // Stand: 19.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -1180,6 +1180,7 @@ const App = window.App = {
             settings: ['Einstellungen', 'Konfiguration'],
             moderation: ['Moderation', 'Moderations-Verwaltung'],
             admin: ['Admin Panel', 'Eingeschränkter Bereich'],
+            soundboard: ['Soundboard', 'Sound-Effekte & Radio-Callouts'],
         };
         const [title, sub] = labels[view] || ['Dashboard', ''];
         document.getElementById('topbarTitle').textContent = title;
@@ -5157,6 +5158,275 @@ document.addEventListener('DOMContentLoaded', () => {
 window.ModPanel = ModPanel;
 
 
+// ════════════════════════════════════════════════════════════════
+// SOUNDBOARD — Sound-Tile-Grid mit Click-to-Play + Custom Uploads
+// Pre-populated mit bestehenden App-Sounds, User kann eigene dazu.
+// Config in localStorage, pfade via file:// URL.
+// ════════════════════════════════════════════════════════════════
+const Soundboard = (() => {
+    const STORAGE_KEY = 'soundboard-tiles-v1';
+    const DEFAULT_TILES = [
+        { name: 'Walkie Start', file: 'walkie-talkie-start.mp3.wav', icon: 'radio', volume: 80 },
+        { name: 'Ticket', file: 'ticketsound.mp3', icon: 'bell', volume: 80 },
+        { name: 'Notification', file: 'notif.mp3', icon: 'message', volume: 80 },
+        { name: 'Chirp', file: 'chirsp.wav', icon: 'zap', volume: 80 },
+        { name: 'Support', file: 'supportwarteraumsound.mp3', icon: 'siren', volume: 80 },
+        { name: 'Error', file: 'error.wav', icon: 'alert', volume: 80 },
+        { name: 'Start', file: 'startsound.mp3', icon: 'play', volume: 80 },
+        { name: 'Out', file: 'out.wav', icon: 'arrow', volume: 80 },
+    ];
+
+    const ICONS = {
+        radio: '<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>',
+        bell:  '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+        message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+        zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+        siren: '<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1z"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>',
+        alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+        arrow: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+        custom: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    };
+
+    let tiles = [];
+    let masterVol = 80;
+    const playing = new Map(); // idx -> { audio, progressInterval }
+
+    function load() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                tiles = Array.isArray(parsed.tiles) ? parsed.tiles : DEFAULT_TILES.slice();
+                masterVol = typeof parsed.masterVol === 'number' ? parsed.masterVol : 80;
+            } else {
+                tiles = DEFAULT_TILES.slice();
+            }
+        } catch (_) {
+            tiles = DEFAULT_TILES.slice();
+        }
+    }
+
+    function save() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ tiles, masterVol }));
+        } catch (_) {}
+    }
+
+    function iconSvg(name) {
+        const path = ICONS[name] || ICONS.custom;
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+    }
+
+    function resolveSrc(file) {
+        if (!file) return '';
+        // Absolute path (custom upload) — use file:// URL
+        if (/^[a-zA-Z]:[\\/]/.test(file) || file.startsWith('/')) {
+            return 'file:///' + file.replace(/\\/g, '/').replace(/^\//, '');
+        }
+        // Relative — bundled asset
+        return file;
+    }
+
+    function render() {
+        const grid = document.getElementById('soundboardGrid');
+        if (!grid) return;
+
+        const tilesHtml = tiles.map((t, i) => {
+            const playingNow = playing.has(i);
+            return `
+                <div class="sb-tile ${playingNow ? 'playing' : ''}" data-idx="${i}"
+                     oncontextmenu="Soundboard.tileContext(event, ${i})">
+                    <div class="sb-tile-progress" id="sbProg_${i}"></div>
+                    <div class="sb-tile-head">
+                        <div class="sb-tile-icon">${iconSvg(t.icon)}</div>
+                        <div style="flex:1; min-width:0;">
+                            <div class="sb-tile-name">${escapeHtml(t.name)}</div>
+                            <div class="sb-tile-sub">${escapeHtml(t.file.split(/[/\\]/).pop())}</div>
+                        </div>
+                        <div class="sb-bars"><span></span><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="sb-tile-bottom" onclick="event.stopPropagation();">
+                        <input type="range" class="sb-tile-vol" min="0" max="100" value="${t.volume ?? 80}"
+                               oninput="Soundboard.setTileVolume(${i}, this.value)">
+                        <span class="sb-tile-vol-val" id="sbVol_${i}">${t.volume ?? 80}%</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const addTileHtml = `
+            <div class="sb-tile empty" onclick="Soundboard.addCustom()">
+                <div class="sb-tile-head">
+                    <div class="sb-tile-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </div>
+                    <div class="sb-tile-name" style="color:var(--text-sub)">Sound hinzufügen</div>
+                </div>
+                <div class="sb-tile-sub" style="margin-top:auto;">MP3 / WAV / OGG</div>
+            </div>
+        `;
+
+        grid.innerHTML = tilesHtml + addTileHtml;
+
+        // Attach click handlers (not inline because we need event vs stopPropagation on slider)
+        grid.querySelectorAll('.sb-tile[data-idx]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.sb-tile-bottom')) return;
+                const i = parseInt(el.dataset.idx, 10);
+                togglePlay(i);
+            });
+        });
+    }
+
+    function togglePlay(idx) {
+        if (playing.has(idx)) {
+            stopTile(idx);
+            return;
+        }
+        const t = tiles[idx];
+        if (!t) return;
+        try {
+            const audio = new Audio(resolveSrc(t.file));
+            audio.volume = Math.max(0, Math.min(1, (t.volume / 100) * (masterVol / 100)));
+            audio.play().catch(err => {
+                console.error('[Soundboard] play:', err);
+                playing.delete(idx);
+                render();
+            });
+
+            const progEl = document.getElementById(`sbProg_${idx}`);
+            const interval = setInterval(() => {
+                if (!audio.duration) return;
+                const pct = (audio.currentTime / audio.duration) * 100;
+                if (progEl) progEl.style.width = pct + '%';
+            }, 50);
+
+            audio.addEventListener('ended', () => stopTile(idx));
+            audio.addEventListener('error', () => stopTile(idx));
+
+            playing.set(idx, { audio, interval });
+            render();
+        } catch (e) {
+            console.error('[Soundboard] play error:', e);
+        }
+    }
+
+    function stopTile(idx) {
+        const entry = playing.get(idx);
+        if (entry) {
+            try { entry.audio.pause(); entry.audio.src = ''; } catch (_) {}
+            clearInterval(entry.interval);
+        }
+        playing.delete(idx);
+        render();
+    }
+
+    function stopAll() {
+        for (const idx of Array.from(playing.keys())) stopTile(idx);
+    }
+
+    function setMasterVolume(v) {
+        masterVol = parseInt(v, 10) || 0;
+        const el = document.getElementById('sbMasterVal');
+        if (el) el.textContent = masterVol + '%';
+        // Live-apply to playing
+        for (const [idx, entry] of playing) {
+            const t = tiles[idx];
+            if (t && entry.audio) {
+                entry.audio.volume = Math.max(0, Math.min(1, (t.volume / 100) * (masterVol / 100)));
+            }
+        }
+        save();
+    }
+
+    function setTileVolume(idx, v) {
+        const vol = parseInt(v, 10) || 0;
+        if (tiles[idx]) tiles[idx].volume = vol;
+        const el = document.getElementById(`sbVol_${idx}`);
+        if (el) el.textContent = vol + '%';
+        const entry = playing.get(idx);
+        if (entry && entry.audio) {
+            entry.audio.volume = Math.max(0, Math.min(1, (vol / 100) * (masterVol / 100)));
+        }
+        save();
+    }
+
+    async function addCustom() {
+        if (!window.electronAPI?.pickAudioFile) {
+            alert('File-Picker nicht verfuegbar — App neu starten.');
+            return;
+        }
+        try {
+            const result = await window.electronAPI.pickAudioFile();
+            if (!result || !result.path) return;
+            const name = result.name || result.path.split(/[/\\]/).pop().replace(/\.[^.]+$/, '');
+            tiles.push({
+                name,
+                file: result.path,
+                icon: 'custom',
+                volume: 80,
+            });
+            save();
+            render();
+        } catch (e) {
+            console.error('[Soundboard] addCustom:', e);
+        }
+    }
+
+    function tileContext(event, idx) {
+        event.preventDefault();
+        const t = tiles[idx];
+        if (!t) return;
+        const actions = ['Umbenennen', 'Entfernen', 'Abbrechen'];
+        const choice = prompt(
+            `"${t.name}"\n\nWas tun?\n1 = Umbenennen\n2 = Entfernen\n(Enter leer = Abbrechen)`,
+            ''
+        );
+        if (choice === '1') {
+            const newName = prompt('Neuer Name:', t.name);
+            if (newName && newName.trim()) {
+                tiles[idx].name = newName.trim();
+                save();
+                render();
+            }
+        } else if (choice === '2') {
+            if (playing.has(idx)) stopTile(idx);
+            tiles.splice(idx, 1);
+            save();
+            render();
+        }
+    }
+
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[c]);
+    }
+
+    function init() {
+        load();
+        // Sync master-volume UI
+        const mv = document.getElementById('sbMasterVolume');
+        const mvl = document.getElementById('sbMasterVal');
+        if (mv) mv.value = masterVol;
+        if (mvl) mvl.textContent = masterVol + '%';
+        render();
+    }
+
+    return {
+        init, render, togglePlay, stopAll,
+        setMasterVolume, setTileVolume, addCustom, tileContext,
+    };
+})();
+
+window.Soundboard = Soundboard;
+
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
+    Soundboard.init();
 });

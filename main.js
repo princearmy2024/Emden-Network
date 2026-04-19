@@ -9,7 +9,7 @@
  * - Native Notifications
  */
 
-const { app, BrowserWindow, ipcMain, Notification, globalShortcut, screen, shell, clipboard, nativeImage, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, globalShortcut, screen, shell, clipboard, nativeImage, desktopCapturer, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
@@ -232,6 +232,27 @@ function getLocalChangelog() {
 }
 
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+// Soundboard: File-Picker fuer eigene Audio-Sounds
+ipcMain.handle('pick-audio-file', async () => {
+    try {
+        const result = await dialog.showOpenDialog(mainWindow, {
+            title: 'Sound auswaehlen',
+            properties: ['openFile'],
+            filters: [
+                { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'] },
+                { name: 'Alle Dateien', extensions: ['*'] },
+            ],
+        });
+        if (result.canceled || !result.filePaths || !result.filePaths[0]) return null;
+        const filePath = result.filePaths[0];
+        const name = path.basename(filePath, path.extname(filePath));
+        return { path: filePath, name };
+    } catch (e) {
+        console.error('[Soundboard] pick-audio-file:', e.message);
+        return null;
+    }
+});
 
 // Verified User: Speichert verifizierte User-Daten persistent (ueberlebt Updates + localStorage-Clear)
 const VERIFIED_USER_FILE = path.join(app.getPath('userData'), 'verified-user.json');

@@ -92,4 +92,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dashboardReady: () => ipcRenderer.send('dashboard-ready'),
     takeScreenshot: () => ipcRenderer.send('take-screenshot'),
     onScreenshotTaken: (cb) => ipcRenderer.on('screenshot-taken', (event, data) => cb(data)),
+
+    // Soundboard
+    pickAudioFile: () => ipcRenderer.invoke('pick-audio-file'),
 });

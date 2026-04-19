@@ -169,6 +169,15 @@
                 <!-- Moderation Button wird per JS eingefügt -->
                 <div id="modNavSlot"></div>
 
+                <a class="nav-item" data-view="soundboard" data-label="Soundboard" onclick="App.navigate('soundboard')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="9" width="4" height="6" rx="1"/>
+                        <rect x="8" y="5" width="4" height="14" rx="1"/>
+                        <rect x="14" y="2" width="4" height="20" rx="1"/>
+                        <rect x="20" y="11" width="2" height="2" rx="0.5"/>
+                    </svg>
+                </a>
+
                 <div class="sidebar-divider"></div>
 
                 <a class="nav-item" data-view="servers" data-label="Server" onclick="App.navigate('servers')">
@@ -656,6 +665,36 @@
                     </div>
                 </div>
 
+
+                <!-- ===== SOUNDBOARD ===== -->
+                <div class="view" id="view-soundboard">
+                    <div class="view-header">
+                        <h2>Soundboard</h2>
+                        <div class="view-header-actions">
+                            <div class="sb-master">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="flex-shrink:0;">
+                                    <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                                </svg>
+                                <input type="range" id="sbMasterVolume" min="0" max="100" value="80" oninput="Soundboard.setMasterVolume(this.value)">
+                                <span id="sbMasterVal">80%</span>
+                            </div>
+                            <button class="sb-add-btn" onclick="Soundboard.addCustom()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Sound hinzufügen
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sb-intro">
+                        Klick = Play. Nochmal klicken = Stop. Rechtsklick = Umbenennen / Entfernen. Eigene Sounds per „Sound hinzufügen" (MP3/WAV/OGG).
+                    </div>
+                    <div class="sb-grid" id="soundboardGrid">
+                        <!-- Tiles werden von JS gerendert -->
+                    </div>
+                </div>
 
                 <!-- ===== SERVERS ===== -->
                 <div class="view" id="view-servers">
