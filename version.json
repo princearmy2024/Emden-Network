@@ -1,6 +1,6 @@
 {
-    "version": "4.64.2",
+    "version": "4.64.3",
     "releaseDate": "2026-04-19",
-    "notes": "v4.64.2: Shader-Fixes — gruene Streifen weg (2D-Canvas Bridge), FPS-Schutz (Capture 1080p-Cap + requestVideoFrameCallback + Pass-Skip), mildere Presets, Render-Qualitaet Chips (Leistung/Ausgewogen/Qualitaet), Auto-Atmosphaere (Szenen-Analyse live), Stream-Fenster 'Emden Network Shader' fuer Discord/OBS zurueck. Alt-Tab fix: Overlay versteckt in 150ms + Shift+F6 instant Pause.",
+    "notes": "v4.64.3: Shader Performance + mehr Optionen. 4 neue Presets (Golden Hour/Night/Vivid/Moody). Capture-Framerate auf 60-144fps hochgedreht. Uniform-Locations gecacht (massiv weniger GPU-Calls pro Frame). 2D-Canvas-Bridge mit desynchronized=true (low-latency). tasklist statt wmic fuer Roblox-Detection (schneller Alt-Tab). Permission-Check-Handler dazu. Bessere Fehler-Meldungen.",
     "forceUpdate": false
 }

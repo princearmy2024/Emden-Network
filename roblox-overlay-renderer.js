@@ -2063,8 +2063,8 @@ window.OverlayShift = OverlayShift;
 // (Canvas liegt hinter dem HUD, zeigt den Roblox-Stream mit Shadern)
 // ════════════════════════════════════════════════════════════════
 const ShaderCtrl = (() => {
-    const STORAGE_KEY = 'shader-stack-settings-v2';
-    // Mildere Presets — kein Over-Effekt mehr
+    const STORAGE_KEY = 'shader-stack-settings-v3';
+    // 8 Presets — von ultra-clean bis cinematic-dramatic
     const PRESETS = {
         realism: {
             enabled: true,
@@ -2089,6 +2089,34 @@ const ShaderCtrl = (() => {
             exposure: 100, saturation: 100, contrast: 100,
             bloom: 0, ssao: 0, sharpen: 30,
             ca: 0, vignette: 0, grain: 0,
+        },
+        goldenhour: {
+            // Warme Abendstimmung — Sonnenuntergang-Vibe
+            enabled: true,
+            exposure: 105, saturation: 118, contrast: 108,
+            bloom: 60, ssao: 30, sharpen: 20,
+            ca: 15, vignette: 35, grain: 8,
+        },
+        night: {
+            // Dunkle Nacht-Atmosphaere — kuehl, Kontrast, tiefe Schatten
+            enabled: true,
+            exposure: 85, saturation: 90, contrast: 125,
+            bloom: 50, ssao: 55, sharpen: 35,
+            ca: 30, vignette: 70, grain: 35,
+        },
+        vivid: {
+            // Knallige Farben — IG-filter-like
+            enabled: true,
+            exposure: 105, saturation: 135, contrast: 118,
+            bloom: 25, ssao: 25, sharpen: 45,
+            ca: 0, vignette: 15, grain: 0,
+        },
+        moody: {
+            // Entsaettigt, dramatisch, Horror-RP
+            enabled: true,
+            exposure: 88, saturation: 75, contrast: 130,
+            bloom: 20, ssao: 60, sharpen: 30,
+            ca: 40, vignette: 80, grain: 60,
         },
     };
 
@@ -2137,7 +2165,12 @@ const ShaderCtrl = (() => {
         try {
             const sources = await window.electronAPI.shaderListSources();
             btn.disabled = false;
-            if (!sources || sources.length === 0) {
+            if (sources && sources.__error) {
+                setStatus('Capture-API Fehler: ' + sources.__error, 'err');
+                console.error('[Shader] listSources error:', sources.__error);
+                return;
+            }
+            if (!Array.isArray(sources) || sources.length === 0) {
                 setStatus('Keine Fenster gefunden.', 'err');
                 return;
             }
@@ -2191,7 +2224,7 @@ const ShaderCtrl = (() => {
 
         try {
             setStatus('Verbinde mit Roblox-Fenster...');
-            // Cap capture at 1080p/60fps — verhindert 4K-Overload
+            // High-refresh capture: 60fps minimum, up to 144fps if driver supports
             mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
@@ -2200,7 +2233,7 @@ const ShaderCtrl = (() => {
                         chromeMediaSourceId: selectedSourceId,
                         minWidth:  640, maxWidth:  1920,
                         minHeight: 360, maxHeight: 1080,
-                        minFrameRate: 30, maxFrameRate: 60,
+                        minFrameRate: 60, maxFrameRate: 144,
                     },
                 },
             });

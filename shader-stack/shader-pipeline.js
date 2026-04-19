@@ -42,15 +42,25 @@
             if (!gl) throw new Error('WebGL2 not supported');
             this.gl = gl;
             gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-            gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+            gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.BROWSER_DEFAULT_WEBGL);
 
             this.settings = this.defaultSettings();
-            this.renderMode = 'balanced';
+            this.renderMode = 'performance';
             this.autoAtmosphere = false;
-
-            // 2D canvas intermediate — avoids video→GL YUV green-stripe artifact
+            // 2D canvas bridge fixes YUV420→RGB green-pixel artifacts from desktopCapturer.
+            // desynchronized: low-latency path, drawImage hits GPU when video is accelerated.
+            this.safeUpload = true;
             this._bridge = document.createElement('canvas');
-            this._bridgeCtx = this._bridge.getContext('2d', { alpha: false, willReadFrequently: false });
+            this._bridgeCtx = this._bridge.getContext('2d', {
+                alpha: false,
+                desynchronized: true,
+                willReadFrequently: false,
+            });
+            this._bridgeCtx.imageSmoothingEnabled = true;
+            this._bridgeCtx.imageSmoothingQuality = 'medium';
+
+            // Cached uniform locations per program (key: 'progName:uniformName')
+            this._uloc = new Map();
 
             // Auto-Atmosphere state
             this._autoLuma = 0.5;
@@ -143,6 +153,17 @@
             return prog;
         }
 
+        // Cached getUniformLocation — called per program-uniform once, then free.
+        _u(prog, name) {
+            const key = prog + ':' + name;
+            let loc = this._uloc.get(key);
+            if (loc === undefined) {
+                loc = this.gl.getUniformLocation(prog, name);
+                this._uloc.set(key, loc);
+            }
+            return loc;
+        }
+
         _initPrograms() {
             const S = root.SHADERS;
             this.progCopy = this._compile(S.VS_FULLSCREEN, S.FS_COPY);
@@ -211,8 +232,7 @@
 
             this.canvas.width = w;
             this.canvas.height = h;
-            this._bridge.width = w;
-            this._bridge.height = h;
+            if (this._bridge) { this._bridge.width = w; this._bridge.height = h; }
 
             this._resizeFBO(this.mainA, w, h);
             this._resizeFBO(this.mainB, w, h);
@@ -223,6 +243,16 @@
             this._resizeFBO(this._autoFBO, 16, 16);
         }
 
+        setSafeUpload(on) {
+            this.safeUpload = !!on;
+            if (this.safeUpload && !this._bridge) {
+                this._bridge = document.createElement('canvas');
+                this._bridgeCtx = this._bridge.getContext('2d', { alpha: false, willReadFrequently: false });
+                this._bridge.width = this._lastRender.w || 1280;
+                this._bridge.height = this._lastRender.h || 720;
+            }
+        }
+
         _uploadSrc(video) {
             const gl = this.gl;
             const w = video.videoWidth;
@@ -230,15 +260,17 @@
             if (!w || !h) return false;
             this._resize(w, h);
 
-            // 2D canvas bridge: forces browser to do proper colorspace convert,
-            // eliminates green-stripe YUV->RGB artifacts seen on some GPUs.
-            const rw = this._lastRender.w;
-            const rh = this._lastRender.h;
-            this._bridgeCtx.drawImage(video, 0, 0, rw, rh);
-
             gl.bindTexture(gl.TEXTURE_2D, this.srcTex);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._bridge);
+
+            if (this.safeUpload && this._bridge) {
+                // Safe Mode: 2D canvas bridge (only if green stripes return on some drivers)
+                this._bridgeCtx.drawImage(video, 0, 0, this._lastRender.w, this._lastRender.h);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._bridge);
+            } else {
+                // Fast path: direct video → GPU texture (GPU-to-GPU copy if possible)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+            }
             return true;
         }
 
@@ -253,9 +285,9 @@
             gl.useProgram(prog);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tex);
-            const loc = gl.getUniformLocation(prog, 'u_tex');
+            const loc = this._u(prog, 'u_tex');
             if (loc) gl.uniform1i(loc, 0);
-            if (setUniforms) setUniforms(gl, prog);
+            if (setUniforms) setUniforms(gl, prog, this);
             gl.bindVertexArray(this._vao);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
@@ -375,29 +407,29 @@
                 const bw = this.bloomA.w, bh = this.bloomA.h;
                 this._bindFBO(this.bloomA);
                 this._drawWithTex(this.progBloomThresh, this.srcTex, (gl, p) => {
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_threshold'), s.bloomThreshold);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_knee'), s.bloomKnee);
+                    gl.uniform1f(this._u(p,'u_threshold'), s.bloomThreshold);
+                    gl.uniform1f(this._u(p,'u_knee'), s.bloomKnee);
                 });
                 this._bindFBO(this.bloomB);
                 this._drawWithTex(this.progBlur, this.bloomA.tex, (gl, p) => {
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_texel'), 1 / bw, 1 / bh);
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_dir'), 1, 0);
+                    gl.uniform2f(this._u(p,'u_texel'), 1 / bw, 1 / bh);
+                    gl.uniform2f(this._u(p,'u_dir'), 1, 0);
                 });
                 this._bindFBO(this.bloomA);
                 this._drawWithTex(this.progBlur, this.bloomB.tex, (gl, p) => {
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_texel'), 1 / bw, 1 / bh);
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_dir'), 0, 1);
+                    gl.uniform2f(this._u(p,'u_texel'), 1 / bw, 1 / bh);
+                    gl.uniform2f(this._u(p,'u_dir'), 0, 1);
                 });
                 // Combine
                 this._bindFBO(this.mainA);
                 gl.useProgram(this.progBloomCombine);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this.srcTex);
-                gl.uniform1i(gl.getUniformLocation(this.progBloomCombine, 'u_base'), 0);
+                gl.uniform1i(this._u(this.progBloomCombine, 'u_base'), 0);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, this.bloomA.tex);
-                gl.uniform1i(gl.getUniformLocation(this.progBloomCombine, 'u_bloom'), 1);
-                gl.uniform1f(gl.getUniformLocation(this.progBloomCombine, 'u_intensity'), s.bloomIntensity);
+                gl.uniform1i(this._u(this.progBloomCombine, 'u_bloom'), 1);
+                gl.uniform1f(this._u(this.progBloomCombine, 'u_intensity'), s.bloomIntensity);
                 gl.bindVertexArray(this._vao);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
                 current = this.mainA;
@@ -412,9 +444,9 @@
                 const next = current === this.mainA ? this.mainB : this.mainA;
                 this._bindFBO(next);
                 this._drawWithTex(this.progSSAO, current.tex, (gl, p) => {
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_texel'), 1 / w, 1 / h);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_intensity'), s.ssaoIntensity);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_radius'), s.ssaoRadius);
+                    gl.uniform2f(this._u(p,'u_texel'), 1 / w, 1 / h);
+                    gl.uniform1f(this._u(p,'u_intensity'), s.ssaoIntensity);
+                    gl.uniform1f(this._u(p,'u_radius'), s.ssaoRadius);
                 });
                 current = next;
             }
@@ -423,9 +455,9 @@
             const next1 = current === this.mainA ? this.mainB : this.mainA;
             this._bindFBO(next1);
             this._drawWithTex(this.progACES, current.tex, (gl, p) => {
-                gl.uniform1f(gl.getUniformLocation(p, 'u_exposure'), s.exposure);
-                gl.uniform1f(gl.getUniformLocation(p, 'u_saturation'), s.saturation);
-                gl.uniform1f(gl.getUniformLocation(p, 'u_contrast'), s.contrast);
+                gl.uniform1f(this._u(p,'u_exposure'), s.exposure);
+                gl.uniform1f(this._u(p,'u_saturation'), s.saturation);
+                gl.uniform1f(this._u(p,'u_contrast'), s.contrast);
             });
             current = next1;
 
@@ -433,8 +465,8 @@
                 const next2 = current === this.mainA ? this.mainB : this.mainA;
                 this._bindFBO(next2);
                 this._drawWithTex(this.progCAS, current.tex, (gl, p) => {
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_texel'), 1 / w, 1 / h);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_sharpness'), s.sharpness);
+                    gl.uniform2f(this._u(p,'u_texel'), 1 / w, 1 / h);
+                    gl.uniform1f(this._u(p,'u_sharpness'), s.sharpness);
                 });
                 current = next2;
             }
@@ -443,11 +475,11 @@
                 this._bindFBO(null);
                 const elapsed = (now - this._startTime) / 1000;
                 this._drawWithTex(this.progFinal, current.tex, (gl, p) => {
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_ca'), s.chromaticAberration);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_vignette'), s.vignette);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_grain'), s.grain);
-                    gl.uniform1f(gl.getUniformLocation(p, 'u_time'), elapsed);
-                    gl.uniform2f(gl.getUniformLocation(p, 'u_resolution'), w, h);
+                    gl.uniform1f(this._u(p,'u_ca'), s.chromaticAberration);
+                    gl.uniform1f(this._u(p,'u_vignette'), s.vignette);
+                    gl.uniform1f(this._u(p,'u_grain'), s.grain);
+                    gl.uniform1f(this._u(p,'u_time'), elapsed);
+                    gl.uniform2f(this._u(p,'u_resolution'), w, h);
                 });
             } else {
                 this._bindFBO(null);

@@ -529,6 +529,12 @@ function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
         }
         cb(false);
     });
+    robloxOverlayWin.webContents.session.setPermissionCheckHandler((wc, permission) => {
+        if (wc === robloxOverlayWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
+            return true;
+        }
+        return false;
+    });
     const adminFlag = isAdmin ? '1' : '0';
     const staffFlag = isStaff ? '1' : '0';
     robloxOverlayWin.loadFile('roblox-overlay.html', {
@@ -556,7 +562,7 @@ const OverlayState = {
     showTimeout: null,
     hideTimeout: null,
     SHOW_DELAY: 4000,  // 4s stabil aktiv bevor Overlay erscheint
-    HIDE_DELAY: 150,   // 0.15s bevor Overlay verschwindet (wichtig: Shader-Canvas raus wenn Alt-Tab)
+    HIDE_DELAY: 50,    // 50ms — sehr schnell wegen Shader-Canvas Alt-Tab Fix
 
     start() {
         if (this.checkInterval) return;
@@ -574,12 +580,12 @@ const OverlayState = {
                 // Fallback: Einfach prüfen ob Roblox-Prozess existiert UND unser Overlay nicht fokussiert ist
             });
 
-            // Sicherer Check: tasklist + aktives Fenster Titel via wmic
-            exec('wmic process where "name=\'RobloxPlayerBeta.exe\'" get ProcessId /format:list',
-                { timeout: 1500, windowsHide: true }, (err, stdout) => {
+            // Schnell: tasklist statt wmic (kein PowerShell-Overhead, nativer Binary)
+            exec('tasklist /FI "IMAGENAME eq RobloxPlayerBeta.exe" /NH /FO CSV',
+                { timeout: 800, windowsHide: true }, (err, stdout) => {
                 if (err || !robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
 
-                const robloxRunning = (stdout || '').includes('ProcessId=');
+                const robloxRunning = (stdout || '').includes('RobloxPlayerBeta.exe');
 
                 // Prüfe ob unser eigenes Hauptfenster fokussiert ist
                 const ourAppFocused = mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused();
@@ -589,7 +595,7 @@ const OverlayState = {
 
                 this._handleStateChange(robloxShouldShow);
             });
-        }, 700);
+        }, 250);
     },
 
     stop() {
@@ -1056,16 +1062,20 @@ ipcMain.handle('shader-list-sources', async () => {
         const sources = await desktopCapturer.getSources({
             types: ['window', 'screen'],
             thumbnailSize: { width: 320, height: 180 },
+            fetchWindowIcons: false,
         });
-        return sources.map(s => ({
+        const mapped = sources.map(s => ({
             id: s.id,
             name: s.name,
             displayId: s.display_id || '',
             thumbnailDataUrl: s.thumbnail?.toDataURL() || '',
         }));
+        console.log(`[Shader] list-sources: ${mapped.length} sources gefunden`);
+        return mapped;
     } catch (e) {
-        console.error('[Shader] list-sources:', e.message);
-        return [];
+        console.error('[Shader] list-sources FAILED:', e.message, e.stack);
+        // Return error info so renderer can display it
+        return { __error: e.message || 'Unknown error' };
     }
 });
 
