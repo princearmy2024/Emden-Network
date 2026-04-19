@@ -1262,6 +1262,129 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
 }
 .settings-reset:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
+/* ── Shader Stack section (overlay settings) ── */
+.shader-section-title {
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(77, 166, 255, 0.85);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 2px;
+  border-top: 1px solid rgba(77, 166, 255, 0.15);
+  border-bottom: 1px solid rgba(77, 166, 255, 0.1);
+}
+.shader-section-title .beta {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffb347;
+  margin-left: auto;
+}
+.shader-action-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+.shader-btn {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid rgba(77, 166, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(77, 166, 255, 0.08);
+  color: #9ec9ff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.shader-btn:hover { background: rgba(77, 166, 255, 0.18); color: #fff; border-color: rgba(77, 166, 255, 0.45); }
+.shader-btn.danger {
+  border-color: rgba(255, 82, 82, 0.3);
+  background: rgba(255, 82, 82, 0.08);
+  color: #ffb4b4;
+}
+.shader-btn.danger:hover { background: rgba(255, 82, 82, 0.18); color: #fff; }
+.shader-status {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+  padding: 4px 2px;
+}
+.shader-status.ok { color: #6dd49c; }
+.shader-status.err { color: #ff8080; }
+.shader-source-list {
+  margin-top: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.25);
+  display: none;
+}
+.shader-source-list.show { display: block; }
+.shader-source-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+}
+.shader-source-item:hover { background: rgba(77, 166, 255, 0.12); }
+.shader-source-item img {
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #000;
+}
+.shader-source-item .nm {
+  font-size: 11px;
+  color: #dfe4f0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shader-preset-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.shader-preset-chip {
+  flex: 1;
+  padding: 5px 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  color: rgba(255,255,255,0.6);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.shader-preset-chip:hover { background: rgba(77, 166, 255, 0.1); color: #fff; }
+.shader-preset-chip.active {
+  border-color: rgba(77, 166, 255, 0.5);
+  background: rgba(77, 166, 255, 0.15);
+  color: #9ec9ff;
+}
+#shaderSettingsPane {
+  margin-top: 4px;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+#shaderSettingsPane.disabled { opacity: 0.35; pointer-events: none; }
+
 /* Body classes for settings */
 body.no-fade #panel-bottom,
 body.no-fade #panel-right, body.no-fade #corner-bl,
@@ -1731,6 +1854,89 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
         <div class="settings-label">Mod-Panel Transparenz <span class="settings-val" id="settModPanelOpacityVal">92%</span></div>
         <input type="range" class="settings-range" id="settModPanelOpacity" min="30" max="100" value="92" oninput="Overlay.applySetting()">
       </div>
+
+      <!-- ────────── Shader Stack ────────── -->
+      <div class="shader-section-title">
+        <i data-lucide="palette" style="width:14px;height:14px;"></i>
+        Shader Stack
+        <span class="beta">BETA</span>
+      </div>
+
+      <div class="settings-group">
+        <div class="shader-action-row">
+          <button class="shader-btn" id="shaderBtnSource" onclick="Overlay.shaderPickSource()">Roblox-Quelle wählen</button>
+        </div>
+        <div class="shader-source-list" id="shaderSourceList"></div>
+        <div class="shader-status" id="shaderStatus">Noch keine Quelle gewählt.</div>
+
+        <div class="shader-action-row">
+          <button class="shader-btn" id="shaderBtnStart" onclick="Overlay.shaderStart()" disabled style="opacity:.5;">Shader starten</button>
+          <button class="shader-btn danger" onclick="Overlay.shaderStop()">Stop</button>
+        </div>
+      </div>
+
+      <div id="shaderSettingsPane" class="disabled">
+        <div class="settings-group">
+          <div class="settings-label">Preset</div>
+          <div class="shader-preset-row">
+            <div class="shader-preset-chip active" data-preset="realism" onclick="Overlay.shaderSetPreset('realism', this)">Realism</div>
+            <div class="shader-preset-chip" data-preset="cinematic" onclick="Overlay.shaderSetPreset('cinematic', this)">Cinematic</div>
+            <div class="shader-preset-chip" data-preset="film" onclick="Overlay.shaderSetPreset('film', this)">Film</div>
+            <div class="shader-preset-chip" data-preset="clean" onclick="Overlay.shaderSetPreset('clean', this)">Clean</div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-toggle-row">
+            <span class="settings-desc">Shader aktiv</span>
+            <label class="settings-switch">
+              <input type="checkbox" id="shaderEnabled" checked onchange="Overlay.shaderApply()">
+              <span class="settings-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-label">Belichtung <span class="settings-val" id="shaderExposureVal">100%</span></div>
+          <input type="range" class="settings-range" id="shaderExposure" min="50" max="200" value="100" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Sättigung <span class="settings-val" id="shaderSaturationVal">105%</span></div>
+          <input type="range" class="settings-range" id="shaderSaturation" min="0" max="200" value="105" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Kontrast <span class="settings-val" id="shaderContrastVal">108%</span></div>
+          <input type="range" class="settings-range" id="shaderContrast" min="50" max="200" value="108" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Bloom <span class="settings-val" id="shaderBloomVal">45%</span></div>
+          <input type="range" class="settings-range" id="shaderBloom" min="0" max="200" value="45" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">SSAO / Tiefe <span class="settings-val" id="shaderSSAOVal">35%</span></div>
+          <input type="range" class="settings-range" id="shaderSSAO" min="0" max="100" value="35" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Schärfe <span class="settings-val" id="shaderSharpenVal">40%</span></div>
+          <input type="range" class="settings-range" id="shaderSharpen" min="0" max="100" value="40" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Chromatische Aberration <span class="settings-val" id="shaderCAVal">25%</span></div>
+          <input type="range" class="settings-range" id="shaderCA" min="0" max="200" value="25" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Vignette <span class="settings-val" id="shaderVignetteVal">35%</span></div>
+          <input type="range" class="settings-range" id="shaderVignette" min="0" max="100" value="35" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Film Grain <span class="settings-val" id="shaderGrainVal">25%</span></div>
+          <input type="range" class="settings-range" id="shaderGrain" min="0" max="100" value="25" oninput="Overlay.shaderApply()">
+        </div>
+        <div class="settings-group">
+          <button class="settings-reset" onclick="Overlay.shaderResetPreset()">Preset zurücksetzen</button>
+        </div>
+      </div>
+      <!-- ────────── End Shader Stack ────────── -->
 
       <!-- Reset -->
       <div class="settings-group" style="margin-top:12px;">

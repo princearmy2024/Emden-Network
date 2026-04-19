@@ -92,4 +92,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dashboardReady: () => ipcRenderer.send('dashboard-ready'),
     takeScreenshot: () => ipcRenderer.send('take-screenshot'),
     onScreenshotTaken: (cb) => ipcRenderer.on('screenshot-taken', (event, data) => cb(data)),
+
+    // ── SHADER STACK (Roblox Post-Processing) ─────────────────────
+    shaderListSources: () => ipcRenderer.invoke('shader-list-sources'),
+    shaderOpen: (sourceId) => ipcRenderer.send('shader-open', { sourceId }),
+    shaderClose: () => ipcRenderer.send('shader-close'),
+    shaderUpdateSettings: (settings) => ipcRenderer.send('shader-update-settings', settings),
+    // Used by shader-window.html (the renderer side receives these)
+    onShaderSetSource: (cb) => ipcRenderer.on('shader:set-source', (event, id) => cb(id)),
+    onShaderSettings: (cb) => ipcRenderer.on('shader:settings', (event, s) => cb(s)),
+    onShaderStop: (cb) => ipcRenderer.on('shader:stop', () => cb()),
+    shaderWindowReady: () => ipcRenderer.send('shader-window-ready'),
 });
