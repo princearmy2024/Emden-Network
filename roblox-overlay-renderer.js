@@ -2063,44 +2063,53 @@ window.OverlayShift = OverlayShift;
 // (Canvas liegt hinter dem HUD, zeigt den Roblox-Stream mit Shadern)
 // ════════════════════════════════════════════════════════════════
 const ShaderCtrl = (() => {
-    const STORAGE_KEY = 'shader-stack-settings';
+    const STORAGE_KEY = 'shader-stack-settings-v2';
+    // Mildere Presets — kein Over-Effekt mehr
     const PRESETS = {
         realism: {
             enabled: true,
-            exposure: 100, saturation: 105, contrast: 108,
-            bloom: 45, ssao: 35, sharpen: 40,
-            ca: 25, vignette: 35, grain: 25,
+            exposure: 100, saturation: 102, contrast: 104,
+            bloom: 15, ssao: 20, sharpen: 25,
+            ca: 5, vignette: 20, grain: 10,
         },
         cinematic: {
             enabled: true,
-            exposure: 95, saturation: 95, contrast: 120,
-            bloom: 70, ssao: 50, sharpen: 30,
-            ca: 60, vignette: 60, grain: 40,
+            exposure: 97, saturation: 95, contrast: 112,
+            bloom: 35, ssao: 35, sharpen: 25,
+            ca: 20, vignette: 50, grain: 25,
         },
         film: {
             enabled: true,
-            exposure: 90, saturation: 85, contrast: 115,
-            bloom: 55, ssao: 40, sharpen: 25,
-            ca: 80, vignette: 70, grain: 70,
+            exposure: 92, saturation: 88, contrast: 115,
+            bloom: 45, ssao: 40, sharpen: 20,
+            ca: 45, vignette: 65, grain: 50,
         },
         clean: {
             enabled: true,
             exposure: 100, saturation: 100, contrast: 100,
-            bloom: 20, ssao: 20, sharpen: 50,
-            ca: 0, vignette: 15, grain: 5,
+            bloom: 0, ssao: 0, sharpen: 30,
+            ca: 0, vignette: 0, grain: 0,
         },
     };
 
     let selectedSourceId = null;
     let selectedSourceName = '';
     let activePreset = 'realism';
+    let renderMode = 'balanced'; // 'performance' | 'balanced' | 'quality'
+    let autoAtmosphere = false;
     let running = false;
+    let paused = false; // Shader-Pause via Shortcut (instant Alt-Tab Escape)
 
     // In-overlay rendering state
     let pipeline = null;
     let mediaStream = null;
     let videoEl = null;
     let rafId = 0;
+    let vfcId = 0;
+    let useVFC = false;
+    let fps = 0;
+    let fpsFrames = 0;
+    let fpsLast = 0;
 
     function statusEl() { return document.getElementById('shaderStatus'); }
     function setStatus(text, cls) {
@@ -2182,14 +2191,15 @@ const ShaderCtrl = (() => {
 
         try {
             setStatus('Verbinde mit Roblox-Fenster...');
+            // Cap capture at 1080p/60fps — verhindert 4K-Overload
             mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
                     mandatory: {
                         chromeMediaSource: 'desktop',
                         chromeMediaSourceId: selectedSourceId,
-                        minWidth:  640, maxWidth:  3840,
-                        minHeight: 360, maxHeight: 2160,
+                        minWidth:  640, maxWidth:  1920,
+                        minHeight: 360, maxHeight: 1080,
                         minFrameRate: 30, maxFrameRate: 60,
                     },
                 },
@@ -2202,28 +2212,82 @@ const ShaderCtrl = (() => {
             await videoEl.play();
 
             if (!pipeline) pipeline = new window.ShaderPipeline(canvas);
+            pipeline.setRenderMode(renderMode);
+            pipeline.setAutoAtmosphere(autoAtmosphere);
             canvas.style.display = 'block';
             running = true;
+            paused = false;
+            fpsFrames = 0; fpsLast = performance.now();
             const pane = id('shaderSettingsPane');
             if (pane) pane.classList.remove('disabled');
-            setStatus('LIVE: ' + selectedSourceName + ' (' + videoEl.videoWidth + 'x' + videoEl.videoHeight + ')', 'ok');
+            setStatus('LIVE: ' + selectedSourceName + ' @ ' + videoEl.videoWidth + 'x' + videoEl.videoHeight, 'ok');
 
-            // Apply current UI settings
             apply();
 
-            const tick = () => {
-                if (videoEl && videoEl.readyState >= 2 && pipeline) {
-                    try { pipeline.render(videoEl); } catch (_) {}
-                }
-                if (running) rafId = requestAnimationFrame(tick);
-            };
-            tick();
+            // Prefer requestVideoFrameCallback — render only on new frames
+            useVFC = typeof videoEl.requestVideoFrameCallback === 'function';
+            if (useVFC) {
+                const vfcTick = () => {
+                    if (!running) return;
+                    if (!paused && pipeline && videoEl.readyState >= 2) {
+                        try { pipeline.render(videoEl); } catch (_) {}
+                        _tickFPS();
+                    }
+                    if (videoEl && running) vfcId = videoEl.requestVideoFrameCallback(vfcTick);
+                };
+                vfcId = videoEl.requestVideoFrameCallback(vfcTick);
+            } else {
+                const tick = () => {
+                    if (!running) return;
+                    if (!paused && videoEl && videoEl.readyState >= 2 && pipeline) {
+                        try { pipeline.render(videoEl); } catch (_) {}
+                        _tickFPS();
+                    }
+                    rafId = requestAnimationFrame(tick);
+                };
+                tick();
+            }
         } catch (e) {
             console.error('[Shader] start failed:', e);
             setStatus('Fehler: ' + (e.message || e), 'err');
             running = false;
             await stopCapture();
         }
+    }
+
+    function _tickFPS() {
+        fpsFrames++;
+        const now = performance.now();
+        if (now - fpsLast >= 1000) {
+            fps = fpsFrames;
+            fpsFrames = 0;
+            fpsLast = now;
+            const el = id('shaderFPS');
+            if (el) el.textContent = fps + ' fps';
+        }
+    }
+
+    function pauseShader() {
+        paused = !paused;
+        const canvas = id('shader-ingame-canvas');
+        if (canvas) canvas.style.display = paused ? 'none' : 'block';
+        setStatus(paused ? 'PAUSE (Shift+F6 = resume)' : 'LIVE (Shift+F6 = pause)', paused ? '' : 'ok');
+    }
+
+    function setRenderMode(mode, chip) {
+        if (!['performance', 'balanced', 'quality'].includes(mode)) return;
+        renderMode = mode;
+        if (pipeline) pipeline.setRenderMode(mode);
+        document.querySelectorAll('.shader-res-chip').forEach(c => c.classList.remove('active'));
+        if (chip) chip.classList.add('active');
+        else document.querySelector(`.shader-res-chip[data-res="${mode}"]`)?.classList.add('active');
+        _persist();
+    }
+
+    function setAutoAtmosphere(on) {
+        autoAtmosphere = !!on;
+        if (pipeline) pipeline.setAutoAtmosphere(autoAtmosphere);
+        _persist();
     }
 
     async function stopCapture() {
@@ -2312,12 +2376,22 @@ const ShaderCtrl = (() => {
         };
     }
 
+    function _persist() {
+        try {
+            const ui = readUI();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                preset: activePreset, ui, renderMode, autoAtmosphere,
+            }));
+        } catch (_) {}
+    }
+
     function apply() {
         updateLabels();
-        const ui = readUI();
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ preset: activePreset, ui })); } catch (_) {}
+        _persist();
         if (!running || !pipeline) return;
-        pipeline.setSettings(toPipeline(ui));
+        pipeline.setSettings(toPipeline(readUI()));
+        // Broadcast to stream window if open
+        window.electronAPI?.shaderStreamSettings?.(toPipeline(readUI()));
     }
 
     function setPreset(name, chip) {
@@ -2336,7 +2410,6 @@ const ShaderCtrl = (() => {
     }
 
     function init() {
-        // Restore previous settings
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
@@ -2344,19 +2417,55 @@ const ShaderCtrl = (() => {
                 if (saved.preset && PRESETS[saved.preset]) activePreset = saved.preset;
                 if (saved.ui) writeUI(saved.ui);
                 else writeUI(PRESETS[activePreset]);
+                document.querySelectorAll('.shader-preset-chip').forEach(c => c.classList.remove('active'));
                 document.querySelector(`.shader-preset-chip[data-preset="${activePreset}"]`)?.classList.add('active');
+                if (saved.renderMode) renderMode = saved.renderMode;
+                if (typeof saved.autoAtmosphere === 'boolean') autoAtmosphere = saved.autoAtmosphere;
             } else {
                 writeUI(PRESETS.realism);
             }
+            document.querySelectorAll('.shader-res-chip').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.shader-res-chip[data-res="${renderMode}"]`)?.classList.add('active');
+            const autoCB = id('shaderAutoAtmo');
+            if (autoCB) autoCB.checked = autoAtmosphere;
         } catch (_) {
             writeUI(PRESETS.realism);
         }
         updateLabels();
     }
 
+    function toggleStreamWindow(on) {
+        if (!window.electronAPI) return;
+        if (on) {
+            if (!selectedSourceId) {
+                setStatus('Erst Quelle waehlen!', 'err');
+                const cb = id('shaderStreamToggle');
+                if (cb) cb.checked = false;
+                return;
+            }
+            window.electronAPI.shaderStreamOpen?.({
+                sourceId: selectedSourceId,
+                settings: toPipeline(readUI()),
+                renderMode,
+                autoAtmosphere,
+            });
+            setStatus('Stream-Fenster offen — in Discord "Emden Network Shader" waehlen.', 'ok');
+        } else {
+            window.electronAPI.shaderStreamClose?.();
+        }
+    }
+
+    // Shift+F6 via globalShortcut -> instant pause (fuer Alt-Tab-Escape)
+    window.electronAPI?.onShaderTogglePause?.(() => {
+        if (running) pauseShader();
+    });
+
     window.addEventListener('DOMContentLoaded', init);
 
-    return { pickSource, start, stop, apply, setPreset, resetPreset };
+    return {
+        pickSource, start, stop, apply, setPreset, resetPreset,
+        setRenderMode, setAutoAtmosphere, pauseShader, toggleStreamWindow,
+    };
 })();
 
 // Expose shader control as Overlay.shader* so inline onclick handlers work
@@ -2367,6 +2476,10 @@ Object.assign(Overlay, {
     shaderApply: () => ShaderCtrl.apply(),
     shaderSetPreset: (name, el) => ShaderCtrl.setPreset(name, el),
     shaderResetPreset: () => ShaderCtrl.resetPreset(),
+    shaderSetRenderMode: (mode, el) => ShaderCtrl.setRenderMode(mode, el),
+    shaderSetAutoAtmo: (on) => ShaderCtrl.setAutoAtmosphere(on),
+    shaderPause: () => ShaderCtrl.pauseShader(),
+    shaderStreamToggle: (on) => ShaderCtrl.toggleStreamWindow(on),
 });
 
 window.addEventListener('DOMContentLoaded', () => {

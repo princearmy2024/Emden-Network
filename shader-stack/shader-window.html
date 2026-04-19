@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Emden Network Shader</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        width: 100%; height: 100%;
+        background: #000;
+        overflow: hidden;
+        font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #e0e0ea;
+    }
+    #wrap { position: relative; width: 100%; height: 100%; }
+    #shader-canvas {
+        width: 100%; height: 100%;
+        display: block;
+        background: #000;
+    }
+    #status {
+        position: absolute;
+        top: 10px; left: 10px;
+        background: rgba(0,0,0,.7);
+        backdrop-filter: blur(8px);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        border: 1px solid rgba(255,255,255,.1);
+        pointer-events: none;
+        opacity: .85;
+        transition: opacity .4s;
+    }
+    #status.hide { opacity: 0; }
+    #status .dot {
+        display: inline-block;
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #ff5252;
+        margin-right: 6px;
+        vertical-align: middle;
+        box-shadow: 0 0 6px currentColor;
+    }
+    #status.live .dot { background: #4DA6FF; }
+    #status.err  .dot { background: #ffb347; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+    <canvas id="shader-canvas"></canvas>
+    <div id="status"><span class="dot"></span><span id="status-text">Verbinde...</span></div>
+</div>
+
+<script src="shaders.js"></script>
+<script src="shader-pipeline.js"></script>
+<script>
+(function () {
+    'use strict';
+    const statusEl  = document.getElementById('status');
+    const statusTxt = document.getElementById('status-text');
+    const canvas    = document.getElementById('shader-canvas');
+
+    let pipeline = null;
+    let mediaStream = null;
+    let videoEl = null;
+    let rafId = 0;
+    let vfcId = 0;
+
+    function setStatus(text, cls) {
+        statusTxt.textContent = text;
+        statusEl.className = cls || '';
+        if (cls === 'live') setTimeout(() => statusEl.classList.add('hide'), 3000);
+        else statusEl.classList.remove('hide');
+    }
+
+    async function attach(sourceId) {
+        stop();
+        try {
+            setStatus('Verbinde mit Quelle...', 'live');
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sourceId,
+                        minWidth: 640, maxWidth: 1920,
+                        minHeight: 360, maxHeight: 1080,
+                        minFrameRate: 30, maxFrameRate: 60,
+                    },
+                },
+            });
+            videoEl = document.createElement('video');
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.srcObject = mediaStream;
+            await videoEl.play();
+
+            if (!pipeline) pipeline = new window.ShaderPipeline(canvas);
+            setStatus('LIVE ' + videoEl.videoWidth + 'x' + videoEl.videoHeight, 'live');
+
+            if (typeof videoEl.requestVideoFrameCallback === 'function') {
+                const vfcTick = () => {
+                    if (videoEl && pipeline && videoEl.readyState >= 2) {
+                        try { pipeline.render(videoEl); } catch (_) {}
+                    }
+                    if (videoEl) vfcId = videoEl.requestVideoFrameCallback(vfcTick);
+                };
+                vfcId = videoEl.requestVideoFrameCallback(vfcTick);
+            } else {
+                const tick = () => {
+                    if (videoEl && pipeline && videoEl.readyState >= 2) {
+                        try { pipeline.render(videoEl); } catch (_) {}
+                    }
+                    rafId = requestAnimationFrame(tick);
+                };
+                tick();
+            }
+        } catch (e) {
+            console.error('[Stream-Shader] fail:', e);
+            setStatus('Fehler: ' + (e.message || e), 'err');
+        }
+    }
+
+    function stop() {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+        if (mediaStream) { mediaStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} }); mediaStream = null; }
+        if (videoEl) { videoEl.srcObject = null; videoEl = null; }
+    }
+
+    window.electronAPI?.onShaderStreamSource?.((sourceId) => attach(sourceId));
+    window.electronAPI?.onShaderStreamSettings?.((settings) => {
+        if (pipeline) pipeline.setSettings(settings);
+    });
+    window.electronAPI?.onShaderStreamMeta?.((meta) => {
+        if (!pipeline) return;
+        if (meta.renderMode) pipeline.setRenderMode(meta.renderMode);
+        if (typeof meta.autoAtmosphere === 'boolean') pipeline.setAutoAtmosphere(meta.autoAtmosphere);
+    });
+    window.electronAPI?.onShaderStreamStop?.(() => { stop(); setStatus('Gestoppt.'); });
+    window.addEventListener('beforeunload', stop);
+
+    window.electronAPI?.shaderStreamReady?.();
+    setStatus('Bereit — warte auf Quelle...', 'live');
+})();
+</script>
+</body>
+</html>

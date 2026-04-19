@@ -21,6 +21,7 @@ const { spawn } = require('child_process');
 let mainWindow;
 let overlayWindow;
 let robloxOverlayWin = null;
+let shaderStreamWin = null; // Separates "Emden Network Shader" Fenster fuer Discord/OBS
 let globalPTTActive  = false; // Verhindert doppeltes Feuern
 
 function createOverlayWindow() {
@@ -555,7 +556,7 @@ const OverlayState = {
     showTimeout: null,
     hideTimeout: null,
     SHOW_DELAY: 4000,  // 4s stabil aktiv bevor Overlay erscheint
-    HIDE_DELAY: 800,   // 0.8s bevor Overlay verschwindet
+    HIDE_DELAY: 150,   // 0.15s bevor Overlay verschwindet (wichtig: Shader-Canvas raus wenn Alt-Tab)
 
     start() {
         if (this.checkInterval) return;
@@ -588,7 +589,7 @@ const OverlayState = {
 
                 this._handleStateChange(robloxShouldShow);
             });
-        }, 2000);
+        }, 700);
     },
 
     stop() {
@@ -1010,6 +1011,15 @@ app.whenReady().then(() => {
         globalShortcut.register('Control+4', modPanelHandler);
     }
 
+    // ==========================================
+    // SHIFT+F6: Shader instant pause/resume (Alt-Tab Escape)
+    // ==========================================
+    globalShortcut.register('Shift+F6', () => {
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            robloxOverlayWin.webContents.send('shader-toggle-pause');
+        }
+    });
+
     app.on('activate', () => {
         // macOS: Klick auf Dock-Icon stellt Fenster wieder her
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1031,13 +1041,15 @@ app.on('before-quit', () => {
     try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
     try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.destroy(); robloxOverlayWin = null; } } catch(_) {}
     try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.destroy(); overlayWindow = null; } } catch(_) {}
+    try { if (shaderStreamWin && !shaderStreamWin.isDestroyed()) { shaderStreamWin.destroy(); shaderStreamWin = null; } } catch(_) {}
     // Alle uebrigen Fenster zerstoeren
     BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch(_) {} });
 });
 
 // ================================================================
-// SHADER STACK — In-Overlay Rendering (Canvas liegt im Roblox-Overlay selbst)
-// Nur noch das Listing der Capture-Sources via IPC; Pipeline laeuft im Renderer.
+// SHADER STACK
+// - In-Overlay Rendering (Canvas im Roblox-Overlay selbst)
+// - Optionales "Emden Network Shader" Fenster fuer Discord/OBS
 // ================================================================
 ipcMain.handle('shader-list-sources', async () => {
     try {
@@ -1055,6 +1067,80 @@ ipcMain.handle('shader-list-sources', async () => {
         console.error('[Shader] list-sources:', e.message);
         return [];
     }
+});
+
+function createShaderStreamWindow() {
+    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) return shaderStreamWin;
+    shaderStreamWin = new BrowserWindow({
+        width: 1280,
+        height: 720,
+        minWidth: 640,
+        minHeight: 360,
+        title: 'Emden Network Shader',
+        backgroundColor: '#000000',
+        show: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            backgroundThrottling: false,
+        },
+    });
+    shaderStreamWin.setMenu(null);
+    shaderStreamWin.setTitle('Emden Network Shader');
+    shaderStreamWin.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
+        if (wc === shaderStreamWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
+            cb(true);
+            return;
+        }
+        cb(false);
+    });
+    shaderStreamWin.loadFile(path.join('shader-stack', 'shader-window.html'));
+    shaderStreamWin.once('ready-to-show', () => {
+        shaderStreamWin.setTitle('Emden Network Shader');
+        shaderStreamWin.show();
+    });
+    shaderStreamWin.on('closed', () => { shaderStreamWin = null; });
+    return shaderStreamWin;
+}
+
+ipcMain.on('shader-stream-open', (event, payload = {}) => {
+    const { sourceId, settings, renderMode, autoAtmosphere } = payload;
+    const w = createShaderStreamWindow();
+    const send = () => {
+        if (!w || w.isDestroyed()) return;
+        w.webContents.send('shader:stream-meta', { renderMode, autoAtmosphere });
+        if (settings) w.webContents.send('shader:stream-settings', settings);
+        if (sourceId) w.webContents.send('shader:stream-source', sourceId);
+    };
+    if (w.webContents.isLoading()) {
+        w.webContents.once('did-finish-load', send);
+    } else {
+        send();
+    }
+});
+
+ipcMain.on('shader-stream-close', () => {
+    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
+        try { shaderStreamWin.webContents.send('shader:stream-stop'); } catch (_) {}
+        shaderStreamWin.close();
+    }
+});
+
+ipcMain.on('shader-stream-settings', (event, settings) => {
+    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
+        shaderStreamWin.webContents.send('shader:stream-settings', settings || {});
+    }
+});
+
+ipcMain.on('shader-stream-meta', (event, meta) => {
+    if (shaderStreamWin && !shaderStreamWin.isDestroyed()) {
+        shaderStreamWin.webContents.send('shader:stream-meta', meta || {});
+    }
+});
+
+ipcMain.on('shader-stream-ready', () => {
+    console.log('[Shader-Stream] Window ready');
 });
 
 app.on('will-quit', () => {

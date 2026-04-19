@@ -1877,13 +1877,50 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
       <div class="settings-group">
         <div class="shader-action-row">
           <button class="shader-btn" id="shaderBtnSource" onclick="Overlay.shaderPickSource()">Roblox-Quelle wählen</button>
+          <span id="shaderFPS" style="font-size:10px;color:rgba(255,255,255,.45);padding:0 8px;min-width:52px;text-align:right;">-- fps</span>
         </div>
         <div class="shader-source-list" id="shaderSourceList"></div>
         <div class="shader-status" id="shaderStatus">Noch keine Quelle gewählt.</div>
 
         <div class="shader-action-row">
           <button class="shader-btn" id="shaderBtnStart" onclick="Overlay.shaderStart()" disabled style="opacity:.5;">Shader starten</button>
+          <button class="shader-btn" onclick="Overlay.shaderPause()" title="Shift+F6">Pause</button>
           <button class="shader-btn danger" onclick="Overlay.shaderStop()">Stop</button>
+        </div>
+      </div>
+
+      <!-- Render-Qualität (immer einstellbar) -->
+      <div class="settings-group">
+        <div class="settings-label">Render-Qualität</div>
+        <div class="shader-preset-row">
+          <div class="shader-res-chip shader-preset-chip" data-res="performance" onclick="Overlay.shaderSetRenderMode('performance', this)">Leistung</div>
+          <div class="shader-res-chip shader-preset-chip active" data-res="balanced" onclick="Overlay.shaderSetRenderMode('balanced', this)">Ausgewogen</div>
+          <div class="shader-res-chip shader-preset-chip" data-res="quality" onclick="Overlay.shaderSetRenderMode('quality', this)">Qualität</div>
+        </div>
+      </div>
+
+      <!-- Auto-Atmosphäre -->
+      <div class="settings-group">
+        <div class="settings-toggle-row">
+          <span class="settings-desc">Auto-Atmosphäre (Szenen-Analyse live)</span>
+          <label class="settings-switch">
+            <input type="checkbox" id="shaderAutoAtmo" onchange="Overlay.shaderSetAutoAtmo(this.checked)">
+            <span class="settings-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Stream-Fenster Toggle -->
+      <div class="settings-group">
+        <div class="settings-toggle-row">
+          <span class="settings-desc">Stream-Fenster „Emden Network Shader"</span>
+          <label class="settings-switch">
+            <input type="checkbox" id="shaderStreamToggle" onchange="Overlay.shaderStreamToggle(this.checked)">
+            <span class="settings-slider"></span>
+          </label>
+        </div>
+        <div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:2px;padding:0 2px;">
+          Discord/OBS → Fenster „Emden Network Shader" teilen (Shift+F6 = Shader pausieren).
         </div>
       </div>
 
