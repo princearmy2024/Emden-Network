@@ -1,6 +1,6 @@
 {
-    "version": "4.63.4",
-    "releaseDate": "2026-04-18",
-    "notes": "v4.63.4: Support-Case-System — User joint Warteraum 1365102454550695936 → Bot postet Case-Panel in 1495127620730360073 mit Uebernehmen-Button. Staff klickt → User wird zu Staff-Voice gemoved (egal wo Staff gerade ist). Nach Case-Ende 30min Cooldown-Block auf den Warteraum.",
-    "forceUpdate": true
+    "version": "4.64.0",
+    "releaseDate": "2026-04-19",
+    "notes": "v4.64.0: Shader Stack V1 — WebGL2 Post-Processing fuer Roblox. Bloom + SSAO-Fake + ACES Tonemap + CAS Sharpening + Chromatic Aberration + Vignette + Film Grain. 4 Presets (Realism/Cinematic/Film/Clean) mit 9 Slidern im Overlay-Settings. Output via OBS Fensteraufnahme des Emden-Shader-Fensters. Fuer alle User sichtbar.",
+    "forceUpdate": false
 }
