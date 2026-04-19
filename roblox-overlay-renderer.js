@@ -2059,7 +2059,8 @@ const OverlayShift = {
 window.OverlayShift = OverlayShift;
 
 // ════════════════════════════════════════════════════════════════
-// SHADER STACK CONTROL — Overlay settings panel → main process IPC
+// SHADER STACK CONTROL — In-Overlay WebGL Post-Processing
+// (Canvas liegt hinter dem HUD, zeigt den Roblox-Stream mit Shadern)
 // ════════════════════════════════════════════════════════════════
 const ShaderCtrl = (() => {
     const STORAGE_KEY = 'shader-stack-settings';
@@ -2091,8 +2092,15 @@ const ShaderCtrl = (() => {
     };
 
     let selectedSourceId = null;
+    let selectedSourceName = '';
     let activePreset = 'realism';
     let running = false;
+
+    // In-overlay rendering state
+    let pipeline = null;
+    let mediaStream = null;
+    let videoEl = null;
+    let rafId = 0;
 
     function statusEl() { return document.getElementById('shaderStatus'); }
     function setStatus(text, cls) {
@@ -2124,7 +2132,6 @@ const ShaderCtrl = (() => {
                 setStatus('Keine Fenster gefunden.', 'err');
                 return;
             }
-            // Sort: Roblox first, then windows, then screens
             sources.sort((a, b) => {
                 const ra = /roblox/i.test(a.name) ? 0 : (/screen/i.test(a.id) ? 2 : 1);
                 const rb = /roblox/i.test(b.name) ? 0 : (/screen/i.test(b.id) ? 2 : 1);
@@ -2140,11 +2147,13 @@ const ShaderCtrl = (() => {
             list.querySelectorAll('.shader-source-item').forEach(item => {
                 item.addEventListener('click', () => {
                     selectedSourceId = item.dataset.id;
-                    const nm = item.dataset.name;
-                    setStatus('Quelle: ' + nm, 'ok');
+                    selectedSourceName = item.dataset.name;
+                    setStatus('Quelle: ' + selectedSourceName, 'ok');
                     list.classList.remove('show');
                     const startBtn = id('shaderBtnStart');
                     if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = '1'; }
+                    // Auto-start if shader already running (switch source live)
+                    if (running) start();
                 });
             });
         } catch (e) {
@@ -2153,23 +2162,88 @@ const ShaderCtrl = (() => {
         }
     }
 
-    function start() {
+    async function start() {
         if (!selectedSourceId) {
             setStatus('Erst Quelle wählen!', 'err');
             return;
         }
-        window.electronAPI?.shaderOpen(selectedSourceId);
-        running = true;
-        const pane = id('shaderSettingsPane');
-        if (pane) pane.classList.remove('disabled');
-        setStatus('Shader läuft – in OBS "Fensteraufnahme" wählen.', 'ok');
-        // Send initial settings after a short delay so window is ready
-        setTimeout(apply, 600);
+        if (!window.ShaderPipeline || !window.SHADERS) {
+            setStatus('Shader-Bibliothek fehlt.', 'err');
+            return;
+        }
+        // Stop previous stream (if switching source)
+        await stopCapture();
+
+        const canvas = id('shader-ingame-canvas');
+        if (!canvas) {
+            setStatus('Canvas nicht gefunden.', 'err');
+            return;
+        }
+
+        try {
+            setStatus('Verbinde mit Roblox-Fenster...');
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: selectedSourceId,
+                        minWidth:  640, maxWidth:  3840,
+                        minHeight: 360, maxHeight: 2160,
+                        minFrameRate: 30, maxFrameRate: 60,
+                    },
+                },
+            });
+
+            videoEl = document.createElement('video');
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.srcObject = mediaStream;
+            await videoEl.play();
+
+            if (!pipeline) pipeline = new window.ShaderPipeline(canvas);
+            canvas.style.display = 'block';
+            running = true;
+            const pane = id('shaderSettingsPane');
+            if (pane) pane.classList.remove('disabled');
+            setStatus('LIVE: ' + selectedSourceName + ' (' + videoEl.videoWidth + 'x' + videoEl.videoHeight + ')', 'ok');
+
+            // Apply current UI settings
+            apply();
+
+            const tick = () => {
+                if (videoEl && videoEl.readyState >= 2 && pipeline) {
+                    try { pipeline.render(videoEl); } catch (_) {}
+                }
+                if (running) rafId = requestAnimationFrame(tick);
+            };
+            tick();
+        } catch (e) {
+            console.error('[Shader] start failed:', e);
+            setStatus('Fehler: ' + (e.message || e), 'err');
+            running = false;
+            await stopCapture();
+        }
     }
 
-    function stop() {
-        window.electronAPI?.shaderClose();
+    async function stopCapture() {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
+            mediaStream = null;
+        }
+        if (videoEl) {
+            videoEl.srcObject = null;
+            videoEl = null;
+        }
+    }
+
+    async function stop() {
         running = false;
+        await stopCapture();
+        const canvas = id('shader-ingame-canvas');
+        if (canvas) canvas.style.display = 'none';
         const pane = id('shaderSettingsPane');
         if (pane) pane.classList.add('disabled');
         setStatus('Shader gestoppt.');
@@ -2242,8 +2316,8 @@ const ShaderCtrl = (() => {
         updateLabels();
         const ui = readUI();
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ preset: activePreset, ui })); } catch (_) {}
-        if (!running) return;
-        window.electronAPI?.shaderUpdateSettings(toPipeline(ui));
+        if (!running || !pipeline) return;
+        pipeline.setSettings(toPipeline(ui));
     }
 
     function setPreset(name, chip) {

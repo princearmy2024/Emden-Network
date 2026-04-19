@@ -1699,6 +1699,18 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 </head>
 <body>
 
+<!-- ========== SHADER CANVAS (covers Roblox, behind HUD) ========== -->
+<canvas id="shader-ingame-canvas" style="
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    display: none;
+    pointer-events: none;
+    background: #000;
+"></canvas>
+
 <!-- ========== GRADIENT FRAME ========== -->
 <div id="panel-left">
   <div class="grid-pattern"></div>
@@ -2197,6 +2209,8 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="shader-stack/shaders.js"></script>
+<script src="shader-stack/shader-pipeline.js"></script>
 <script src="roblox-overlay-renderer.js"></script>
 </body>
 </html>

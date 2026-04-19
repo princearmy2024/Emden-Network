@@ -21,7 +21,6 @@ const { spawn } = require('child_process');
 let mainWindow;
 let overlayWindow;
 let robloxOverlayWin = null;
-let shaderWin = null; // Post-processing Shader-Fenster
 let globalPTTActive  = false; // Verhindert doppeltes Feuern
 
 function createOverlayWindow() {
@@ -520,6 +519,14 @@ function createRobloxOverlay(discordId, robloxId, isAdmin, isStaff) {
     robloxOverlayWin.webContents.setAudioMuted(false);
     robloxOverlayWin.webContents.on('did-finish-load', () => {
         robloxOverlayWin.webContents.setAudioMuted(false);
+    });
+    // Desktop-Capture Permission (fuer Shader-Stack getUserMedia)
+    robloxOverlayWin.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
+        if (wc === robloxOverlayWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
+            cb(true);
+            return;
+        }
+        cb(false);
     });
     const adminFlag = isAdmin ? '1' : '0';
     const staffFlag = isStaff ? '1' : '0';
@@ -1024,46 +1031,14 @@ app.on('before-quit', () => {
     try { if (robloxCallbackServer?.listening) { robloxCallbackServer.close(); robloxCallbackServer = null; } } catch(_) {}
     try { if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) { robloxOverlayWin.destroy(); robloxOverlayWin = null; } } catch(_) {}
     try { if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.destroy(); overlayWindow = null; } } catch(_) {}
-    try { if (shaderWin && !shaderWin.isDestroyed()) { shaderWin.destroy(); shaderWin = null; } } catch(_) {}
     // Alle uebrigen Fenster zerstoeren
     BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch(_) {} });
 });
 
 // ================================================================
-// SHADER STACK — Window + IPC
+// SHADER STACK — In-Overlay Rendering (Canvas liegt im Roblox-Overlay selbst)
+// Nur noch das Listing der Capture-Sources via IPC; Pipeline laeuft im Renderer.
 // ================================================================
-function createShaderWindow() {
-    if (shaderWin && !shaderWin.isDestroyed()) return shaderWin;
-    shaderWin = new BrowserWindow({
-        width: 1280,
-        height: 720,
-        minWidth: 480,
-        minHeight: 270,
-        title: 'Emden Shader',
-        backgroundColor: '#0a0a0f',
-        show: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-            backgroundThrottling: false,
-        },
-    });
-    shaderWin.setMenu(null);
-    // Auto-approve media (getUserMedia for desktop capture) for this window
-    shaderWin.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
-        if (wc === shaderWin?.webContents && (permission === 'media' || permission === 'display-capture')) {
-            cb(true);
-            return;
-        }
-        cb(false);
-    });
-    shaderWin.loadFile(path.join('shader-stack', 'shader-window.html'));
-    shaderWin.once('ready-to-show', () => shaderWin.show());
-    shaderWin.on('closed', () => { shaderWin = null; });
-    return shaderWin;
-}
-
 ipcMain.handle('shader-list-sources', async () => {
     try {
         const sources = await desktopCapturer.getSources({
@@ -1080,35 +1055,6 @@ ipcMain.handle('shader-list-sources', async () => {
         console.error('[Shader] list-sources:', e.message);
         return [];
     }
-});
-
-ipcMain.on('shader-open', (event, { sourceId } = {}) => {
-    const w = createShaderWindow();
-    const send = () => {
-        if (w && !w.isDestroyed()) w.webContents.send('shader:set-source', sourceId);
-    };
-    if (w.webContents.isLoading()) {
-        w.webContents.once('did-finish-load', send);
-    } else {
-        send();
-    }
-});
-
-ipcMain.on('shader-close', () => {
-    if (shaderWin && !shaderWin.isDestroyed()) {
-        shaderWin.webContents.send('shader:stop');
-        shaderWin.close();
-    }
-});
-
-ipcMain.on('shader-update-settings', (event, settings) => {
-    if (shaderWin && !shaderWin.isDestroyed()) {
-        shaderWin.webContents.send('shader:settings', settings || {});
-    }
-});
-
-ipcMain.on('shader-window-ready', () => {
-    console.log('[Shader] Window ready');
 });
 
 app.on('will-quit', () => {
