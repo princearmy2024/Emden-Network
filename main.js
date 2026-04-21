@@ -1009,18 +1009,42 @@ app.whenReady().then(() => {
         try { fs.writeFileSync(file, JSON.stringify({ x, y, w, h })); } catch(e) {}
     }
 
-    // Mod-Panel: F4 (Windows) + Cmd+4 / Ctrl+4 (Mac)
+    // Mod-Panel: F4 (Windows) + Cmd+4 / Ctrl+4 (Mac) + Fallbacks falls F4 geklaut
     const modPanelHandler = () => {
+        console.log('[F4] modPanelHandler fired — overlay:',
+            !!(robloxOverlayWin && !robloxOverlayWin.isDestroyed()));
         if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
             robloxOverlayWin.webContents.send('toggle-mod-panel');
         } else {
             toggleModButton();
         }
     };
-    globalShortcut.register('F4', modPanelHandler);
+    const f4Ok = globalShortcut.register('F4', modPanelHandler);
+    console.log('[F4] globalShortcut.register("F4") →', f4Ok ? 'OK' : 'FAILED (andere App hat F4 geklaut!)');
+    // Fallbacks: diese Kombis haben selten Konflikte
+    const altOk = globalShortcut.register('Alt+M', modPanelHandler);
+    const ctrlShiftMOk = globalShortcut.register('CommandOrControl+Shift+M', modPanelHandler);
+    console.log('[F4] Fallbacks — Alt+M:', altOk, '· Ctrl+Shift+M:', ctrlShiftMOk);
     if (process.platform === 'darwin') {
         globalShortcut.register('Command+4', modPanelHandler);
         globalShortcut.register('Control+4', modPanelHandler);
+    }
+
+    // Wenn F4-Registrierung fehlgeschlagen ist → Dashboard-Hinweis
+    if (!f4Ok && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.once('did-finish-load', () => {
+            setTimeout(() => {
+                try {
+                    mainWindow.webContents.executeJavaScript(
+                        `window.NotificationService && NotificationService.show(
+                            'F4 blockiert',
+                            'F4 wird von einer anderen App benutzt (Discord?). Alt+M oder Strg+Shift+M funktioniert als Ersatz.',
+                            'warn'
+                        );`
+                    ).catch(() => {});
+                } catch(_) {}
+            }, 5000);
+        });
     }
 
     app.on('activate', () => {

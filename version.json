@@ -1,6 +1,6 @@
 {
-    "version": "4.66.0",
-    "releaseDate": "2026-04-19",
-    "notes": "v4.66.0: Support-Cases jetzt auf allen 3 Surfaces. Bot broadcastet support_case_new/_update/_closed via Socket.IO, neue HTTP-Endpoints /api/support-cases/open + /api/support-case/take. Dashboard hat 'Support-Anfragen' Section auf Overview (staff-only), Mobile hat Section auf Home, Roblox-Overlay hat Staff-Toast top-center. Klick auf Uebernehmen moved User in Staff's Voice-Channel — wie der Discord-Button. BOT-CODE MUSS NEU AUF CYBRANCEE HOCHGELADEN WERDEN.",
+    "version": "4.66.1",
+    "releaseDate": "2026-04-21",
+    "notes": "v4.66.1: F4-Fix. Wenn F4 von einer anderen App (z.B. Discord-Overlay) geblockt wird, gibt es jetzt Fallback-Tasten Alt+M und Strg+Shift+M. Dashboard zeigt Hinweis wenn F4 blockiert ist. Logging in Dev-Console zeigt Registrierungs-Status.",
     "forceUpdate": false
 }
