@@ -3725,26 +3725,32 @@ let supportWaitingUsers = [];
 
 client.on("voiceStateUpdate", (oldState, newState) => {
     // ─── SUPPORT-CASE SYSTEM ────────────────────────────────────────
-    // User joint den spezifischen Warteraum → Case-Panel posten
-    if (newState.channelId === SUPPORT_VOICE_CHANNEL_ID && oldState.channelId !== SUPPORT_VOICE_CHANNEL_ID) {
-        const m = newState.member;
-        if (m && !m.user.bot) {
-            postSupportCase(m).catch(e => console.warn('[Support] postSupportCase Fehler:', e.message));
-        }
-    }
-    // User mit uebernommenem Case verlaesst Support-Staff-Channel (Support 1-5):
-    //   → Case schliessen. Block NUR wenn User NICHT zurueck zum Warteraum geht
-    //     (wenn User wieder Hilfe will, soll neuer Case sofort moeglich sein).
+    // ORDER: close vor post, sonst findet postSupportCase noch den alten
+    // 'taken' Case und skipt die Neu-Erstellung.
+
+    // 1) User mit uebernommenem Case verlaesst Support-Staff-Channel (Support 1-5):
+    //    → Case schliessen. Block NUR wenn User NICHT zurueck zum Warteraum geht
+    //      (wenn User wieder Hilfe will, soll neuer Case sofort moeglich sein).
     const leftSupportStaffChan = oldState.channelId && SUPPORT_STAFF_VOICE_IDS.includes(oldState.channelId);
     const switchedChannel = newState.channelId !== oldState.channelId;
     if (leftSupportStaffChan && switchedChannel) {
         const openCase = findOpenSupportCase(oldState.id);
         if (openCase && openCase.status === 'taken') {
             const goingToWarteraum = newState.channelId === SUPPORT_VOICE_CHANNEL_ID;
+            // SYNC: status wird sofort auf 'closed' gesetzt; Discord-Edit laeuft async
             closeSupportCase(openCase, { applyBlock: !goingToWarteraum }).catch(e => console.warn('[Support] closeCase Fehler:', e.message));
         }
     }
-    // User verlaesst Warteraum ohne dass Case uebernommen wurde → abbrechen ohne Block
+
+    // 2) User joint den Warteraum → NEUEN Case-Panel posten (nach evtl. close oben)
+    if (newState.channelId === SUPPORT_VOICE_CHANNEL_ID && oldState.channelId !== SUPPORT_VOICE_CHANNEL_ID) {
+        const m = newState.member;
+        if (m && !m.user.bot) {
+            postSupportCase(m).catch(e => console.warn('[Support] postSupportCase Fehler:', e.message));
+        }
+    }
+
+    // 3) User verlaesst Warteraum ohne dass Case uebernommen wurde → abbrechen ohne Block
     if (oldState.channelId === SUPPORT_VOICE_CHANNEL_ID && newState.channelId !== SUPPORT_VOICE_CHANNEL_ID) {
         const openCase = findOpenSupportCase(oldState.id);
         if (openCase && openCase.status === 'open') {

@@ -1,6 +1,6 @@
 {
-    "version": "4.66.10",
+    "version": "4.66.11",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.10: Mobile-Fix + Ghost-Case-Cleanup. (1) Mobile ging nicht weil API_URL_DIRECT (HTTP) auf Android geblockt ist — jetzt via PHP-HTTPS-Proxy. api.php Whitelist um support-case/take + support-cases/open erweitert. (2) Alte Ghost-Cases (z.B. 66h alt) wurden immer noch angezeigt — Bot raeumt jetzt automatisch stale Cases auf (>30min + User nicht im Warteraum). Startup-Cleanup + alle 10min. BOT-CODE + api.php neu hochladen!",
+    "notes": "v4.66.11: Re-Take-Bug Fix. voiceStateUpdate Handler-Order: close vor post. Vorher lief postSupportCase zuerst waehrend der alte Case noch status='taken' hatte → findOpenSupportCase fand ihn → SKIP → kein neuer Case. Jetzt: Case wird zuerst geschlossen (status sofort sync auf 'closed'), dann neuer Case gepostet. BOT NEU HOCHLADEN auf Cybrancee!",
     "forceUpdate": false
 }
