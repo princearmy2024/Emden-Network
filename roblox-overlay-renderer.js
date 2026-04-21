@@ -2071,7 +2071,7 @@ window.OverlayShift = OverlayShift;
 // ════════════════════════════════════════════════════════════════
 const SupportOverlay = (() => {
     const cases = new Map();
-    let eventsReceived = 0;
+    const dismissedIds = new Set(); // Client-seitig per X weggeklickt
 
     function escapeHtml(s) {
         if (typeof s !== 'string') return '';
@@ -2084,27 +2084,15 @@ const SupportOverlay = (() => {
         return Math.floor(d/60) + 'm ' + (d%60) + 's';
     }
 
-    function updateDebugBadge() {
-        let el = document.getElementById('supDebugBadge');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'supDebugBadge';
-            el.style.cssText = 'position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#ffb347;padding:4px 10px;border-radius:6px;font-size:10px;font-family:monospace;z-index:99999;pointer-events:none;opacity:.85;';
-            document.body.appendChild(el);
-        }
-        el.textContent = `[Support] staff=${window._isStaff ? 'yes' : 'no'} · events=${eventsReceived} · cases=${cases.size}`;
-    }
-
     function render() {
-        updateDebugBadge();
         const stack = document.getElementById('supOverlayStack');
         if (!stack) return;
-        // Staff-Gate entfernt — Bot-Endpoint validiert EN-Team serverseitig.
-        if (cases.size === 0) {
+        const visible = Array.from(cases.values()).filter(c => !dismissedIds.has(c.caseId));
+        if (visible.length === 0) {
             stack.innerHTML = '';
             return;
         }
-        const list = Array.from(cases.values()).sort((a,b) => a.createdAt - b.createdAt);
+        const list = visible.sort((a,b) => a.createdAt - b.createdAt);
         stack.innerHTML = list.map(c => {
             const taken = c.status === 'taken';
             const av = c.avatarUrl
@@ -2121,14 +2109,32 @@ const SupportOverlay = (() => {
                     <button class="sup-ov-btn" ${taken ? 'disabled' : ''} data-case-id="${escapeHtml(c.caseId)}">
                         ${taken ? '✓' : '→ Übernehmen'}
                     </button>
+                    <button class="sup-ov-close" data-case-id="${escapeHtml(c.caseId)}" title="Schließen">×</button>
                 </div>
             `;
         }).join('');
 
+        // Focus-Grant auf ganzes Toast (groessere Hit-Area, verhindert Click-Loss)
+        stack.querySelectorAll('.sup-ov-toast').forEach(toast => {
+            toast.addEventListener('mouseenter', () => window.electronAPI?.requestOverlayFocus?.(true));
+            toast.addEventListener('mouseleave', () => window.electronAPI?.requestOverlayFocus?.(false));
+        });
+        // Uebernehmen-Button
         stack.querySelectorAll('.sup-ov-btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => window.electronAPI?.requestOverlayFocus?.(true));
-            btn.addEventListener('mouseleave', () => window.electronAPI?.requestOverlayFocus?.(false));
-            btn.addEventListener('click', () => take(btn.dataset.caseId, btn));
+            btn.addEventListener('mousedown', () => window.electronAPI?.requestOverlayFocus?.(true));
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                take(btn.dataset.caseId, btn);
+            });
+        });
+        // X Close-Button
+        stack.querySelectorAll('.sup-ov-close').forEach(btn => {
+            btn.addEventListener('mousedown', () => window.electronAPI?.requestOverlayFocus?.(true));
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                dismissedIds.add(btn.dataset.caseId);
+                render();
+            });
         });
     }
 
@@ -2166,15 +2172,11 @@ const SupportOverlay = (() => {
     }
 
     function add(c) {
-        console.log('[SupportOverlay] add event received:', c);
-        eventsReceived++;
         if (!c || !c.caseId) return;
         cases.set(c.caseId, c);
         render();
     }
     function update(c) {
-        console.log('[SupportOverlay] update event received:', c);
-        eventsReceived++;
         if (!c || !c.caseId) return;
         const prev = cases.get(c.caseId);
         cases.set(c.caseId, { ...(prev || {}), ...c });
@@ -2183,6 +2185,7 @@ const SupportOverlay = (() => {
     function remove(caseId) {
         if (!caseId) return;
         cases.delete(caseId);
+        dismissedIds.delete(caseId);
         render();
     }
 
@@ -2222,8 +2225,7 @@ const SupportOverlay = (() => {
 
     function init() {
         setInterval(tickTimes, 1000);
-        setInterval(updateDebugBadge, 2000);
-        setTimeout(() => { updateDebugBadge(); loadInitial(); }, 3500);
+        setTimeout(loadInitial, 3500);
     }
 
     return { init, add, update, remove, render, loadInitial, _testFake };

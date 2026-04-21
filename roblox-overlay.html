@@ -1276,13 +1276,13 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 /* Support-Case Overlay Toast (Staff-only) */
 .sup-ov-toast {
     pointer-events: auto;
-    background: linear-gradient(135deg, rgba(20,10,0,.95), rgba(30,15,0,.88));
-    border: 1px solid rgba(255, 179, 71, 0.55);
+    background: linear-gradient(135deg, rgba(20,10,0,.35), rgba(30,15,0,.22));
+    border: 1px solid rgba(255, 179, 71, 0.4);
     border-radius: 14px;
-    padding: 12px 14px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255, 179, 71, 0.15), 0 0 24px rgba(255, 179, 71, 0.25);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    padding: 10px 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255, 179, 71, 0.12), 0 0 24px rgba(255, 179, 71, 0.18);
+    backdrop-filter: blur(16px) saturate(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(1.1);
     display: flex;
     gap: 10px;
     align-items: center;
@@ -1291,6 +1291,30 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
     transition: transform 0.25s ease-out, opacity 0.25s ease-out;
     font-family: -apple-system, Segoe UI, Roboto, sans-serif;
     color: #fff;
+    position: relative;
+}
+.sup-ov-close {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: rgba(255,255,255,0.55);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    padding: 0;
+}
+.sup-ov-close:hover {
+    background: rgba(255,82,82,0.4);
+    color: #fff;
+    transform: scale(1.1);
 }
 .sup-ov-toast.show { transform: translateY(0); opacity: 1; }
 .sup-ov-avatar {

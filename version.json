@@ -1,6 +1,6 @@
 {
-    "version": "4.66.2",
+    "version": "4.66.3",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.2: Support-Cases Debug — Staff-Gate entfernt (Bot validiert serverseitig), Debug-Badge unten-mittig im Overlay zeigt Status (staff/events/cases), verbose Logging in Dev-Console. Test-Case via window._testSupport() spawnen.",
+    "notes": "v4.66.3: Support-Toast Polish + Voice-Channel-Check. Background transparent (35% Opacity mit Blur). X-Button zum lokalen Wegklicken. Click-Fix: Focus-Request auf ganzen Toast + mousedown als Backup. Bot validiert: Uebernehmen geht NUR wenn Staff in Support 1–5 Voice ist — sonst 'Du musst in einem Support-Channel (Support 1–5) sein'. Stv. Projektleitung als Lead hinzugefuegt (darf Mod-Eintraege loeschen).",
     "forceUpdate": false
 }

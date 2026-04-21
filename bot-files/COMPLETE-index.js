@@ -40,6 +40,14 @@ const SUPPORT_LOGS_CHANNEL_ID = "1383433388173820027";  // Voice-Logs Channel (C
 const SUPPORT_PING_ROLE_ID = "1367924090513526874";     // Voice-Support-Rolle — wird bei neuem Case gepingt
 const SUPPORT_CASES_FILE = path.join(path.resolve(), "data", "supportCases.json");
 const SUPPORT_REENTRY_COOLDOWN_MS = 2 * 60 * 1000; // Nach Case-Close 2min Block vom Warteraum
+// Support-Staff-Voice-Channels — Take-Over nur erlaubt wenn Staff in einem dieser Channels ist
+const SUPPORT_STAFF_VOICE_IDS = [
+    "1391570729677623449", // Support 1
+    "1391570762514829384", // Support 2
+    "1391570782261477397", // Support 3
+    "1391570801815453837", // Support 4
+    "1391570830215086170", // Support 5
+];
 
 // === Roblox OAuth2 Config ===
 const ROBLOX_CLIENT_ID = process.env.ROBLOX_CLIENT_ID || '';
@@ -378,7 +386,11 @@ async function performSupportTake(caseId, staffDiscordId) {
     }
     const staffVoice = staff.voice.channel;
     if (!staffVoice) {
-        return { ok: false, error: 'Du musst in einem Voice-Channel sein, damit der User zu dir gemoved werden kann.' };
+        return { ok: false, error: 'Du musst in einem Support-Channel (Support 1–5) sein.' };
+    }
+    // NEU: Nur erlauben wenn Staff in einem der 5 Support-Channels ist
+    if (!SUPPORT_STAFF_VOICE_IDS.includes(staffVoice.id)) {
+        return { ok: false, error: `Du musst in einem Support-Channel (Support 1–5) sein. Aktuell: ${staffVoice.name}` };
     }
     const userMember = await guild.members.fetch(sCase.userId).catch(() => null);
     if (!userMember) return { ok: false, error: 'User ist nicht mehr im Server.' };
@@ -569,6 +581,7 @@ function addStreakEntry(discordId) {
 // Lead role IDs that can manage shifts + delete mod entries
 const LEAD_ROLE_IDS = [
     "1365085407381028864",  // Projektleitung
+    "1365085926551720096",  // Stv. Projektleitung
     "1365086249592815637",  // Manager
     "1365087911308951572",  // Teamleitung
     "1365088012517642343",  // Stv. Teamleitung
