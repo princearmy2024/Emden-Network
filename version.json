@@ -1,6 +1,6 @@
 {
-    "version": "4.66.4",
+    "version": "4.66.5",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.4: Support-Toast Inline-Error + Global-Cursor-Track. alert() war im Electron-Overlay unsichtbar — jetzt wird der Fehler DIREKT im Toast angezeigt (rote Zeile unten drunter). Globaler Mousemove-Handler gibt Focus frei sobald Cursor in Toast-Bereich ist (fixt mouseenter-Miss bei bereits-stehendem Cursor). Auf Erfolg wird Toast lokal geschlossen.",
+    "notes": "v4.66.5: Support-Click Aggressive-Fix + DevTools Shortcut. Sobald EIN Support-Toast sichtbar ist, wird das Overlay voll klickbar (requestOverlayFocus(true)) — kein Cursor-Tracking mehr noetig. X wegklicken macht's wieder click-through. NEU: Ctrl+Shift+D oder F12 oeffnet DevTools als separates Fenster fuer Overlay/Main — du siehst jetzt die Console zum Debuggen.",
     "forceUpdate": false
 }

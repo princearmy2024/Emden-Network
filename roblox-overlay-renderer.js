@@ -2072,6 +2072,7 @@ window.OverlayShift = OverlayShift;
 const SupportOverlay = (() => {
     const cases = new Map();
     const dismissedIds = new Set(); // Client-seitig per X weggeklickt
+    let _forceFocus = false;        // Overlay voll klickbar solange Toast sichtbar
 
     function escapeHtml(s) {
         if (typeof s !== 'string') return '';
@@ -2090,7 +2091,17 @@ const SupportOverlay = (() => {
         const visible = Array.from(cases.values()).filter(c => !dismissedIds.has(c.caseId));
         if (visible.length === 0) {
             stack.innerHTML = '';
+            // Kein Toast mehr → Overlay wieder click-through (wenn zuvor Focus granted)
+            if (_forceFocus) {
+                window.electronAPI?.requestOverlayFocus?.(false);
+                _forceFocus = false;
+            }
             return;
+        }
+        // Mindestens ein Toast sichtbar → Overlay voll klickbar (sonst Click-Loss!)
+        if (!_forceFocus) {
+            window.electronAPI?.requestOverlayFocus?.(true);
+            _forceFocus = true;
         }
         const list = visible.sort((a,b) => a.createdAt - b.createdAt);
         stack.innerHTML = list.map(c => {
@@ -2244,39 +2255,9 @@ const SupportOverlay = (() => {
         console.log('[SupportOverlay] Test-Case gespawnt. Sollte oben-zentral sichtbar sein.');
     }
 
-    // Globaler mousemove-Tracker: gibt Focus frei sobald Cursor in Toast-Bereich ist.
-    // Loest das Problem wenn mouseenter nicht feuert (z.B. wenn Toast unter bereits-
-    // stehendem Cursor erscheint).
-    let _hadFocus = false;
-    function startGlobalCursorTrack() {
-        document.addEventListener('mousemove', (e) => {
-            const stack = document.getElementById('supOverlayStack');
-            if (!stack) return;
-            const toasts = stack.querySelectorAll('.sup-ov-toast');
-            if (toasts.length === 0) {
-                if (_hadFocus) { window.electronAPI?.requestOverlayFocus?.(false); _hadFocus = false; }
-                return;
-            }
-            let over = false;
-            for (const t of toasts) {
-                const rect = t.getBoundingClientRect();
-                if (e.clientX >= rect.left && e.clientX <= rect.right &&
-                    e.clientY >= rect.top  && e.clientY <= rect.bottom) { over = true; break; }
-            }
-            if (over && !_hadFocus) {
-                window.electronAPI?.requestOverlayFocus?.(true);
-                _hadFocus = true;
-            } else if (!over && _hadFocus) {
-                window.electronAPI?.requestOverlayFocus?.(false);
-                _hadFocus = false;
-            }
-        });
-    }
-
     function init() {
         setInterval(tickTimes, 1000);
         setTimeout(loadInitial, 3500);
-        startGlobalCursorTrack();
     }
 
     return { init, add, update, remove, render, loadInitial, _testFake };

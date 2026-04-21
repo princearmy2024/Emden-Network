@@ -1030,6 +1030,38 @@ app.whenReady().then(() => {
         globalShortcut.register('Control+4', modPanelHandler);
     }
 
+    // Ctrl+Shift+D: DevTools fuer Overlay oder Main (als detached Fenster)
+    globalShortcut.register('CommandOrControl+Shift+D', () => {
+        let target = null;
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed()) {
+            target = robloxOverlayWin;
+        } else if (mainWindow && !mainWindow.isDestroyed()) {
+            target = mainWindow;
+        }
+        if (!target) return;
+        try {
+            if (target.webContents.isDevToolsOpened()) {
+                target.webContents.closeDevTools();
+            } else {
+                target.webContents.openDevTools({ mode: 'detach' });
+            }
+        } catch(e) { console.error('[DevTools] Fehler:', e.message); }
+    });
+    // Alias fuer Legacy F12
+    globalShortcut.register('F12', () => {
+        let target = null;
+        if (robloxOverlayWin && !robloxOverlayWin.isDestroyed() && robloxOverlayWin.isVisible()) {
+            target = robloxOverlayWin;
+        } else if (mainWindow && !mainWindow.isDestroyed()) {
+            target = mainWindow;
+        }
+        if (!target) return;
+        try {
+            if (target.webContents.isDevToolsOpened()) target.webContents.closeDevTools();
+            else target.webContents.openDevTools({ mode: 'detach' });
+        } catch(_) {}
+    });
+
     // Wenn F4-Registrierung fehlgeschlagen ist → Dashboard-Hinweis
     if (!f4Ok && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.once('did-finish-load', () => {
