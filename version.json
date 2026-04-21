@@ -1,6 +1,6 @@
 {
-    "version": "4.66.5",
+    "version": "4.66.6",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.5: Support-Click Aggressive-Fix + DevTools Shortcut. Sobald EIN Support-Toast sichtbar ist, wird das Overlay voll klickbar (requestOverlayFocus(true)) — kein Cursor-Tracking mehr noetig. X wegklicken macht's wieder click-through. NEU: Ctrl+Shift+D oder F12 oeffnet DevTools als separates Fenster fuer Overlay/Main — du siehst jetzt die Console zum Debuggen.",
+    "notes": "v4.66.6: Support-Toast Success-Animation. Beim erfolgreichen Uebernehmen pulst der Toast gruen, zeigt einen animierten Checkmark mit 'User → Channel'-Info, und faded nach 2s weg. Wenn ein anderer Staff uebernimmt, erscheint die gleiche Animation mit dessen Namen. Toast-Position von top:80px auf 140px verschoben (weiter runter).",
     "forceUpdate": false
 }

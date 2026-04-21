@@ -2175,6 +2175,30 @@ const SupportOverlay = (() => {
         toast._errTimer = setTimeout(() => { errEl?.remove(); }, 5000);
     }
 
+    function playTookAnimation(caseId, byText) {
+        const toast = document.querySelector(`.sup-ov-toast[data-case-id="${caseId}"]`);
+        if (!toast) return;
+        toast.classList.add('took');
+        // Overlay-Badge (Checkmark + Text)
+        const badge = document.createElement('div');
+        badge.className = 'sup-ov-took-badge';
+        badge.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>${byText || 'Übernommen!'}</span>
+        `;
+        toast.appendChild(badge);
+        // Fade-out nach 2s
+        setTimeout(() => {
+            toast.classList.add('fading-out');
+            setTimeout(() => {
+                dismissedIds.add(caseId);
+                render();
+            }, 600);
+        }, 2000);
+    }
+
     async function take(caseId, btn) {
         console.log('[SupportOverlay] take() called for', caseId);
         const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
@@ -2193,9 +2217,8 @@ const SupportOverlay = (() => {
                 showInlineError(caseId, d.error || ('HTTP ' + r.status));
                 return;
             }
-            // Success → dismiss local toast
-            dismissedIds.add(caseId);
-            render();
+            // Success → animate + dismiss
+            playTookAnimation(caseId, `✓ ${d.userName || 'User'} → ${d.movedToChannelName || 'Support'}`);
         } catch (e) {
             if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
             console.error('[SupportOverlay] take error:', e);
@@ -2213,6 +2236,14 @@ const SupportOverlay = (() => {
         const prev = cases.get(c.caseId);
         cases.set(c.caseId, { ...(prev || {}), ...c });
         render();
+        // Wenn STATUS gerade auf 'taken' gewechselt hat und Toast noch sichtbar ist
+        // → Animation abspielen (z.B. ein anderer Staff hat uebernommen)
+        if (c.status === 'taken' && !dismissedIds.has(c.caseId)) {
+            // Warten bis DOM gerendert ist, dann Animation
+            setTimeout(() => {
+                playTookAnimation(c.caseId, `✓ Übernommen von ${c.takenByName || 'Staff'}`);
+            }, 50);
+        }
     }
     function remove(caseId) {
         if (!caseId) return;

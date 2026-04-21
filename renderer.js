@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.66.5'; // Stand: 21.04.2026
+let CURRENT_VERSION = '4.66.6'; // Stand: 21.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
