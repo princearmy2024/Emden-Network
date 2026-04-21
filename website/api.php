@@ -138,8 +138,8 @@ if ($endpoint === 'roblox-search') {
 header('Content-Type: application/json');
 
 // Erlaubte Endpoints (sowohl GET als auch POST)
-$allowedGet  = ['status', 'team', 'mod-history', 'mod-log', 'on-duty', 'gsg9', 'mobile-version', 'shifts', 'streaks', 'storage', 'roblox/profile'];
-$allowedPost = ['verify', 'heartbeat', 'mod-action', 'check-staff', 'check-lead', 'shift/start', 'shift/pause', 'shift/end', 'shift/manage', 'link-roblox', 'roblox/start-verify', 'roblox/confirm-verify'];
+$allowedGet  = ['status', 'team', 'mod-history', 'mod-log', 'on-duty', 'gsg9', 'mobile-version', 'shifts', 'streaks', 'storage', 'roblox/profile', 'support-cases/open'];
+$allowedPost = ['verify', 'heartbeat', 'mod-action', 'check-staff', 'check-lead', 'shift/start', 'shift/pause', 'shift/end', 'shift/manage', 'link-roblox', 'roblox/start-verify', 'roblox/confirm-verify', 'support-case/take'];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $isPost = $method === 'POST';

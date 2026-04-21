@@ -456,6 +456,30 @@ async function rebuildSupportCaseMessage(caseId) {
     await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 }).catch(e => console.warn('[Support] rebuildCaseMessage edit fehlgeschlagen:', e.message));
 }
 
+// Stale-Case-Cleanup: alte Cases (>30min + User nicht im Warteraum) schliessen
+const SUPPORT_CASE_STALE_MS = 30 * 60 * 1000; // 30 Minuten
+async function cleanupStaleCases() {
+    try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (!guild) return;
+        const warteraum = guild.channels.cache.get(SUPPORT_VOICE_CHANNEL_ID);
+        const now = Date.now();
+        let closed = 0;
+        for (const caseId of Object.keys(supportCases)) {
+            const sCase = supportCases[caseId];
+            if (sCase.status === 'closed') continue;
+            const age = now - (sCase.createdAt || 0);
+            const userInWarteraum = warteraum?.members?.has(sCase.userId) || false;
+            // Schliessen wenn: alt UND User nicht mehr im Warteraum (Ghost-Case)
+            if (age > SUPPORT_CASE_STALE_MS && !userInWarteraum) {
+                await closeSupportCase(sCase, { applyBlock: false }).catch(() => {});
+                closed++;
+            }
+        }
+        if (closed > 0) console.log(`[Support] Cleanup: ${closed} stale Cases geschlossen.`);
+    } catch(e) { console.warn('[Support] cleanupStaleCases:', e.message); }
+}
+
 async function closeSupportCase(sCase, { applyBlock = true } = {}) {
     if (!sCase || sCase.status === 'closed') return;
     sCase.status = 'closed';
@@ -1639,10 +1663,11 @@ const apiServer = http.createServer(async (req, res) => {
     }
 
     // POST /api/heartbeat
-    // GET /api/support-cases/open — staff-only Liste offener Cases
+    // GET /api/support-cases/open — staff-only Liste offener Cases (ohne Ghost-Cases)
     if (req.method === "GET" && url.pathname === "/api/support-cases/open") {
+        const now = Date.now();
         const open = Object.values(supportCases)
-            .filter(c => c.status === 'open')
+            .filter(c => c.status === 'open' && (now - (c.createdAt || 0)) < SUPPORT_CASE_STALE_MS)
             .map(c => supportCaseSnapshot(c))
             .sort((a, b) => a.createdAt - b.createdAt);
         res.writeHead(200);
@@ -3599,6 +3624,10 @@ client.once("ready", async () => {
 
     await checkGithubRelease();
     setInterval(checkGithubRelease, 5 * 60 * 1000);
+
+    // Support-Cases Cleanup: einmal beim Start + alle 10min
+    await cleanupStaleCases();
+    setInterval(cleanupStaleCases, 10 * 60 * 1000);
 
     // Live-Shift-Leaderboard: falls Panel jemals initialisiert → alle 60s aktualisieren
     startLeaderboardLoop();

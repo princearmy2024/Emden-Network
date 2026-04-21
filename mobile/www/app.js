@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.66.9'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.66.10'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -1533,7 +1533,8 @@ const SupportMobile = (() => {
         if (!u) return;
         if (btn) { btn.disabled = true; btn.textContent = '...'; }
         try {
-            const r = await fetch(CONFIG.API_URL_DIRECT + '/api/support-case/take', {
+            // PHP-Proxy (HTTPS) statt API_URL_DIRECT (HTTP, auf Android geblockt)
+            const r = await fetch(apiUrl('/api/support-case/take'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
                 body: JSON.stringify({ caseId, discordId: u.discordId }),
@@ -1565,7 +1566,7 @@ const SupportMobile = (() => {
         if (!u || !App._isStaff()) return;
         try {
             const r = await fetch(
-                `${CONFIG.API_URL_DIRECT}/api/support-cases/open?discordId=${encodeURIComponent(u.discordId)}`,
+                apiUrl('/api/support-cases/open', { discordId: u.discordId }),
                 { headers: { 'x-api-key': CONFIG.API_KEY } }
             );
             if (!r.ok) return;

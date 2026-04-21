@@ -1,6 +1,6 @@
 {
-    "version": "4.66.9",
+    "version": "4.66.10",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.9: Support-Rejoin-Bug + Scroll-Stack. BUG FIX: Wenn User aus Support 1-5 zurueck in Warteraum geht, wird alter Case jetzt richtig geschlossen (ohne Block) und ein neuer kann sofort erstellt werden. Zuvor blieb Case auf 'taken' → neue Cases wurden uebersprungen. SCROLL: Toast-Stack zeigt max 2 Toasts, ab 3+ wird scrollbar (orange scrollbar, 6px). BOT NEU HOCHLADEN + NEU STARTEN auf Cybrancee!",
+    "notes": "v4.66.10: Mobile-Fix + Ghost-Case-Cleanup. (1) Mobile ging nicht weil API_URL_DIRECT (HTTP) auf Android geblockt ist — jetzt via PHP-HTTPS-Proxy. api.php Whitelist um support-case/take + support-cases/open erweitert. (2) Alte Ghost-Cases (z.B. 66h alt) wurden immer noch angezeigt — Bot raeumt jetzt automatisch stale Cases auf (>30min + User nicht im Warteraum). Startup-Cleanup + alle 10min. BOT-CODE + api.php neu hochladen!",
     "forceUpdate": false
 }
