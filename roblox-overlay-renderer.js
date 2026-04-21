@@ -2091,18 +2091,14 @@ const SupportOverlay = (() => {
         const visible = Array.from(cases.values()).filter(c => !dismissedIds.has(c.caseId));
         if (visible.length === 0) {
             stack.innerHTML = '';
-            // Kein Toast mehr → Overlay wieder click-through (wenn zuvor Focus granted)
             if (_forceFocus) {
                 window.electronAPI?.requestOverlayFocus?.(false);
                 _forceFocus = false;
             }
             return;
         }
-        // Mindestens ein Toast sichtbar → Overlay voll klickbar (sonst Click-Loss!)
-        if (!_forceFocus) {
-            window.electronAPI?.requestOverlayFocus?.(true);
-            _forceFocus = true;
-        }
+        // Focus wird NUR granted wenn Maus tatsaechlich ueber dem Toast ist
+        // (via startCursorTracker) — blockt sonst Roblox-Input nicht
         const list = visible.sort((a,b) => a.createdAt - b.createdAt);
         stack.innerHTML = list.map(c => {
             const taken = c.status === 'taken';
@@ -2299,9 +2295,43 @@ const SupportOverlay = (() => {
         console.log('[SupportOverlay] Test-Case gespawnt. Sollte oben-zentral sichtbar sein.');
     }
 
+    // Cursor-Tracker: gibt Focus nur frei wenn Maus im Toast-Bereich ist (+ 40px Buffer).
+    // So bleibt Roblox-Input normal nutzbar wenn User nicht interagieren will.
+    function startCursorTracker() {
+        const BUFFER = 40; // Pixels rund um den Toast — Focus schon granted kurz vor Kontakt
+        document.addEventListener('mousemove', (e) => {
+            const stack = document.getElementById('supOverlayStack');
+            if (!stack) return;
+            const toasts = stack.querySelectorAll('.sup-ov-toast');
+            if (toasts.length === 0) {
+                if (_forceFocus) {
+                    window.electronAPI?.requestOverlayFocus?.(false);
+                    _forceFocus = false;
+                }
+                return;
+            }
+            let over = false;
+            for (const t of toasts) {
+                const r = t.getBoundingClientRect();
+                if (e.clientX >= r.left - BUFFER && e.clientX <= r.right + BUFFER &&
+                    e.clientY >= r.top - BUFFER  && e.clientY <= r.bottom + BUFFER) {
+                    over = true; break;
+                }
+            }
+            if (over && !_forceFocus) {
+                window.electronAPI?.requestOverlayFocus?.(true);
+                _forceFocus = true;
+            } else if (!over && _forceFocus) {
+                window.electronAPI?.requestOverlayFocus?.(false);
+                _forceFocus = false;
+            }
+        });
+    }
+
     function init() {
         setInterval(tickTimes, 1000);
         setTimeout(loadInitial, 3500);
+        startCursorTracker();
     }
 
     return { init, add, update, remove, render, loadInitial, _testFake };

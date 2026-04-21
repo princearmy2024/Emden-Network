@@ -1,6 +1,6 @@
 {
-    "version": "4.66.7",
+    "version": "4.66.8",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.7: Support-Take DiscordID-Fallback. Overlay.getDiscordId() gab leeren String zurueck wenn URL-Param nicht gesetzt war → 'Keine Discord-ID' Fehler. Jetzt Fallback auf localStorage en_session.user.discordId, ist also auch dann verfuegbar wenn Overlay ohne Query-Param geoeffnet wurde.",
+    "notes": "v4.66.8: Support-Toast blockt Roblox-Input nicht mehr. Statt aggressivem Focus-Grab (blockte alles solange Toast sichtbar) jetzt Cursor-basiert mit 40px Buffer: Focus wird NUR granted wenn deine Maus wirklich ueber dem Toast ist. Ansonsten laeuft Roblox-Input normal weiter — keine Blockaden mehr waehrend Ankuendigungen.",
     "forceUpdate": false
 }
