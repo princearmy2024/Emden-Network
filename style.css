@@ -4082,3 +4082,118 @@ body.has-custom-bg .gif-picker-panel {
     0%, 100% { transform: scaleY(0.4); }
     50% { transform: scaleY(1); }
 }
+
+/* ============================================================
+   SUPPORT-ANFRAGEN (Dashboard) — Live-Cards vom Bot
+   ============================================================ */
+.support-cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+.sup-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 179, 71, 0.35);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    animation: supFadeIn 0.3s ease-out;
+    box-shadow: 0 0 0 1px rgba(255, 179, 71, 0.1), 0 4px 16px rgba(0,0,0,0.25);
+}
+@keyframes supFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.sup-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top left, rgba(255, 179, 71, 0.1), transparent 60%);
+    pointer-events: none;
+}
+.sup-card .sup-avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 179, 71, 0.4);
+}
+.sup-card .sup-avatar.fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 179, 71, 0.15);
+    color: #ffb347;
+    font-weight: 700;
+    font-size: 16px;
+}
+.sup-card-body {
+    flex: 1;
+    min-width: 0;
+}
+.sup-card-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sup-card-meta {
+    font-size: 11px;
+    color: var(--text-sub);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.sup-card-meta .dot-warn {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ffb347;
+    animation: supPulseDot 1s ease-in-out infinite;
+}
+@keyframes supPulseDot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+.sup-take-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.sup-take-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+}
+.sup-take-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.sup-card.taken {
+    border-color: rgba(77, 166, 255, 0.3);
+    opacity: 0.75;
+}
+.sup-card.taken .sup-take-btn {
+    background: rgba(255,255,255,0.08);
+    color: var(--text-sub);
+}

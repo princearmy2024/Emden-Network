@@ -1273,6 +1273,97 @@ body.no-shimmer #panel-left::after, body.no-shimmer #panel-right::after { displa
 
 /* ── Mod Notification (top center, glass) ── */
 /* iOS-style Glass Notification — fade to transparent at bottom */
+/* Support-Case Overlay Toast (Staff-only) */
+.sup-ov-toast {
+    pointer-events: auto;
+    background: linear-gradient(135deg, rgba(20,10,0,.95), rgba(30,15,0,.88));
+    border: 1px solid rgba(255, 179, 71, 0.55);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255, 179, 71, 0.15), 0 0 24px rgba(255, 179, 71, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    transform: translateY(-12px);
+    opacity: 0;
+    transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    color: #fff;
+}
+.sup-ov-toast.show { transform: translateY(0); opacity: 1; }
+.sup-ov-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 179, 71, 0.5);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.sup-ov-avatar.fallback {
+    background: rgba(255, 179, 71, 0.15);
+    color: #ffb347;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+}
+.sup-ov-body {
+    flex: 1;
+    min-width: 0;
+}
+.sup-ov-title {
+    font-size: 11px;
+    color: #ffb347;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+}
+.sup-ov-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ffb347;
+    animation: supOvPulse 1s ease-in-out infinite;
+}
+@keyframes supOvPulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.sup-ov-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.sup-ov-meta {
+    font-size: 10px;
+    color: rgba(255,255,255,.55);
+    margin-top: 1px;
+}
+.sup-ov-btn {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.sup-ov-btn:hover { transform: translateY(-1px); }
+.sup-ov-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.5);
+    transform: none;
+}
+
 .ov-mod-notif {
     position: fixed;
     top: clamp(40px, 5vh, 65px);
@@ -1989,6 +2080,21 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     </div>
   </div>
 </div>
+
+<!-- Support-Cases Container (Toasts, Staff-only, appended by JS) -->
+<div id="supOverlayStack" style="
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100000;
+    pointer-events: none;
+    max-width: 420px;
+    width: 94%;
+"></div>
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

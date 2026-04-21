@@ -50,6 +50,7 @@ const Overlay = (() => {
         robloxId   = p.get('robloxId')  || '';
         isAdmin    = p.get('admin') === '1';
         const isStaff = p.get('staff') === '1';
+        window._isStaff = isStaff;
         voiceDiscordId = discordId;
 
         // User-Info aus dem Dashboard localStorage lesen
@@ -780,6 +781,11 @@ const Overlay = (() => {
         socket.on('shift_update', (data) => {
             if (data.discordId === discordId) OverlayShift._syncFromServer(data);
         });
+
+        // Support-Case Live-Panel (Staff-only)
+        socket.on('support_case_new',    (c) => SupportOverlay.add(c));
+        socket.on('support_case_update', (c) => SupportOverlay.update(c));
+        socket.on('support_case_closed', (c) => SupportOverlay.remove(c.caseId));
 
         // Mod-Eintrag: Custom Notification (top, glass, sound)
         socket.on('mod_new_entry', (entry) => {
@@ -2058,9 +2064,143 @@ const OverlayShift = {
 
 window.OverlayShift = OverlayShift;
 
+// ════════════════════════════════════════════════════════════════
+// SUPPORT-CASES OVERLAY TOAST — Staff-only, erscheint top-center
+// Bei Klick auf "Uebernehmen" ruft /api/support-case/take, Bot moved
+// User zu Staff's Voice-Channel (muss in Voice sein).
+// ════════════════════════════════════════════════════════════════
+const SupportOverlay = (() => {
+    const cases = new Map();
+
+    function iAmStaff() {
+        return !!window.Overlay && (Overlay.getRobloxUsername !== undefined) && window._isStaff;
+    }
+
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function secondsAgo(ts) {
+        const d = Math.floor((Date.now() - (ts||0)) / 1000);
+        if (d < 60) return d + 's';
+        return Math.floor(d/60) + 'm ' + (d%60) + 's';
+    }
+
+    function render() {
+        const stack = document.getElementById('supOverlayStack');
+        if (!stack) return;
+        if (!iAmStaff() || cases.size === 0) {
+            stack.innerHTML = '';
+            return;
+        }
+        const list = Array.from(cases.values()).sort((a,b) => a.createdAt - b.createdAt);
+        stack.innerHTML = list.map(c => {
+            const taken = c.status === 'taken';
+            const av = c.avatarUrl
+                ? `<img class="sup-ov-avatar" src="${escapeHtml(c.avatarUrl)}" alt="">`
+                : `<div class="sup-ov-avatar fallback">${escapeHtml((c.username||'?').charAt(0).toUpperCase())}</div>`;
+            return `
+                <div class="sup-ov-toast show" data-case-id="${escapeHtml(c.caseId)}">
+                    ${av}
+                    <div class="sup-ov-body">
+                        <div class="sup-ov-title">Support #S-${escapeHtml(c.caseId)}</div>
+                        <div class="sup-ov-name">${escapeHtml(c.username)}</div>
+                        <div class="sup-ov-meta sup-ov-wait" data-ts="${c.createdAt}">wartet ${secondsAgo(c.createdAt)}${taken ? ' · übernommen' : ''}</div>
+                    </div>
+                    <button class="sup-ov-btn" ${taken ? 'disabled' : ''} data-case-id="${escapeHtml(c.caseId)}">
+                        ${taken ? '✓' : '→ Übernehmen'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        stack.querySelectorAll('.sup-ov-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => window.electronAPI?.requestOverlayFocus?.(true));
+            btn.addEventListener('mouseleave', () => window.electronAPI?.requestOverlayFocus?.(false));
+            btn.addEventListener('click', () => take(btn.dataset.caseId, btn));
+        });
+    }
+
+    function tickTimes() {
+        document.querySelectorAll('.sup-ov-wait').forEach(el => {
+            const ts = parseInt(el.dataset.ts, 10);
+            if (!isNaN(ts)) {
+                const sCase = cases.get(el.closest('.sup-ov-toast')?.dataset.caseId);
+                const taken = sCase && sCase.status === 'taken';
+                el.textContent = 'wartet ' + secondsAgo(ts) + (taken ? ' · übernommen' : '');
+            }
+        });
+    }
+
+    async function take(caseId, btn) {
+        const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        if (!myId) return;
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/support-case/take`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ caseId, discordId: myId }),
+            });
+            const d = await r.json().catch(()=>({}));
+            if (!r.ok || !d.ok) {
+                if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
+                alert('Support: ' + (d.error || ('HTTP ' + r.status)));
+                return;
+            }
+        } catch (e) {
+            if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
+            console.error('[SupportOverlay] take error:', e);
+        }
+    }
+
+    function add(c) {
+        if (!c || !c.caseId) return;
+        cases.set(c.caseId, c);
+        render();
+    }
+    function update(c) {
+        if (!c || !c.caseId) return;
+        const prev = cases.get(c.caseId);
+        cases.set(c.caseId, { ...(prev || {}), ...c });
+        render();
+    }
+    function remove(caseId) {
+        if (!caseId) return;
+        cases.delete(caseId);
+        render();
+    }
+
+    async function loadInitial() {
+        if (!iAmStaff()) return;
+        const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        if (!myId) return;
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/support-cases/open?discordId=${encodeURIComponent(myId)}`, {
+                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
+            });
+            if (!r.ok) return;
+            const d = await r.json();
+            if (Array.isArray(d.cases)) {
+                d.cases.forEach(c => cases.set(c.caseId, c));
+                render();
+            }
+        } catch (_) {}
+    }
+
+    function init() {
+        setInterval(tickTimes, 1000);
+        setTimeout(loadInitial, 3500);
+    }
+
+    return { init, add, update, remove, render, loadInitial };
+})();
+window.SupportOverlay = SupportOverlay;
 
 window.addEventListener('DOMContentLoaded', () => {
     Overlay.init();
     // Load shift state after a short delay (socket needs to connect first)
     setTimeout(() => OverlayShift.loadFromServer(), 2000);
+    SupportOverlay.init();
 });

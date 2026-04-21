@@ -1,6 +1,6 @@
 {
-    "version": "4.65.1",
+    "version": "4.66.0",
     "releaseDate": "2026-04-19",
-    "notes": "v4.65.1: Soundboard im Dashboard — Grid mit Sound-Tiles, pre-populated mit bestehenden App-Sounds (Walkie-Start, Chirp, Ticket, Notification, Support, Error, Start, Out). Click = Play, nochmal = Stop, animiert mit pulsierendem Icon + Progress-Bar + Wave-Bars. Eigene MP3/WAV/OGG per 'Sound hinzufügen'-Button. Volume pro Tile + Master-Volume. Rechtsklick = Umbenennen/Entfernen. Config persistiert in localStorage.",
+    "notes": "v4.66.0: Support-Cases jetzt auf allen 3 Surfaces. Bot broadcastet support_case_new/_update/_closed via Socket.IO, neue HTTP-Endpoints /api/support-cases/open + /api/support-case/take. Dashboard hat 'Support-Anfragen' Section auf Overview (staff-only), Mobile hat Section auf Home, Roblox-Overlay hat Staff-Toast top-center. Klick auf Uebernehmen moved User in Staff's Voice-Channel — wie der Discord-Button. BOT-CODE MUSS NEU AUF CYBRANCEE HOCHGELADEN WERDEN.",
     "forceUpdate": false
 }

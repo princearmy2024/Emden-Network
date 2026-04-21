@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.65.1'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.66.0'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -121,6 +121,11 @@ function connectSocket() {
             tag: 'en-support-' + (data.userId || Date.now()),
         });
     });
+
+    // Support-Cases Live-Panel (staff)
+    socket.on('support_case_new',    (c) => SupportMobile.add(c));
+    socket.on('support_case_update', (c) => SupportMobile.update(c));
+    socket.on('support_case_closed', (c) => SupportMobile.remove(c.caseId));
 
     // Streak (eigener)
     socket.on('streak_complete', (data) => {
@@ -1463,5 +1468,127 @@ const App = {
     },
 };
 
+// ════════════════════════════════════════════════════════════════
+// SUPPORT CASES (Mobile, Staff-only)
+// ════════════════════════════════════════════════════════════════
+const SupportMobile = (() => {
+    const cases = new Map();
+
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function secondsAgo(ts) {
+        const d = Math.floor((Date.now() - (ts||0)) / 1000);
+        if (d < 60) return d + 's';
+        return Math.floor(d/60) + 'm ' + (d%60) + 's';
+    }
+
+    function render() {
+        const card = document.getElementById('homeSupportCases');
+        const list = document.getElementById('supMobileList');
+        const sub = document.getElementById('supMobileSub');
+        if (!card || !list) return;
+        if (!App._isStaff() || cases.size === 0) {
+            card.classList.add('hidden');
+            return;
+        }
+        const arr = Array.from(cases.values()).sort((a,b) => a.createdAt - b.createdAt);
+        card.classList.remove('hidden');
+        if (sub) sub.textContent = arr.length + ' offen';
+
+        list.innerHTML = arr.map(c => {
+            const taken = c.status === 'taken';
+            const av = c.avatarUrl
+                ? `<img src="${escapeHtml(c.avatarUrl)}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,179,71,.4);flex-shrink:0;">`
+                : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(255,179,71,.15);color:#ffb347;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${escapeHtml((c.username||'?').charAt(0).toUpperCase())}</div>`;
+            return `
+                <div style="display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.25);" data-case-id="${escapeHtml(c.caseId)}">
+                    ${av}
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;color:#fff;">${escapeHtml(c.username)}</div>
+                        <div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px;" data-ts="${c.createdAt}" class="sup-mobile-wait">wartet ${secondsAgo(c.createdAt)}${taken ? ' · übernommen' : ''}</div>
+                    </div>
+                    <button onclick="SupportMobile.take('${escapeHtml(c.caseId)}', this)" ${taken ? 'disabled' : ''} style="padding:8px 12px;border:none;border-radius:8px;background:${taken ? 'rgba(255,255,255,.08)' : 'linear-gradient(135deg,#22c55e,#16a34a)'};color:${taken ? 'rgba(255,255,255,.5)' : '#fff'};font-size:11px;font-weight:700;cursor:${taken ? 'default' : 'pointer'};white-space:nowrap;">
+                        ${taken ? '✓' : '→ Übernehmen'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function tickTimes() {
+        document.querySelectorAll('.sup-mobile-wait').forEach(el => {
+            const ts = parseInt(el.dataset.ts, 10);
+            if (isNaN(ts)) return;
+            const cid = el.closest('[data-case-id]')?.dataset.caseId;
+            const c = cid ? cases.get(cid) : null;
+            const taken = c && c.status === 'taken';
+            el.textContent = 'wartet ' + secondsAgo(ts) + (taken ? ' · übernommen' : '');
+        });
+    }
+
+    async function take(caseId, btn) {
+        const u = Auth?.user;
+        if (!u) return;
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        try {
+            const r = await fetch(CONFIG.API_URL_DIRECT + '/api/support-case/take', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': CONFIG.API_KEY },
+                body: JSON.stringify({ caseId, discordId: u.discordId }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) {
+                if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
+                alert(d.error || ('HTTP ' + r.status));
+                return;
+            }
+            App._notifyRaw?.({ title: 'Übernommen', body: `${d.userName} → ${d.movedToChannelName}` });
+        } catch (e) {
+            console.error('[SupportMobile] take:', e);
+            if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
+        }
+    }
+
+    function add(c) { if (!c?.caseId) return; cases.set(c.caseId, c); render(); }
+    function update(c) {
+        if (!c?.caseId) return;
+        const prev = cases.get(c.caseId);
+        cases.set(c.caseId, { ...(prev || {}), ...c });
+        render();
+    }
+    function remove(caseId) { if (!caseId) return; cases.delete(caseId); render(); }
+
+    async function loadInitial() {
+        const u = Auth?.user;
+        if (!u || !App._isStaff()) return;
+        try {
+            const r = await fetch(
+                `${CONFIG.API_URL_DIRECT}/api/support-cases/open?discordId=${encodeURIComponent(u.discordId)}`,
+                { headers: { 'x-api-key': CONFIG.API_KEY } }
+            );
+            if (!r.ok) return;
+            const d = await r.json();
+            if (Array.isArray(d.cases)) {
+                cases.clear();
+                d.cases.forEach(c => cases.set(c.caseId, c));
+                render();
+            }
+        } catch (_) {}
+    }
+
+    function init() {
+        setInterval(tickTimes, 1000);
+        setTimeout(loadInitial, 3500);
+    }
+
+    return { init, add, update, remove, take, render };
+})();
+window.SupportMobile = SupportMobile;
+
 // Boot
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+    SupportMobile.init();
+});

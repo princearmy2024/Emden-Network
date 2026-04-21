@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.65.1'; // Stand: 19.04.2026
+let CURRENT_VERSION = '4.66.0'; // Stand: 19.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -275,6 +275,11 @@ const WebSocketService = {
                     try { const a = new Audio(App.getSoundFile('sound_support')); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
                 }
             });
+
+            // Support-Case Live-Panel (staff-only)
+            this.socket.on('support_case_new',    (c) => SupportCases.add(c));
+            this.socket.on('support_case_update', (c) => SupportCases.update(c));
+            this.socket.on('support_case_closed', (c) => SupportCases.remove(c.caseId));
 
             // 🔥 Streak Complete
             this.socket.on('streak_complete', (data) => {
@@ -5426,7 +5431,171 @@ const Soundboard = (() => {
 
 window.Soundboard = Soundboard;
 
+// ════════════════════════════════════════════════════════════════
+// SUPPORT-CASES — Live Panel auf Overview (Staff-only)
+// Empfaengt support_case_new / _update / _closed vom Bot und
+// rendert Cards mit Uebernehmen-Button. Click ruft Bot-HTTP
+// /api/support-case/take — Bot moved User zu Staff's Voice-Channel.
+// ════════════════════════════════════════════════════════════════
+const SupportCases = (() => {
+    const cases = new Map(); // caseId -> snapshot
+    let initialLoadDone = false;
+
+    function isStaff() {
+        const u = (window.AuthService && AuthService.getUser()) || null;
+        return !!(u && (u.role === 'staff' || u.role === 'admin' || u.isStaff));
+    }
+
+    function secondsAgo(ts) {
+        const diff = Math.floor((Date.now() - (ts || 0)) / 1000);
+        if (diff < 60) return diff + 's';
+        const m = Math.floor(diff / 60);
+        return m + 'm ' + (diff % 60) + 's';
+    }
+
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function avatarFallback(name) {
+        const init = (name || '?').trim().charAt(0).toUpperCase();
+        return `<div class="sup-avatar fallback">${init}</div>`;
+    }
+
+    function render() {
+        const sec = document.getElementById('supportCasesSection');
+        const grid = document.getElementById('supportCasesGrid');
+        const countEl = document.getElementById('supportCasesCount');
+        if (!sec || !grid) return;
+
+        if (!isStaff() || cases.size === 0) {
+            sec.style.display = 'none';
+            return;
+        }
+
+        const list = Array.from(cases.values()).sort((a, b) => a.createdAt - b.createdAt);
+        sec.style.display = '';
+        if (countEl) countEl.textContent = list.length + ' offen';
+
+        grid.innerHTML = list.map(c => {
+            const avatar = c.avatarUrl
+                ? `<img class="sup-avatar" src="${escapeHtml(c.avatarUrl)}" alt="" onerror="this.replaceWith(this.cloneNode(false));">`
+                : avatarFallback(c.username);
+            const taken = c.status === 'taken';
+            const btnLabel = taken
+                ? `Von ${escapeHtml(c.takenByName || '…')} übernommen`
+                : `Übernehmen`;
+            return `
+                <div class="sup-card ${taken ? 'taken' : ''}" data-case-id="${escapeHtml(c.caseId)}">
+                    ${avatar}
+                    <div class="sup-card-body">
+                        <div class="sup-card-name">${escapeHtml(c.username)}</div>
+                        <div class="sup-card-meta">
+                            <span class="dot-warn"></span>
+                            <span>#S-${escapeHtml(c.caseId)}</span>
+                            <span>·</span>
+                            <span class="sup-waiting" data-ts="${c.createdAt}">wartet ${secondsAgo(c.createdAt)}</span>
+                        </div>
+                    </div>
+                    <button class="sup-take-btn" ${taken ? 'disabled' : ''} onclick="SupportCases.take('${escapeHtml(c.caseId)}', this)">
+                        ${taken ? '✓' : '→'} ${btnLabel}
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 1s tick to update "wartet Xm Ys" text live
+    function tickWaitingTimes() {
+        document.querySelectorAll('.sup-waiting').forEach(el => {
+            const ts = parseInt(el.dataset.ts, 10);
+            if (!isNaN(ts)) el.textContent = 'wartet ' + secondsAgo(ts);
+        });
+    }
+
+    function add(c) {
+        if (!c || !c.caseId) return;
+        cases.set(c.caseId, c);
+        render();
+    }
+    function update(c) {
+        if (!c || !c.caseId) return;
+        const prev = cases.get(c.caseId);
+        cases.set(c.caseId, { ...(prev || {}), ...c });
+        render();
+    }
+    function remove(caseId) {
+        if (!caseId) return;
+        cases.delete(caseId);
+        render();
+    }
+
+    async function take(caseId, btnEl) {
+        const u = (window.AuthService && AuthService.getUser()) || null;
+        if (!u) return;
+        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '… moved'; }
+        try {
+            const resp = await fetch(CONFIG.API_URL + '/api/support-case/take', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': CONFIG.API_KEY,
+                },
+                body: JSON.stringify({ caseId, discordId: u.discordId }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.ok) {
+                const errMsg = data.error || `HTTP ${resp.status}`;
+                if (window.NotificationService) NotificationService.show('Support', errMsg, 'error');
+                else alert(errMsg);
+                if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Übernehmen'; }
+                return;
+            }
+            if (window.NotificationService) {
+                NotificationService.show('✅ Übernommen', `${data.userName} → ${data.movedToChannelName}`, 'success');
+            }
+        } catch (e) {
+            console.error('[SupportCases] take error:', e);
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Übernehmen'; }
+        }
+    }
+
+    async function loadInitial() {
+        if (initialLoadDone) return;
+        const u = (window.AuthService && AuthService.getUser()) || null;
+        if (!u || !isStaff()) return;
+        try {
+            const resp = await fetch(
+                CONFIG.API_URL + '/api/support-cases/open?discordId=' + encodeURIComponent(u.discordId),
+                { headers: { 'x-api-key': CONFIG.API_SECRET } }
+            );
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (Array.isArray(data.cases)) {
+                cases.clear();
+                data.cases.forEach(c => cases.set(c.caseId, c));
+                render();
+            }
+            initialLoadDone = true;
+        } catch (e) {
+            console.warn('[SupportCases] loadInitial fail:', e.message);
+        }
+    }
+
+    function init() {
+        setInterval(tickWaitingTimes, 1000);
+        // Initial-Load leicht verzoegert, damit Socket + Auth bereit sind
+        setTimeout(loadInitial, 3500);
+    }
+
+    return { init, add, update, remove, take, render, loadInitial };
+})();
+
+window.SupportCases = SupportCases;
+
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
     Soundboard.init();
+    SupportCases.init();
 });

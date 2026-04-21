@@ -325,17 +325,81 @@ async function postSupportCase(member) {
             flags: MessageFlags.IsComponentsV2,
             allowedMentions: SUPPORT_PING_ROLE_ID ? { roles: [SUPPORT_PING_ROLE_ID] } : { parse: [] }
         });
+        const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 128 });
         supportCases[caseId] = {
-            caseId, userId: member.id, username,
+            caseId, userId: member.id, username, avatarUrl,
             createdAt: now, channelId: logsChannel.id, messageId: msg.id,
             status: 'open', takenBy: null, takenByName: null, takenAt: null,
             handlingChannelId: null, closedAt: null,
         };
         saveSupportCases();
         console.log(`[Support] Case #S-${caseId} erstellt fuer ${username}`);
+        // Broadcast to connected clients (dashboard, mobile, overlay)
+        try { io.emit('support_case_new', supportCaseSnapshot(supportCases[caseId])); } catch(_) {}
     } catch(e) {
         console.error('[Support] Konnte Case-Nachricht nicht senden:', e.message);
     }
+}
+
+// Snapshot-Shape fuer Socket/HTTP — was Clients zum Rendern brauchen
+function supportCaseSnapshot(sCase) {
+    if (!sCase) return null;
+    return {
+        caseId: sCase.caseId,
+        userId: sCase.userId,
+        username: sCase.username,
+        avatarUrl: sCase.avatarUrl || null,
+        createdAt: sCase.createdAt,
+        status: sCase.status,
+        takenBy: sCase.takenBy,
+        takenByName: sCase.takenByName,
+        takenAt: sCase.takenAt,
+        handlingChannelId: sCase.handlingChannelId,
+        closedAt: sCase.closedAt,
+    };
+}
+
+// Take-Over Logik — wird von Discord-Button UND HTTP-Endpoint genutzt
+async function performSupportTake(caseId, staffDiscordId) {
+    const sCase = supportCases[caseId];
+    if (!sCase) return { ok: false, error: 'Case nicht gefunden.' };
+    if (sCase.status === 'taken')   return { ok: false, error: `Case bereits uebernommen von ${sCase.takenByName || sCase.takenBy}.`, taken: true };
+    if (sCase.status === 'closed')  return { ok: false, error: 'Case bereits geschlossen.' };
+
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (!guild) return { ok: false, error: 'Guild nicht im Cache.' };
+
+    const staff = guild.members.cache.get(staffDiscordId) || await guild.members.fetch(staffDiscordId).catch(() => null);
+    if (!staff) return { ok: false, error: 'Staff-User nicht gefunden.' };
+
+    const EN_TEAM = '1365083291044282389';
+    if (!staff.roles.cache.has(EN_TEAM)) {
+        return { ok: false, error: 'Nur EN-Team kann Cases uebernehmen.' };
+    }
+    const staffVoice = staff.voice.channel;
+    if (!staffVoice) {
+        return { ok: false, error: 'Du musst in einem Voice-Channel sein, damit der User zu dir gemoved werden kann.' };
+    }
+    const userMember = await guild.members.fetch(sCase.userId).catch(() => null);
+    if (!userMember) return { ok: false, error: 'User ist nicht mehr im Server.' };
+    if (!userMember.voice.channel) return { ok: false, error: 'User ist nicht mehr im Voice-Channel.' };
+
+    await userMember.voice.setChannel(staffVoice, `Support #S-${caseId} von ${staff.displayName || staff.user.username}`);
+    sCase.status = 'taken';
+    sCase.takenBy = staff.id;
+    sCase.takenByName = staff.displayName || staff.user.username;
+    sCase.takenAt = Date.now();
+    sCase.handlingChannelId = staffVoice.id;
+    saveSupportCases();
+    await rebuildSupportCaseMessage(caseId);
+    try { io.emit('support_case_update', supportCaseSnapshot(sCase)); } catch(_) {}
+    return {
+        ok: true,
+        movedToChannelId: staffVoice.id,
+        movedToChannelName: staffVoice.name,
+        userName: userMember.displayName || userMember.user.username,
+        staffName: sCase.takenByName,
+    };
 }
 
 async function rebuildSupportCaseMessage(caseId) {
@@ -386,6 +450,7 @@ async function closeSupportCase(sCase, { applyBlock = true } = {}) {
     sCase.closedAt = Date.now();
     saveSupportCases();
     await rebuildSupportCaseMessage(sCase.caseId);
+    try { io.emit('support_case_closed', { caseId: sCase.caseId }); } catch(_) {}
 
     if (!applyBlock) return;
     // Permission-Overwrite: User darf SUPPORT_VOICE_CHANNEL_ID fuer X Minuten nicht mehr betreten
@@ -847,40 +912,15 @@ client.on("interactionCreate", async interaction => {
     // ============================================
     if (interaction.isButton() && interaction.customId.startsWith('sup_take_')) {
         const caseId = interaction.customId.replace('sup_take_', '');
-        const sCase = supportCases[caseId];
         try {
-            if (!sCase) return interaction.reply({ content: '❌ Case nicht gefunden.', flags: MessageFlags.Ephemeral });
-            if (sCase.status !== 'open') {
-                return interaction.reply({
-                    content: sCase.status === 'taken'
-                        ? `ℹ️ Case bereits uebernommen von <@${sCase.takenBy}>.`
-                        : '❌ Case bereits geschlossen.',
-                    flags: MessageFlags.Ephemeral
-                });
+            const result = await performSupportTake(caseId, interaction.user.id);
+            if (!result.ok) {
+                return interaction.reply({ content: (result.taken ? 'ℹ️ ' : '❌ ') + result.error, flags: MessageFlags.Ephemeral });
             }
-            const guild = interaction.guild;
-            const staff = await guild.members.fetch(interaction.user.id);
-            const EN_TEAM = "1365083291044282389";
-            if (!staff.roles.cache.has(EN_TEAM)) {
-                return interaction.reply({ content: '❌ Nur EN-Team kann Cases uebernehmen.', flags: MessageFlags.Ephemeral });
-            }
-            const staffVoice = staff.voice.channel;
-            if (!staffVoice) {
-                return interaction.reply({ content: '❌ Du musst selbst in einem Voice-Channel sein, damit der User zu dir gemoved werden kann.', flags: MessageFlags.Ephemeral });
-            }
-            const userMember = await guild.members.fetch(sCase.userId).catch(() => null);
-            if (!userMember) return interaction.reply({ content: '❌ User ist nicht mehr im Server.', flags: MessageFlags.Ephemeral });
-            if (!userMember.voice.channel) return interaction.reply({ content: '❌ User ist nicht mehr im Voice-Channel.', flags: MessageFlags.Ephemeral });
-
-            await userMember.voice.setChannel(staffVoice, `Support #S-${caseId} von ${staff.displayName || staff.user.username}`);
-            sCase.status = 'taken';
-            sCase.takenBy = staff.id;
-            sCase.takenByName = staff.displayName || staff.user.username;
-            sCase.takenAt = Date.now();
-            sCase.handlingChannelId = staffVoice.id;
-            saveSupportCases();
-            await rebuildSupportCaseMessage(caseId);
-            return interaction.reply({ content: `✅ **${userMember.displayName || userMember.user.username}** wurde zu dir in <#${staffVoice.id}> gemoved.`, flags: MessageFlags.Ephemeral });
+            return interaction.reply({
+                content: `✅ **${result.userName}** wurde zu dir in <#${result.movedToChannelId}> gemoved.`,
+                flags: MessageFlags.Ephemeral,
+            });
         } catch(e) {
             console.error('[Support] Uebernehmen-Fehler:', e);
             try { await interaction.reply({ content: `❌ Fehler: ${e.message}`, flags: MessageFlags.Ephemeral }); } catch(_) {}
@@ -1487,7 +1527,7 @@ const apiServer = http.createServer(async (req, res) => {
     }
 
     // Staff-only GET Endpoints: Caller muss ?discordId=... mitschicken und EN-Team-Rolle haben
-    const staffOnlyPaths = ["/api/mod-log", "/api/on-duty", "/api/shifts", "/api/streaks", "/api/storage", "/api/mod-history"];
+    const staffOnlyPaths = ["/api/mod-log", "/api/on-duty", "/api/shifts", "/api/streaks", "/api/storage", "/api/mod-history", "/api/support-cases/open"];
     if (req.method === "GET" && staffOnlyPaths.includes(url.pathname)) {
         const callerDid = url.searchParams.get("discordId") || url.searchParams.get("callerId");
         if (!callerDid) {
@@ -1586,6 +1626,43 @@ const apiServer = http.createServer(async (req, res) => {
     }
 
     // POST /api/heartbeat
+    // GET /api/support-cases/open — staff-only Liste offener Cases
+    if (req.method === "GET" && url.pathname === "/api/support-cases/open") {
+        const open = Object.values(supportCases)
+            .filter(c => c.status === 'open')
+            .map(c => supportCaseSnapshot(c))
+            .sort((a, b) => a.createdAt - b.createdAt);
+        res.writeHead(200);
+        return res.end(JSON.stringify({ cases: open }));
+    }
+
+    // POST /api/support-case/take — body: { caseId, discordId }
+    if (req.method === "POST" && url.pathname === "/api/support-case/take") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", async () => {
+            try {
+                const { caseId, discordId } = JSON.parse(body || "{}");
+                if (!caseId || !discordId) {
+                    res.writeHead(400);
+                    return res.end(JSON.stringify({ ok: false, error: "caseId und discordId erforderlich" }));
+                }
+                const result = await performSupportTake(caseId, discordId);
+                if (!result.ok) {
+                    res.writeHead(result.taken ? 409 : 400);
+                    return res.end(JSON.stringify(result));
+                }
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+            } catch (e) {
+                console.error('[Support] /take Fehler:', e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/heartbeat") {
         let body = "";
         req.on("data", c => (body += c));
