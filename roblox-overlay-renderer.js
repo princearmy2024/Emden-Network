@@ -2149,9 +2149,25 @@ const SupportOverlay = (() => {
         });
     }
 
+    function showInlineError(caseId, msg) {
+        const toast = document.querySelector(`.sup-ov-toast[data-case-id="${caseId}"]`);
+        if (!toast) return;
+        let errEl = toast.querySelector('.sup-ov-err');
+        if (!errEl) {
+            errEl = document.createElement('div');
+            errEl.className = 'sup-ov-err';
+            errEl.style.cssText = 'position:absolute;bottom:-24px;left:0;right:0;background:rgba(220,40,40,.85);color:#fff;padding:4px 10px;border-radius:8px;font-size:10px;font-weight:600;text-align:center;backdrop-filter:blur(8px);';
+            toast.appendChild(errEl);
+        }
+        errEl.textContent = msg;
+        clearTimeout(toast._errTimer);
+        toast._errTimer = setTimeout(() => { errEl?.remove(); }, 5000);
+    }
+
     async function take(caseId, btn) {
+        console.log('[SupportOverlay] take() called for', caseId);
         const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
-        if (!myId) return;
+        if (!myId) { showInlineError(caseId, 'Keine Discord-ID — neu einloggen.'); return; }
         if (btn) { btn.disabled = true; btn.textContent = '...'; }
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/support-case/take`, {
@@ -2160,14 +2176,19 @@ const SupportOverlay = (() => {
                 body: JSON.stringify({ caseId, discordId: myId }),
             });
             const d = await r.json().catch(()=>({}));
+            console.log('[SupportOverlay] take response:', r.status, d);
             if (!r.ok || !d.ok) {
                 if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
-                alert('Support: ' + (d.error || ('HTTP ' + r.status)));
+                showInlineError(caseId, d.error || ('HTTP ' + r.status));
                 return;
             }
+            // Success → dismiss local toast
+            dismissedIds.add(caseId);
+            render();
         } catch (e) {
             if (btn) { btn.disabled = false; btn.textContent = '→ Übernehmen'; }
             console.error('[SupportOverlay] take error:', e);
+            showInlineError(caseId, 'Netzwerk-Fehler: ' + (e.message || e));
         }
     }
 
@@ -2223,9 +2244,39 @@ const SupportOverlay = (() => {
         console.log('[SupportOverlay] Test-Case gespawnt. Sollte oben-zentral sichtbar sein.');
     }
 
+    // Globaler mousemove-Tracker: gibt Focus frei sobald Cursor in Toast-Bereich ist.
+    // Loest das Problem wenn mouseenter nicht feuert (z.B. wenn Toast unter bereits-
+    // stehendem Cursor erscheint).
+    let _hadFocus = false;
+    function startGlobalCursorTrack() {
+        document.addEventListener('mousemove', (e) => {
+            const stack = document.getElementById('supOverlayStack');
+            if (!stack) return;
+            const toasts = stack.querySelectorAll('.sup-ov-toast');
+            if (toasts.length === 0) {
+                if (_hadFocus) { window.electronAPI?.requestOverlayFocus?.(false); _hadFocus = false; }
+                return;
+            }
+            let over = false;
+            for (const t of toasts) {
+                const rect = t.getBoundingClientRect();
+                if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                    e.clientY >= rect.top  && e.clientY <= rect.bottom) { over = true; break; }
+            }
+            if (over && !_hadFocus) {
+                window.electronAPI?.requestOverlayFocus?.(true);
+                _hadFocus = true;
+            } else if (!over && _hadFocus) {
+                window.electronAPI?.requestOverlayFocus?.(false);
+                _hadFocus = false;
+            }
+        });
+    }
+
     function init() {
         setInterval(tickTimes, 1000);
         setTimeout(loadInitial, 3500);
+        startGlobalCursorTrack();
     }
 
     return { init, add, update, remove, render, loadInitial, _testFake };

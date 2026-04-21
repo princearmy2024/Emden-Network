@@ -1,6 +1,6 @@
 {
-    "version": "4.66.3",
+    "version": "4.66.4",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.3: Support-Toast Polish + Voice-Channel-Check. Background transparent (35% Opacity mit Blur). X-Button zum lokalen Wegklicken. Click-Fix: Focus-Request auf ganzen Toast + mousedown als Backup. Bot validiert: Uebernehmen geht NUR wenn Staff in Support 1–5 Voice ist — sonst 'Du musst in einem Support-Channel (Support 1–5) sein'. Stv. Projektleitung als Lead hinzugefuegt (darf Mod-Eintraege loeschen).",
+    "notes": "v4.66.4: Support-Toast Inline-Error + Global-Cursor-Track. alert() war im Electron-Overlay unsichtbar — jetzt wird der Fehler DIREKT im Toast angezeigt (rote Zeile unten drunter). Globaler Mousemove-Handler gibt Focus frei sobald Cursor in Toast-Bereich ist (fixt mouseenter-Miss bei bereits-stehendem Cursor). Auf Erfolg wird Toast lokal geschlossen.",
     "forceUpdate": false
 }
