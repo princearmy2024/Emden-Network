@@ -1,6 +1,6 @@
 {
-    "version": "4.66.1",
+    "version": "4.66.2",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.1: F4-Fix. Wenn F4 von einer anderen App (z.B. Discord-Overlay) geblockt wird, gibt es jetzt Fallback-Tasten Alt+M und Strg+Shift+M. Dashboard zeigt Hinweis wenn F4 blockiert ist. Logging in Dev-Console zeigt Registrierungs-Status.",
+    "notes": "v4.66.2: Support-Cases Debug — Staff-Gate entfernt (Bot validiert serverseitig), Debug-Badge unten-mittig im Overlay zeigt Status (staff/events/cases), verbose Logging in Dev-Console. Test-Case via window._testSupport() spawnen.",
     "forceUpdate": false
 }

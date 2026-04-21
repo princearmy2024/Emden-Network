@@ -2071,10 +2071,7 @@ window.OverlayShift = OverlayShift;
 // ════════════════════════════════════════════════════════════════
 const SupportOverlay = (() => {
     const cases = new Map();
-
-    function iAmStaff() {
-        return !!window.Overlay && (Overlay.getRobloxUsername !== undefined) && window._isStaff;
-    }
+    let eventsReceived = 0;
 
     function escapeHtml(s) {
         if (typeof s !== 'string') return '';
@@ -2087,10 +2084,23 @@ const SupportOverlay = (() => {
         return Math.floor(d/60) + 'm ' + (d%60) + 's';
     }
 
+    function updateDebugBadge() {
+        let el = document.getElementById('supDebugBadge');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'supDebugBadge';
+            el.style.cssText = 'position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#ffb347;padding:4px 10px;border-radius:6px;font-size:10px;font-family:monospace;z-index:99999;pointer-events:none;opacity:.85;';
+            document.body.appendChild(el);
+        }
+        el.textContent = `[Support] staff=${window._isStaff ? 'yes' : 'no'} · events=${eventsReceived} · cases=${cases.size}`;
+    }
+
     function render() {
+        updateDebugBadge();
         const stack = document.getElementById('supOverlayStack');
         if (!stack) return;
-        if (!iAmStaff() || cases.size === 0) {
+        // Staff-Gate entfernt — Bot-Endpoint validiert EN-Team serverseitig.
+        if (cases.size === 0) {
             stack.innerHTML = '';
             return;
         }
@@ -2156,11 +2166,15 @@ const SupportOverlay = (() => {
     }
 
     function add(c) {
+        console.log('[SupportOverlay] add event received:', c);
+        eventsReceived++;
         if (!c || !c.caseId) return;
         cases.set(c.caseId, c);
         render();
     }
     function update(c) {
+        console.log('[SupportOverlay] update event received:', c);
+        eventsReceived++;
         if (!c || !c.caseId) return;
         const prev = cases.get(c.caseId);
         cases.set(c.caseId, { ...(prev || {}), ...c });
@@ -2173,30 +2187,50 @@ const SupportOverlay = (() => {
     }
 
     async function loadInitial() {
-        if (!iAmStaff()) return;
         const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        console.log('[SupportOverlay] loadInitial — isStaff:', window._isStaff, '· discordId:', myId);
         if (!myId) return;
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/support-cases/open?discordId=${encodeURIComponent(myId)}`, {
                 headers: { 'x-api-key': 'emden-super-secret-key-2026' },
             });
+            console.log('[SupportOverlay] loadInitial response:', r.status);
             if (!r.ok) return;
             const d = await r.json();
+            console.log('[SupportOverlay] loadInitial cases:', d.cases?.length || 0);
             if (Array.isArray(d.cases)) {
                 d.cases.forEach(c => cases.set(c.caseId, c));
                 render();
             }
-        } catch (_) {}
+        } catch (e) {
+            console.warn('[SupportOverlay] loadInitial error:', e.message);
+        }
+    }
+
+    // Debug-Funktion: Test-Case erzeugen ohne Bot (nur um UI zu verifizieren)
+    function _testFake() {
+        add({
+            caseId: 'TEST' + Math.floor(Math.random() * 1000),
+            userId: '000',
+            username: 'TEST User',
+            avatarUrl: null,
+            createdAt: Date.now(),
+            status: 'open',
+        });
+        console.log('[SupportOverlay] Test-Case gespawnt. Sollte oben-zentral sichtbar sein.');
     }
 
     function init() {
         setInterval(tickTimes, 1000);
-        setTimeout(loadInitial, 3500);
+        setInterval(updateDebugBadge, 2000);
+        setTimeout(() => { updateDebugBadge(); loadInitial(); }, 3500);
     }
 
-    return { init, add, update, remove, render, loadInitial };
+    return { init, add, update, remove, render, loadInitial, _testFake };
 })();
 window.SupportOverlay = SupportOverlay;
+// Debug: window._testSupport() → fake Case spawnen
+window._testSupport = () => SupportOverlay._testFake();
 
 window.addEventListener('DOMContentLoaded', () => {
     Overlay.init();
