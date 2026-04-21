@@ -2199,10 +2199,23 @@ const SupportOverlay = (() => {
         }, 2000);
     }
 
+    function getMyDiscordId() {
+        // 1) Primary: aus URL-Param (Overlay.getDiscordId)
+        let id = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        if (id) return id;
+        // 2) Fallback: aus localStorage (gesetzt beim Dashboard-Login)
+        try {
+            const session = JSON.parse(localStorage.getItem('en_session') || 'null');
+            if (session?.user?.discordId) return session.user.discordId;
+        } catch(_) {}
+        return null;
+    }
+
     async function take(caseId, btn) {
         console.log('[SupportOverlay] take() called for', caseId);
-        const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
-        if (!myId) { showInlineError(caseId, 'Keine Discord-ID — neu einloggen.'); return; }
+        const myId = getMyDiscordId();
+        console.log('[SupportOverlay] discordId:', myId);
+        if (!myId) { showInlineError(caseId, 'Keine Discord-ID gefunden — bitte Dashboard-Login prüfen.'); return; }
         if (btn) { btn.disabled = true; btn.textContent = '...'; }
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/support-case/take`, {
@@ -2253,7 +2266,7 @@ const SupportOverlay = (() => {
     }
 
     async function loadInitial() {
-        const myId = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        const myId = getMyDiscordId();
         console.log('[SupportOverlay] loadInitial — isStaff:', window._isStaff, '· discordId:', myId);
         if (!myId) return;
         try {

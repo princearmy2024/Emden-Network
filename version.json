@@ -1,6 +1,6 @@
 {
-    "version": "4.66.6",
+    "version": "4.66.7",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.6: Support-Toast Success-Animation. Beim erfolgreichen Uebernehmen pulst der Toast gruen, zeigt einen animierten Checkmark mit 'User → Channel'-Info, und faded nach 2s weg. Wenn ein anderer Staff uebernimmt, erscheint die gleiche Animation mit dessen Namen. Toast-Position von top:80px auf 140px verschoben (weiter runter).",
+    "notes": "v4.66.7: Support-Take DiscordID-Fallback. Overlay.getDiscordId() gab leeren String zurueck wenn URL-Param nicht gesetzt war → 'Keine Discord-ID' Fehler. Jetzt Fallback auf localStorage en_session.user.discordId, ist also auch dann verfuegbar wenn Overlay ohne Query-Param geoeffnet wurde.",
     "forceUpdate": false
 }
