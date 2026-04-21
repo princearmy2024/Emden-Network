@@ -1,6 +1,6 @@
 {
-    "version": "4.66.8",
+    "version": "4.66.9",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.8: Support-Toast blockt Roblox-Input nicht mehr. Statt aggressivem Focus-Grab (blockte alles solange Toast sichtbar) jetzt Cursor-basiert mit 40px Buffer: Focus wird NUR granted wenn deine Maus wirklich ueber dem Toast ist. Ansonsten laeuft Roblox-Input normal weiter — keine Blockaden mehr waehrend Ankuendigungen.",
+    "notes": "v4.66.9: Support-Rejoin-Bug + Scroll-Stack. BUG FIX: Wenn User aus Support 1-5 zurueck in Warteraum geht, wird alter Case jetzt richtig geschlossen (ohne Block) und ein neuer kann sofort erstellt werden. Zuvor blieb Case auf 'taken' → neue Cases wurden uebersprungen. SCROLL: Toast-Stack zeigt max 2 Toasts, ab 3+ wird scrollbar (orange scrollbar, 6px). BOT NEU HOCHLADEN + NEU STARTEN auf Cybrancee!",
     "forceUpdate": false
 }

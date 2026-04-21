@@ -2181,7 +2181,19 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     pointer-events: none;
     max-width: 420px;
     width: 94%;
+    max-height: calc(2 * 78px + 8px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,179,71,.5) transparent;
+    padding-right: 2px;
 "></div>
+<style>
+#supOverlayStack::-webkit-scrollbar { width: 6px; }
+#supOverlayStack::-webkit-scrollbar-track { background: transparent; }
+#supOverlayStack::-webkit-scrollbar-thumb { background: rgba(255,179,71,.5); border-radius: 3px; }
+#supOverlayStack::-webkit-scrollbar-thumb:hover { background: rgba(255,179,71,.8); }
+</style>
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

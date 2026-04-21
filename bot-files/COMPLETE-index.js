@@ -3703,11 +3703,16 @@ client.on("voiceStateUpdate", (oldState, newState) => {
             postSupportCase(m).catch(e => console.warn('[Support] postSupportCase Fehler:', e.message));
         }
     }
-    // User mit uebernommenem Case verlaesst Voice (kicked / left) → Case schliessen + Cooldown-Block
-    if (oldState.channelId && !newState.channelId) {
+    // User mit uebernommenem Case verlaesst Support-Staff-Channel (Support 1-5):
+    //   → Case schliessen. Block NUR wenn User NICHT zurueck zum Warteraum geht
+    //     (wenn User wieder Hilfe will, soll neuer Case sofort moeglich sein).
+    const leftSupportStaffChan = oldState.channelId && SUPPORT_STAFF_VOICE_IDS.includes(oldState.channelId);
+    const switchedChannel = newState.channelId !== oldState.channelId;
+    if (leftSupportStaffChan && switchedChannel) {
         const openCase = findOpenSupportCase(oldState.id);
         if (openCase && openCase.status === 'taken') {
-            closeSupportCase(openCase, { applyBlock: true }).catch(e => console.warn('[Support] closeCase Fehler:', e.message));
+            const goingToWarteraum = newState.channelId === SUPPORT_VOICE_CHANNEL_ID;
+            closeSupportCase(openCase, { applyBlock: !goingToWarteraum }).catch(e => console.warn('[Support] closeCase Fehler:', e.message));
         }
     }
     // User verlaesst Warteraum ohne dass Case uebernommen wurde → abbrechen ohne Block
