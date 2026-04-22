@@ -1,6 +1,6 @@
 {
-    "version": "4.66.11",
+    "version": "4.66.12",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.11: Re-Take-Bug Fix. voiceStateUpdate Handler-Order: close vor post. Vorher lief postSupportCase zuerst waehrend der alte Case noch status='taken' hatte → findOpenSupportCase fand ihn → SKIP → kein neuer Case. Jetzt: Case wird zuerst geschlossen (status sofort sync auf 'closed'), dann neuer Case gepostet. BOT NEU HOCHLADEN auf Cybrancee!",
+    "notes": "v4.66.12: Stale-Cooldown-Fix. User waren bis zu 25h geblockt weil setTimeout-Timer zum Entfernen des permission overwrite beim Bot-Restart verloren gingen. Jetzt: cleanupSupportPermissionOverwrites() beim Startup entfernt alle user-spezifischen Connect-Deny-Overwrites im Warteraum. Legitimer Cooldown ist nur 2min → nach Bot-Restart sowieso abgelaufen. BOT NEU HOCHLADEN!",
     "forceUpdate": false
 }

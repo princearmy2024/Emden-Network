@@ -456,6 +456,28 @@ async function rebuildSupportCaseMessage(caseId) {
     await msg.edit({ components: [container], flags: MessageFlags.IsComponentsV2 }).catch(e => console.warn('[Support] rebuildCaseMessage edit fehlgeschlagen:', e.message));
 }
 
+// Startup-Cleanup: alle user-spezifischen Connect-Deny-Overwrites im Warteraum entfernen.
+// Grund: setTimeout in closeSupportCase() geht beim Bot-Restart verloren, User bleiben
+// sonst fuer immer geblockt. Da der Cooldown nur 2min ist, ist nach einem Restart
+// jeder legitime Cooldown laengst abgelaufen → sicher alle zu entfernen.
+async function cleanupSupportPermissionOverwrites() {
+    try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (!guild) return;
+        const supportChan = guild.channels.cache.get(SUPPORT_VOICE_CHANNEL_ID);
+        if (!supportChan) return;
+        let removed = 0;
+        for (const [id, ow] of supportChan.permissionOverwrites.cache) {
+            // Type 1 = Member overwrite. @everyone (Type 0) anfassen wir nicht.
+            if (ow.type === 1 && ow.deny?.has('Connect')) {
+                await supportChan.permissionOverwrites.delete(id, 'Startup-Cleanup: stale Cooldown-Block').catch(() => {});
+                removed++;
+            }
+        }
+        if (removed > 0) console.log(`[Support] Startup-Cleanup: ${removed} stale Permission-Overwrites entfernt.`);
+    } catch(e) { console.warn('[Support] permission-cleanup:', e.message); }
+}
+
 // Stale-Case-Cleanup: alte Cases (>30min + User nicht im Warteraum) schliessen
 const SUPPORT_CASE_STALE_MS = 30 * 60 * 1000; // 30 Minuten
 async function cleanupStaleCases() {
@@ -3628,6 +3650,8 @@ client.once("ready", async () => {
     // Support-Cases Cleanup: einmal beim Start + alle 10min
     await cleanupStaleCases();
     setInterval(cleanupStaleCases, 10 * 60 * 1000);
+    // Permission-Overwrite Cleanup: einmal beim Start (setTimeout geht bei Restart verloren)
+    await cleanupSupportPermissionOverwrites();
 
     // Live-Shift-Leaderboard: falls Panel jemals initialisiert → alle 60s aktualisieren
     startLeaderboardLoop();

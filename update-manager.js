@@ -6,7 +6,7 @@
 
 const UpdateManager = (() => {
     // --- KONFIGURATION ---
-    let currentAppVersion = '4.66.11'; // Fallback
+    let currentAppVersion = '4.66.12'; // Fallback
     const CHECK_INTERVAL = 1000 * 60 * 60; // Alle 1 Stunde prüfen
 
     let isChecking = false;
