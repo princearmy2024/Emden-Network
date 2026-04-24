@@ -1,6 +1,6 @@
 {
-    "version": "4.66.12",
+    "version": "4.67.0",
     "releaseDate": "2026-04-21",
-    "notes": "v4.66.12: Stale-Cooldown-Fix. User waren bis zu 25h geblockt weil setTimeout-Timer zum Entfernen des permission overwrite beim Bot-Restart verloren gingen. Jetzt: cleanupSupportPermissionOverwrites() beim Startup entfernt alle user-spezifischen Connect-Deny-Overwrites im Warteraum. Legitimer Cooldown ist nur 2min → nach Bot-Restart sowieso abgelaufen. BOT NEU HOCHLADEN!",
+    "notes": "v4.67.0: TikTok Live im Roblox-Overlay! Neuer TikTok-Button rechts unten (rote TT-Logo). Klick oeffnet Slide-Panel von rechts — Username eingeben (@beispiel), Verbinden klicken → Live-Feed mit Chat + Gifts (🎁) + Likes (❤️) + Follows (+) + Member-Joins direkt im Overlay. Viewer-Count live oben. Letzter Username wird gemerkt. Nutzt tiktok-live-connector (unofficial, funktioniert mit public Live-Streams).",
     "forceUpdate": false
 }

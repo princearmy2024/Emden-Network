@@ -325,6 +325,7 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 body.overlay-active.is-admin #mod-trigger,
 body.overlay-active.is-staff #mod-trigger { display: flex; }
 body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
+body.overlay-active .tiktok-btn { display: flex !important; }
 .gsg9-btn {
   position: fixed;
   bottom: 0;
@@ -346,6 +347,209 @@ body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
 .gsg9-btn:hover { color: #fff; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 #gsg9-slide div::-webkit-scrollbar { display: none; }
+
+/* ── TIKTOK LIVE Button + Slide Panel ── */
+.tiktok-btn {
+  position: fixed;
+  bottom: 0;
+  right: 16px;
+  padding: clamp(10px, 1.3vw, 18px) clamp(16px, 2vw, 28px) clamp(6px, 0.8vw, 12px);
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(to top, rgba(254, 44, 85, 0.35) 0%, rgba(37, 244, 238, 0.1) 50%, transparent 100%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+  z-index: 200;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag;
+  transition: color 0.3s, filter 0.3s;
+  font-family: 'Inter', sans-serif;
+}
+.tiktok-btn:hover { color: #fff; filter: drop-shadow(0 0 8px rgba(254,44,85,0.6)); }
+.tiktok-btn.live::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fe2c55;
+  box-shadow: 0 0 8px #fe2c55;
+  animation: tiktokPulseDot 1.1s ease-in-out infinite;
+}
+@keyframes tiktokPulseDot { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+/* Slide-Panel: kommt von rechts (translateX statt translateY wie GSG9) */
+#tiktok-slide {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 360px;
+  height: 70vh;
+  z-index: 501;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(.16,1,.3,1);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+#tiktok-slide.open { transform: translateX(0); }
+#tiktok-slide > .tt-body {
+  flex: 1;
+  background: rgba(8, 12, 24, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px 0 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: none;
+  border-bottom: none;
+  overflow: hidden;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+#tiktok-slide .tt-glow {
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(254,44,85,0.25), transparent 70%);
+  pointer-events: none;
+  filter: blur(20px);
+}
+#tiktok-slide .tt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+}
+#tiktok-slide .tt-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+#tiktok-slide .tt-title .tt-logo {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, #25f4ee 0%, #000 50%, #fe2c55 100%);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px; color: #fff;
+  letter-spacing: -1px;
+}
+#tiktok-slide .tt-close {
+  cursor: pointer;
+  color: rgba(255,255,255,0.4);
+  font-size: 22px;
+  padding: 4px 8px;
+  line-height: 1;
+  user-select: none;
+}
+#tiktok-slide .tt-close:hover { color: #fff; }
+#tiktok-slide .tt-connect-area {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#tiktok-slide .tt-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #fff;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#tiktok-slide .tt-input:focus { border-color: rgba(254,44,85,0.5); }
+#tiktok-slide .tt-input::placeholder { color: rgba(255,255,255,0.3); }
+#tiktok-slide .tt-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fe2c55, #e11d48);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+#tiktok-slide .tt-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(254,44,85,0.4); }
+#tiktok-slide .tt-btn.disconnect {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+}
+#tiktok-slide .tt-status {
+  padding: 6px 18px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+#tiktok-slide .tt-status.ok { color: #4ade80; }
+#tiktok-slide .tt-status.err { color: #f87171; }
+#tiktok-slide .tt-status.live { color: #fe2c55; }
+#tiktok-slide .tt-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(254,44,85,0.4) transparent;
+}
+#tiktok-slide .tt-feed::-webkit-scrollbar { width: 5px; }
+#tiktok-slide .tt-feed::-webkit-scrollbar-thumb { background: rgba(254,44,85,0.4); border-radius: 3px; }
+.tt-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  font-size: 11px;
+  animation: ttMsgIn 0.25s ease-out;
+}
+@keyframes ttMsgIn { from{opacity:0;transform:translateX(12px);} to{opacity:1;transform:translateX(0);} }
+.tt-msg img, .tt-msg .tt-ava {
+  width: 22px; height: 22px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.5);
+}
+.tt-msg-body { flex: 1; min-width: 0; }
+.tt-msg-name {
+  font-weight: 700;
+  color: #25f4ee;
+  font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tt-msg-text { color: rgba(255,255,255,0.9); word-wrap: break-word; }
+.tt-msg.gift { background: rgba(254,44,85,0.1); border-left: 2px solid #fe2c55; }
+.tt-msg.gift .tt-msg-name { color: #fe2c55; }
+.tt-msg.like { background: rgba(251,191,36,0.06); border-left: 2px solid rgba(251,191,36,0.5); }
+.tt-msg.like .tt-msg-name { color: #fbbf24; }
+.tt-msg.follow { background: rgba(37,244,238,0.08); border-left: 2px solid #25f4ee; }
+.tt-msg.member { background: rgba(148,163,184,0.05); opacity: 0.75; }
+.tt-msg-meta { color: rgba(255,255,255,0.4); font-size: 9px; margin-left: 4px; }
 #modLiveHistory::-webkit-scrollbar { display: none; }
 
 /* Klick-Area */
@@ -1963,6 +2167,45 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <div id="gsg9Content" style="display:flex;flex-direction:column;gap:12px;">
       <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>
     </div>
+    </div>
+  </div>
+</div>
+
+<!-- TIKTOK LIVE BUTTON -->
+<div id="tiktok-trigger" class="tiktok-btn" onclick="event.stopPropagation();Overlay.toggleTiktok()"
+     onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)"
+     style="position:relative;">
+  <div style="display:flex;align-items:center;gap:5px;">
+    <div style="width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,#25f4ee 0%,#000 50%,#fe2c55 100%);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#fff;letter-spacing:-1px;">TT</div>
+    <span style="font-size:11px;font-weight:700;letter-spacing:.04em;">TikTok</span>
+  </div>
+</div>
+
+<!-- TIKTOK LIVE SLIDE PANEL -->
+<div id="tiktok-slide"
+     onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
+  <div class="tt-body">
+    <div class="tt-glow"></div>
+    <div class="tt-header">
+      <div class="tt-title">
+        <div class="tt-logo">TT</div>
+        <span>TikTok Live</span>
+        <span id="tt-viewer-count" style="font-size:10px;color:rgba(255,255,255,.4);font-weight:500;margin-left:6px;"></span>
+      </div>
+      <span class="tt-close" onclick="Overlay.toggleTiktok()">&times;</span>
+    </div>
+    <div class="tt-connect-area">
+      <input id="tt-username-input" class="tt-input" type="text" placeholder="@username" autocomplete="off" spellcheck="false" />
+      <button id="tt-connect-btn" class="tt-btn" onclick="Overlay.tiktokConnect()">Verbinden</button>
+    </div>
+    <div id="tt-status" class="tt-status" style="display:none;"></div>
+    <div id="tt-feed" class="tt-feed">
+      <div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.25);font-size:11px;">
+        Username eingeben und „Verbinden" klicken.<br>
+        <span style="font-size:10px;opacity:.7;">Streamer muss live sein.</span>
+      </div>
     </div>
   </div>
 </div>

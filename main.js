@@ -22,6 +22,8 @@ let mainWindow;
 let overlayWindow;
 let robloxOverlayWin = null;
 let globalPTTActive  = false; // Verhindert doppeltes Feuern
+let tiktokConnection = null;  // TikTok Live — aktive Verbindung
+let tiktokUsername = '';
 
 function createOverlayWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -232,6 +234,93 @@ function getLocalChangelog() {
 }
 
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+// ================================================================
+// TIKTOK LIVE — Chat + Gifts + Likes + Follows in Overlay
+// ================================================================
+ipcMain.handle('tiktok-connect', async (event, username) => {
+    try {
+        // Alte Verbindung trennen
+        if (tiktokConnection) {
+            try { tiktokConnection.disconnect(); } catch(_) {}
+            tiktokConnection = null;
+        }
+        const uname = (username || '').trim().replace(/^@/, '');
+        if (!uname) return { ok: false, error: 'Username leer' };
+
+        const { WebcastPushConnection } = await import('tiktok-live-connector');
+        tiktokConnection = new WebcastPushConnection(uname, {
+            processInitialData: true,
+            enableExtendedGiftInfo: false,
+            requestPollingIntervalMs: 2000,
+        });
+        tiktokUsername = uname;
+
+        const state = await tiktokConnection.connect();
+        console.log(`[TikTok] Verbunden mit @${uname} — Room ${state.roomId}, Viewer ${state.viewerCount || 0}`);
+
+        // Events → Overlay forwarden
+        const fwd = (type, data) => {
+            if (!robloxOverlayWin || robloxOverlayWin.isDestroyed()) return;
+            try { robloxOverlayWin.webContents.send('tiktok:event', { type, data, ts: Date.now() }); } catch(_) {}
+        };
+
+        tiktokConnection.on('chat', (d) => fwd('chat', {
+            uniqueId: d.uniqueId, nickname: d.nickname, comment: d.comment,
+            profilePictureUrl: d.profilePictureUrl,
+        }));
+        tiktokConnection.on('gift', (d) => fwd('gift', {
+            uniqueId: d.uniqueId, nickname: d.nickname, giftName: d.giftName,
+            repeatCount: d.repeatCount || 1, diamondCount: d.diamondCount || 0,
+            profilePictureUrl: d.profilePictureUrl,
+        }));
+        tiktokConnection.on('like', (d) => fwd('like', {
+            uniqueId: d.uniqueId, nickname: d.nickname, likeCount: d.likeCount || 1,
+            totalLikeCount: d.totalLikeCount || 0,
+            profilePictureUrl: d.profilePictureUrl,
+        }));
+        tiktokConnection.on('follow', (d) => fwd('follow', {
+            uniqueId: d.uniqueId, nickname: d.nickname,
+            profilePictureUrl: d.profilePictureUrl,
+        }));
+        tiktokConnection.on('member', (d) => fwd('member', {
+            uniqueId: d.uniqueId, nickname: d.nickname,
+            profilePictureUrl: d.profilePictureUrl,
+        }));
+        tiktokConnection.on('roomUser', (d) => fwd('viewer', { viewerCount: d.viewerCount }));
+        tiktokConnection.on('streamEnd', () => {
+            fwd('end', {});
+            try { tiktokConnection?.disconnect(); } catch(_) {}
+            tiktokConnection = null;
+        });
+        tiktokConnection.on('disconnected', () => fwd('disconnected', {}));
+
+        return {
+            ok: true,
+            roomId: state.roomId,
+            viewerCount: state.viewerCount || 0,
+            username: uname,
+        };
+    } catch (e) {
+        console.error('[TikTok] connect Fehler:', e.message);
+        return { ok: false, error: e.message || 'Verbindung fehlgeschlagen' };
+    }
+});
+
+ipcMain.on('tiktok-disconnect', () => {
+    try {
+        if (tiktokConnection) {
+            tiktokConnection.disconnect();
+            tiktokConnection = null;
+            console.log(`[TikTok] Disconnected von @${tiktokUsername}`);
+        }
+    } catch(e) { console.warn('[TikTok] disconnect:', e.message); }
+});
+
+ipcMain.handle('tiktok-status', () => ({
+    connected: !!tiktokConnection,
+    username: tiktokUsername,
+}));
 
 // Soundboard: File-Picker fuer eigene Audio-Sounds
 ipcMain.handle('pick-audio-file', async () => {

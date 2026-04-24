@@ -95,4 +95,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Soundboard
     pickAudioFile: () => ipcRenderer.invoke('pick-audio-file'),
+
+    // TikTok Live
+    tiktokConnect: (username) => ipcRenderer.invoke('tiktok-connect', username),
+    tiktokDisconnect: () => ipcRenderer.send('tiktok-disconnect'),
+    tiktokStatus: () => ipcRenderer.invoke('tiktok-status'),
+    onTiktokEvent: (cb) => ipcRenderer.on('tiktok:event', (event, payload) => cb(payload)),
 });

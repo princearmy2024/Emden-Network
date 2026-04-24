@@ -2065,6 +2065,232 @@ const OverlayShift = {
 window.OverlayShift = OverlayShift;
 
 // ════════════════════════════════════════════════════════════════
+// TIKTOK LIVE — Chat/Gifts/Likes/Follows im Overlay
+// ════════════════════════════════════════════════════════════════
+const TikTokCtrl = (() => {
+    const STORAGE_KEY = 'tiktok-last-username';
+    let open = false;
+    let connected = false;
+    let username = '';
+    let viewerCount = 0;
+    const MAX_MESSAGES = 150; // Feed-Limit (Memory + Render-Perf)
+
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function setStatus(text, cls) {
+        const el = $('tt-status');
+        if (!el) return;
+        if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+        el.style.display = 'block';
+        el.textContent = text;
+        el.className = 'tt-status' + (cls ? ' ' + cls : '');
+    }
+
+    function setViewer(count) {
+        viewerCount = count;
+        const el = $('tt-viewer-count');
+        if (el) el.textContent = count ? `· ${count} viewer` : '';
+    }
+
+    function toggle() {
+        const panel = $('tiktok-slide');
+        if (!panel) return;
+        open = !open;
+        panel.classList.toggle('open', open);
+        if (open) {
+            // Letzten Username laden
+            try {
+                const last = localStorage.getItem(STORAGE_KEY);
+                const input = $('tt-username-input');
+                if (last && input && !input.value) input.value = last;
+                if (input) setTimeout(() => input.focus(), 200);
+            } catch(_) {}
+        }
+    }
+
+    async function connect() {
+        const input = $('tt-username-input');
+        const btn = $('tt-connect-btn');
+        const uname = (input?.value || '').trim().replace(/^@/, '');
+        if (!uname) { setStatus('Username eingeben.', 'err'); return; }
+        if (!window.electronAPI?.tiktokConnect) { setStatus('electronAPI fehlt.', 'err'); return; }
+
+        if (connected) {
+            // Bereits verbunden → disconnect
+            window.electronAPI.tiktokDisconnect?.();
+            connected = false;
+            setStatus('Getrennt.', '');
+            if (btn) { btn.textContent = 'Verbinden'; btn.classList.remove('disconnect'); }
+            setViewer(0);
+            const trigger = $('tiktok-trigger');
+            if (trigger) trigger.classList.remove('live');
+            return;
+        }
+
+        if (btn) { btn.disabled = true; btn.textContent = 'Verbinde...'; }
+        setStatus('Suche Live-Stream von @' + uname + '...', '');
+
+        try {
+            const r = await window.electronAPI.tiktokConnect(uname);
+            if (!r || !r.ok) {
+                setStatus('Fehler: ' + (r?.error || 'Unbekannt'), 'err');
+                if (btn) { btn.disabled = false; btn.textContent = 'Verbinden'; }
+                return;
+            }
+            connected = true;
+            username = r.username;
+            setViewer(r.viewerCount || 0);
+            setStatus('LIVE · @' + r.username + (r.viewerCount ? ' · ' + r.viewerCount + ' Viewer' : ''), 'live');
+            if (btn) { btn.disabled = false; btn.textContent = 'Trennen'; btn.classList.add('disconnect'); }
+            try { localStorage.setItem(STORAGE_KEY, uname); } catch(_) {}
+            // Feed leeren (bis auf Welcome)
+            const feed = $('tt-feed');
+            if (feed) {
+                feed.innerHTML = '';
+                addSystemMsg('Verbunden mit @' + r.username);
+            }
+            const trigger = $('tiktok-trigger');
+            if (trigger) trigger.classList.add('live');
+        } catch(e) {
+            setStatus('Fehler: ' + (e.message || e), 'err');
+            if (btn) { btn.disabled = false; btn.textContent = 'Verbinden'; }
+        }
+    }
+
+    function addSystemMsg(text) {
+        const feed = $('tt-feed');
+        if (!feed) return;
+        const div = document.createElement('div');
+        div.className = 'tt-msg member';
+        div.innerHTML = `<div class="tt-ava">·</div><div class="tt-msg-body"><div class="tt-msg-text" style="font-size:10px;opacity:.7;">${escapeHtml(text)}</div></div>`;
+        feed.appendChild(div);
+        trimFeed();
+        feed.scrollTop = feed.scrollHeight;
+    }
+
+    function avatarHtml(url, name) {
+        if (url) return `<img src="${escapeHtml(url)}" alt="" onerror="this.remove()">`;
+        const init = (name || '?').trim().charAt(0).toUpperCase();
+        return `<div class="tt-ava">${escapeHtml(init)}</div>`;
+    }
+
+    function addEvent(payload) {
+        const feed = $('tt-feed');
+        if (!feed) return;
+        const { type, data } = payload;
+        const name = data?.nickname || data?.uniqueId || 'User';
+        let html = '';
+        switch (type) {
+            case 'chat':
+                html = `<div class="tt-msg">
+                    ${avatarHtml(data.profilePictureUrl, name)}
+                    <div class="tt-msg-body">
+                        <div class="tt-msg-name">${escapeHtml(name)}</div>
+                        <div class="tt-msg-text">${escapeHtml(data.comment || '')}</div>
+                    </div>
+                </div>`;
+                break;
+            case 'gift':
+                html = `<div class="tt-msg gift">
+                    ${avatarHtml(data.profilePictureUrl, name)}
+                    <div class="tt-msg-body">
+                        <div class="tt-msg-name">🎁 ${escapeHtml(name)}</div>
+                        <div class="tt-msg-text">${escapeHtml(data.giftName || 'Gift')} ×${data.repeatCount || 1}${data.diamondCount ? ` <span class="tt-msg-meta">${data.diamondCount * (data.repeatCount||1)} 💎</span>` : ''}</div>
+                    </div>
+                </div>`;
+                break;
+            case 'like':
+                html = `<div class="tt-msg like">
+                    ${avatarHtml(data.profilePictureUrl, name)}
+                    <div class="tt-msg-body">
+                        <div class="tt-msg-name">❤️ ${escapeHtml(name)}</div>
+                        <div class="tt-msg-text">hat ${data.likeCount || 1} Like${(data.likeCount||1) > 1 ? 's' : ''} gegeben${data.totalLikeCount ? ` <span class="tt-msg-meta">(total: ${data.totalLikeCount})</span>` : ''}</div>
+                    </div>
+                </div>`;
+                break;
+            case 'follow':
+                html = `<div class="tt-msg follow">
+                    ${avatarHtml(data.profilePictureUrl, name)}
+                    <div class="tt-msg-body">
+                        <div class="tt-msg-name">+ ${escapeHtml(name)}</div>
+                        <div class="tt-msg-text">folgt jetzt!</div>
+                    </div>
+                </div>`;
+                break;
+            case 'member':
+                html = `<div class="tt-msg member">
+                    ${avatarHtml(data.profilePictureUrl, name)}
+                    <div class="tt-msg-body">
+                        <div class="tt-msg-name">${escapeHtml(name)}</div>
+                        <div class="tt-msg-text" style="font-size:10px;opacity:.7;">ist dem Live beigetreten</div>
+                    </div>
+                </div>`;
+                break;
+            case 'viewer':
+                setViewer(data.viewerCount || 0);
+                return;
+            case 'end':
+                connected = false;
+                setStatus('Stream beendet.', 'err');
+                addSystemMsg('Live-Stream wurde beendet.');
+                const trigger = $('tiktok-trigger');
+                if (trigger) trigger.classList.remove('live');
+                const btn = $('tt-connect-btn');
+                if (btn) { btn.textContent = 'Verbinden'; btn.classList.remove('disconnect'); }
+                return;
+            case 'disconnected':
+                connected = false;
+                setStatus('Verbindung getrennt.', 'err');
+                return;
+        }
+        if (html) {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            const el = wrap.firstElementChild;
+            feed.appendChild(el);
+            trimFeed();
+            // Auto-scroll nur wenn schon unten
+            const nearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 80;
+            if (nearBottom) feed.scrollTop = feed.scrollHeight;
+        }
+    }
+
+    function trimFeed() {
+        const feed = $('tt-feed');
+        if (!feed) return;
+        while (feed.children.length > MAX_MESSAGES) {
+            feed.removeChild(feed.firstElementChild);
+        }
+    }
+
+    function init() {
+        window.electronAPI?.onTiktokEvent?.(addEvent);
+        // Enter im Input = Connect
+        const input = $('tt-username-input');
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); connect(); }
+            });
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+
+    return { toggle, connect };
+})();
+
+// Expose als Overlay.toggleTiktok / tiktokConnect
+Object.assign(Overlay, {
+    toggleTiktok: () => TikTokCtrl.toggle(),
+    tiktokConnect: () => TikTokCtrl.connect(),
+});
+
+// ════════════════════════════════════════════════════════════════
 // SUPPORT-CASES OVERLAY TOAST — Staff-only, erscheint top-center
 // Bei Klick auf "Uebernehmen" ruft /api/support-case/take, Bot moved
 // User zu Staff's Voice-Channel (muss in Voice sein).
