@@ -2368,10 +2368,59 @@ const TikTokCtrl = (() => {
         } catch(_) {}
     }
 
+    function setupDragHandle() {
+        const handle = $('tt-drag-handle');
+        const panel = $('tiktok-slide');
+        if (!handle || !panel) return;
+
+        // Gespeicherte Position anwenden
+        try {
+            const savedTop = parseInt(localStorage.getItem('tiktok-panel-top'), 10);
+            if (!isNaN(savedTop) && savedTop >= 50) panel.style.top = savedTop + 'px';
+        } catch(_) {}
+
+        let dragging = false;
+        let startY = 0;
+        let startTop = 140;
+
+        handle.addEventListener('mousedown', (e) => {
+            dragging = true;
+            startY = e.clientY;
+            const cs = getComputedStyle(panel);
+            startTop = parseInt(cs.top, 10) || 140;
+            // Transition waehrend Drag deaktivieren fuer flues­siges Ziehen
+            panel.style.transition = 'none';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+            window.electronAPI?.requestOverlayFocus?.(true);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const delta = e.clientY - startY;
+            let newTop = Math.max(50, Math.min(window.innerHeight - 150, startTop + delta));
+            panel.style.top = newTop + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return;
+            dragging = false;
+            panel.style.transition = '';
+            document.body.style.userSelect = '';
+            // Aktuelle Top-Position speichern
+            try {
+                const cs = getComputedStyle(panel);
+                const top = parseInt(cs.top, 10);
+                if (!isNaN(top)) localStorage.setItem('tiktok-panel-top', String(top));
+            } catch(_) {}
+        });
+    }
+
     function init() {
         loadSettings();
         maxMessages = settings.max;
         writeSettingsUI();
+        setupDragHandle();
         window.electronAPI?.onTiktokEvent?.((payload) => {
             if (payload?.type === 'gift') playGiftSound();
             addEvent(payload);

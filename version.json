@@ -1,6 +1,6 @@
 {
-    "version": "4.67.3",
+    "version": "4.67.4",
     "releaseDate": "2026-04-24",
-    "notes": "v4.67.3: TikTok-Panel Position Feintuning. Top 0 → 140px (Platz fuer Roblox-UI: Shop, Kalender, Money oben rechts). Bottom 0 → 80px (Platz fuer Emden-Network Bottom-Bar mit Eintragen/GSG9/TikTok). Pink Border-Left entfernt — jetzt seamless ohne Linie.",
+    "notes": "v4.67.4: TikTok-Panel Resizable + Z-Index-Fix. Drag-Handle oben am Panel — Top-Position via Maus verschieben (erscheint beim Hover). Position wird gespeichert. Wenn Mod-Panel (Eintragen) offen, geht TikTok-Panel automatisch in den Hintergrund (z-index 200 statt 10000).",
     "forceUpdate": false
 }

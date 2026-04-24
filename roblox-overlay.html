@@ -385,8 +385,8 @@ body.overlay-active .tiktok-btn { display: flex !important; }
 /* Slide-Panel: rechts, weiter unten starten, transparent Glass, keine Linie links */
 #tiktok-slide {
   position: fixed;
-  top: 140px;           /* Platz fuer Roblox-UI oben (Shop, Kalender etc.) */
-  bottom: 80px;         /* Platz fuer Bottom-Bar (Eintragen, GSG9, TikTok) */
+  top: 140px;           /* Default — per Drag-Handle veraenderbar */
+  bottom: 80px;
   right: 0;
   width: 360px;
   z-index: 10000;
@@ -397,7 +397,31 @@ body.overlay-active .tiktok-btn { display: flex !important; }
   flex-direction: column;
   --tt-panel-alpha: 0.42;
 }
+/* Wenn Mod-Panel offen → TikTok-Panel in den Hintergrund */
+body.mod-open #tiktok-slide { z-index: 200 !important; }
 #tiktok-slide.open { transform: translateX(0); }
+/* Drag-Handle oben zum Top-Resize */
+#tt-drag-handle {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 10px;
+  cursor: ns-resize;
+  z-index: 5;
+  background: linear-gradient(to bottom, rgba(254,44,85,0.18), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: auto;
+}
+#tiktok-slide:hover #tt-drag-handle { opacity: 1; }
+#tt-drag-handle::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 50%;
+  transform: translateX(-50%);
+  width: 40px; height: 3px;
+  background: rgba(255,255,255,0.4);
+  border-radius: 2px;
+}
 #tiktok-slide > .tt-body {
   flex: 1;
   background: linear-gradient(135deg,
@@ -2273,6 +2297,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
      onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
      onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
   <div class="tt-body">
+    <div id="tt-drag-handle" title="Ziehen zum Groesse aendern"></div>
     <div class="tt-glow"></div>
     <div class="tt-header">
       <div class="tt-title">
