@@ -1,6 +1,6 @@
 {
-    "version": "4.67.2",
+    "version": "4.67.3",
     "releaseDate": "2026-04-24",
-    "notes": "v4.67.2: TikTok-Panel Redesign. Full-height Glass-Panel rechts (top bis bottom), stark transparent mit backdrop-blur + saturate, leicht pink-Tint. z-index 10000 -> ueberdeckt Roblox-UI. Settings-Zahnrad oben: Event-Filter (Chat/Gifts/Likes/Follows/Members einzeln ein/aus), Kompakt-Mode, Gift-Ping-Sound, Transparenz-Slider 10-95%, Max-Messages 30-500. Settings persistieren in localStorage.",
+    "notes": "v4.67.3: TikTok-Panel Position Feintuning. Top 0 → 140px (Platz fuer Roblox-UI: Shop, Kalender, Money oben rechts). Bottom 0 → 80px (Platz fuer Emden-Network Bottom-Bar mit Eintragen/GSG9/TikTok). Pink Border-Left entfernt — jetzt seamless ohne Linie.",
     "forceUpdate": false
 }
