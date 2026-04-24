@@ -2069,11 +2069,24 @@ window.OverlayShift = OverlayShift;
 // ════════════════════════════════════════════════════════════════
 const TikTokCtrl = (() => {
     const STORAGE_KEY = 'tiktok-last-username';
+    const SETTINGS_KEY = 'tiktok-settings-v1';
     let open = false;
+    let settingsOpen = false;
     let connected = false;
     let username = '';
     let viewerCount = 0;
-    const MAX_MESSAGES = 150; // Feed-Limit (Memory + Render-Perf)
+    let maxMessages = 150;
+    let settings = {
+        showChat: true,
+        showGift: true,
+        showLike: true,
+        showFollow: true,
+        showMember: false,
+        smallFont: false,
+        soundGift: false,
+        alpha: 42,
+        max: 150,
+    };
 
     function $(id) { return document.getElementById(id); }
 
@@ -2263,13 +2276,106 @@ const TikTokCtrl = (() => {
     function trimFeed() {
         const feed = $('tt-feed');
         if (!feed) return;
-        while (feed.children.length > MAX_MESSAGES) {
+        while (feed.children.length > maxMessages) {
             feed.removeChild(feed.firstElementChild);
         }
     }
 
+    // Settings ──────────────────────────────────────────────────
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (raw) {
+                const saved = JSON.parse(raw);
+                Object.assign(settings, saved);
+            }
+        } catch(_) {}
+    }
+
+    function saveSettings() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(_) {}
+    }
+
+    function writeSettingsUI() {
+        const map = {
+            'tt-show-chat':   settings.showChat,
+            'tt-show-gift':   settings.showGift,
+            'tt-show-like':   settings.showLike,
+            'tt-show-follow': settings.showFollow,
+            'tt-show-member': settings.showMember,
+            'tt-small-font':  settings.smallFont,
+            'tt-sound-gift':  settings.soundGift,
+        };
+        for (const [id, val] of Object.entries(map)) {
+            const el = $(id);
+            if (el) el.checked = !!val;
+        }
+        const alpha = $('tt-alpha'); if (alpha) alpha.value = settings.alpha;
+        const max = $('tt-max'); if (max) max.value = settings.max;
+        applyToDom();
+    }
+
+    function readSettingsUI() {
+        const get = (id, def) => { const el = $(id); return el ? el.checked : def; };
+        settings.showChat   = get('tt-show-chat',   settings.showChat);
+        settings.showGift   = get('tt-show-gift',   settings.showGift);
+        settings.showLike   = get('tt-show-like',   settings.showLike);
+        settings.showFollow = get('tt-show-follow', settings.showFollow);
+        settings.showMember = get('tt-show-member', settings.showMember);
+        settings.smallFont  = get('tt-small-font',  settings.smallFont);
+        settings.soundGift  = get('tt-sound-gift',  settings.soundGift);
+        const alpha = $('tt-alpha'); if (alpha) settings.alpha = +alpha.value;
+        const max = $('tt-max'); if (max) settings.max = +max.value;
+        maxMessages = settings.max;
+    }
+
+    function applyToDom() {
+        document.body.classList.toggle('tt-hide-chat',   !settings.showChat);
+        document.body.classList.toggle('tt-hide-gift',   !settings.showGift);
+        document.body.classList.toggle('tt-hide-like',   !settings.showLike);
+        document.body.classList.toggle('tt-hide-follow', !settings.showFollow);
+        document.body.classList.toggle('tt-hide-member', !settings.showMember);
+        document.body.classList.toggle('tt-small-font',  settings.smallFont);
+        // Transparenz live auf CSS-Variable
+        const panel = $('tiktok-slide');
+        if (panel) panel.style.setProperty('--tt-panel-alpha', (settings.alpha / 100).toFixed(2));
+        const alphaVal = $('tt-alpha-val'); if (alphaVal) alphaVal.textContent = settings.alpha + '%';
+        const maxVal = $('tt-max-val'); if (maxVal) maxVal.textContent = settings.max;
+        // Feed trimmen falls neuer Max-Wert niedriger
+        trimFeed();
+    }
+
+    function applySetting() {
+        readSettingsUI();
+        applyToDom();
+        saveSettings();
+    }
+
+    function toggleSettings() {
+        const sec = $('tt-settings');
+        if (!sec) return;
+        settingsOpen = !settingsOpen;
+        sec.classList.toggle('open', settingsOpen);
+    }
+
+    function playGiftSound() {
+        if (!settings.soundGift) return;
+        try {
+            const snd = document.getElementById('ovStartSound') || new Audio('chirsp.wav');
+            snd.volume = 0.3;
+            snd.currentTime = 0;
+            snd.play().catch(() => {});
+        } catch(_) {}
+    }
+
     function init() {
-        window.electronAPI?.onTiktokEvent?.(addEvent);
+        loadSettings();
+        maxMessages = settings.max;
+        writeSettingsUI();
+        window.electronAPI?.onTiktokEvent?.((payload) => {
+            if (payload?.type === 'gift') playGiftSound();
+            addEvent(payload);
+        });
         // Enter im Input = Connect
         const input = $('tt-username-input');
         if (input) {
@@ -2281,13 +2387,15 @@ const TikTokCtrl = (() => {
 
     window.addEventListener('DOMContentLoaded', init);
 
-    return { toggle, connect };
+    return { toggle, connect, toggleSettings, applySetting };
 })();
 
-// Expose als Overlay.toggleTiktok / tiktokConnect
+// Expose als Overlay.toggleTiktok / tiktokConnect / etc.
 Object.assign(Overlay, {
     toggleTiktok: () => TikTokCtrl.toggle(),
     tiktokConnect: () => TikTokCtrl.connect(),
+    tiktokToggleSettings: () => TikTokCtrl.toggleSettings(),
+    tiktokApplySetting: () => TikTokCtrl.applySetting(),
 });
 
 // ════════════════════════════════════════════════════════════════

@@ -382,30 +382,33 @@ body.overlay-active .tiktok-btn { display: flex !important; }
 }
 @keyframes tiktokPulseDot { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-/* Slide-Panel: kommt von rechts (translateX statt translateY wie GSG9) */
+/* Slide-Panel: full-height rechts, transparent Glass, ueber Roblox-UI */
 #tiktok-slide {
   position: fixed;
+  top: 0;
   bottom: 0;
   right: 0;
   width: 360px;
-  height: 70vh;
-  z-index: 501;
+  z-index: 10000;
   transform: translateX(100%);
   transition: transform 0.4s cubic-bezier(.16,1,.3,1);
   pointer-events: none;
   display: flex;
   flex-direction: column;
+  --tt-panel-alpha: 0.42;
 }
 #tiktok-slide.open { transform: translateX(0); }
 #tiktok-slide > .tt-body {
   flex: 1;
-  background: rgba(8, 12, 24, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px 0 0 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg,
+    rgba(8, 12, 24, var(--tt-panel-alpha)) 0%,
+    rgba(18, 6, 20, var(--tt-panel-alpha)) 100%);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border-radius: 16px 0 0 16px;
+  border: 1px solid rgba(254, 44, 85, 0.18);
   border-right: none;
-  border-bottom: none;
+  box-shadow: -12px 0 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(254,44,85,0.08);
   overflow: hidden;
   pointer-events: auto;
   display: flex;
@@ -550,6 +553,91 @@ body.overlay-active .tiktok-btn { display: flex !important; }
 .tt-msg.follow { background: rgba(37,244,238,0.08); border-left: 2px solid #25f4ee; }
 .tt-msg.member { background: rgba(148,163,184,0.05); opacity: 0.75; }
 .tt-msg-meta { color: rgba(255,255,255,0.4); font-size: 9px; margin-left: 4px; }
+
+/* Settings-Bereich unten */
+#tt-settings {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 12px 18px;
+  background: rgba(0,0,0,0.2);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+#tt-settings.open { display: flex; }
+.tt-settings-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+}
+.tt-settings-toggle-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.tt-settings-toggle-row input[type=checkbox] {
+  appearance: none;
+  width: 28px; height: 16px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 16px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+}
+.tt-settings-toggle-row input[type=checkbox]::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.2s;
+}
+.tt-settings-toggle-row input[type=checkbox]:checked { background: #fe2c55; }
+.tt-settings-toggle-row input[type=checkbox]:checked::after { left: 14px; }
+.tt-settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+}
+.tt-settings-slider input[type=range] {
+  flex: 1;
+  accent-color: #fe2c55;
+  height: 2px;
+}
+.tt-settings-slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+#tt-settings-toggle {
+  cursor: pointer;
+  color: rgba(255,255,255,0.4);
+  font-size: 14px;
+  padding: 4px 8px;
+  line-height: 1;
+  user-select: none;
+  transition: color 0.2s;
+}
+#tt-settings-toggle:hover { color: #fe2c55; }
+
+/* Event-Type Filter hides per body class */
+body.tt-hide-chat .tt-msg:not(.gift):not(.like):not(.follow):not(.member) { display: none; }
+body.tt-hide-gift .tt-msg.gift { display: none; }
+body.tt-hide-like .tt-msg.like { display: none; }
+body.tt-hide-follow .tt-msg.follow { display: none; }
+body.tt-hide-member .tt-msg.member { display: none; }
+body.tt-small-font .tt-msg { font-size: 10px; }
+body.tt-small-font .tt-msg img, body.tt-small-font .tt-msg .tt-ava { width: 18px; height: 18px; }
 #modLiveHistory::-webkit-scrollbar { display: none; }
 
 /* Klick-Area */
@@ -2193,7 +2281,10 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
         <span>TikTok Live</span>
         <span id="tt-viewer-count" style="font-size:10px;color:rgba(255,255,255,.4);font-weight:500;margin-left:6px;"></span>
       </div>
-      <span class="tt-close" onclick="Overlay.toggleTiktok()">&times;</span>
+      <div style="display:flex;align-items:center;gap:2px;">
+        <span id="tt-settings-toggle" title="Einstellungen" onclick="Overlay.tiktokToggleSettings()">⚙</span>
+        <span class="tt-close" onclick="Overlay.toggleTiktok()">&times;</span>
+      </div>
     </div>
     <div class="tt-connect-area">
       <input id="tt-username-input" class="tt-input" type="text" placeholder="@username" autocomplete="off" spellcheck="false" />
@@ -2204,6 +2295,61 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
       <div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.25);font-size:11px;">
         Username eingeben und „Verbinden" klicken.<br>
         <span style="font-size:10px;opacity:.7;">Streamer muss live sein.</span>
+      </div>
+    </div>
+
+    <!-- Settings (toggle via Zahnrad im Header) -->
+    <div id="tt-settings">
+      <div class="tt-settings-slider-label"><span>Event-Filter</span></div>
+      <div class="tt-settings-toggle-row">
+        <label><span>💬 Chat</span></label>
+        <input type="checkbox" id="tt-show-chat" checked onchange="Overlay.tiktokApplySetting()">
+      </div>
+      <div class="tt-settings-toggle-row">
+        <label><span>🎁 Gifts</span></label>
+        <input type="checkbox" id="tt-show-gift" checked onchange="Overlay.tiktokApplySetting()">
+      </div>
+      <div class="tt-settings-toggle-row">
+        <label><span>❤️ Likes</span></label>
+        <input type="checkbox" id="tt-show-like" checked onchange="Overlay.tiktokApplySetting()">
+      </div>
+      <div class="tt-settings-toggle-row">
+        <label><span>➕ Follows</span></label>
+        <input type="checkbox" id="tt-show-follow" checked onchange="Overlay.tiktokApplySetting()">
+      </div>
+      <div class="tt-settings-toggle-row">
+        <label><span>👥 Member-Joins</span></label>
+        <input type="checkbox" id="tt-show-member" onchange="Overlay.tiktokApplySetting()">
+      </div>
+
+      <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0;"></div>
+
+      <div class="tt-settings-slider-label"><span>Darstellung</span></div>
+      <div class="tt-settings-toggle-row">
+        <label><span>Kompakt (kleinere Schrift)</span></label>
+        <input type="checkbox" id="tt-small-font" onchange="Overlay.tiktokApplySetting()">
+      </div>
+      <div class="tt-settings-toggle-row">
+        <label><span>🔊 Ping-Sound bei Gifts</span></label>
+        <input type="checkbox" id="tt-sound-gift" onchange="Overlay.tiktokApplySetting()">
+      </div>
+
+      <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0;"></div>
+
+      <div class="tt-settings-slider-label">
+        <span>Transparenz</span>
+        <span id="tt-alpha-val">42%</span>
+      </div>
+      <div class="tt-settings-slider">
+        <input type="range" id="tt-alpha" min="10" max="95" value="42" oninput="Overlay.tiktokApplySetting()">
+      </div>
+
+      <div class="tt-settings-slider-label">
+        <span>Max Messages</span>
+        <span id="tt-max-val">150</span>
+      </div>
+      <div class="tt-settings-slider">
+        <input type="range" id="tt-max" min="30" max="500" step="10" value="150" oninput="Overlay.tiktokApplySetting()">
       </div>
     </div>
   </div>
