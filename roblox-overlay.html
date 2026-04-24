@@ -2171,11 +2171,10 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
   </div>
 </div>
 
-<!-- TIKTOK LIVE BUTTON -->
+<!-- TIKTOK LIVE BUTTON (position kommt aus .tiktok-btn Klasse) -->
 <div id="tiktok-trigger" class="tiktok-btn" onclick="event.stopPropagation();Overlay.toggleTiktok()"
      onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
-     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)"
-     style="position:relative;">
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
   <div style="display:flex;align-items:center;gap:5px;">
     <div style="width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,#25f4ee 0%,#000 50%,#fe2c55 100%);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#fff;letter-spacing:-1px;">TT</div>
     <span style="font-size:11px;font-weight:700;letter-spacing:.04em;">TikTok</span>

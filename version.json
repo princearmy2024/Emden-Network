@@ -1,6 +1,6 @@
 {
-    "version": "4.67.0",
-    "releaseDate": "2026-04-21",
-    "notes": "v4.67.0: TikTok Live im Roblox-Overlay! Neuer TikTok-Button rechts unten (rote TT-Logo). Klick oeffnet Slide-Panel von rechts — Username eingeben (@beispiel), Verbinden klicken → Live-Feed mit Chat + Gifts (🎁) + Likes (❤️) + Follows (+) + Member-Joins direkt im Overlay. Viewer-Count live oben. Letzter Username wird gemerkt. Nutzt tiktok-live-connector (unofficial, funktioniert mit public Live-Streams).",
+    "version": "4.67.1",
+    "releaseDate": "2026-04-24",
+    "notes": "v4.67.1: TikTok-Button Position Fix. Button war oben-links statt unten-rechts weil ein inline style='position:relative' das position:fixed der Klasse ueberschrieben hat. Jetzt korrekt unten-rechts neben Eintragen.",
     "forceUpdate": false
 }
