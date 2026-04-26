@@ -577,6 +577,291 @@ body.mod-open #tiktok-slide { z-index: 200 !important; }
 .tt-msg.member { background: rgba(148,163,184,0.05); opacity: 0.75; }
 .tt-msg-meta { color: rgba(255,255,255,0.4); font-size: 9px; margin-left: 4px; }
 
+/* ────────── TICKET-TOAST + LIVE-CHAT-PANEL ────────── */
+#ticket-toast-stack {
+    position: fixed;
+    top: 220px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+    max-width: 460px;
+    width: 94%;
+    max-height: calc(2 * 80px + 8px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+}
+.ticket-toast {
+    pointer-events: auto;
+    background: linear-gradient(135deg, rgba(91, 154, 255, 0.32), rgba(0, 209, 167, 0.18));
+    border: 1px solid rgba(91, 154, 255, 0.5);
+    border-radius: 14px;
+    padding: 10px 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 24px rgba(91, 154, 255, 0.18);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    transform: translateY(-12px);
+    opacity: 0;
+    transition: transform 0.25s ease-out, opacity 0.25s ease-out, filter 0.25s;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    color: #fff;
+    position: relative;
+}
+.ticket-toast.show { transform: translateY(0); opacity: 1; }
+.ticket-toast-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: rgba(91, 154, 255, 0.25);
+    color: #5b9aff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 20px;
+}
+.ticket-toast-body { flex: 1; min-width: 0; }
+.ticket-toast-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #5b9aff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+}
+.ticket-toast-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #5b9aff;
+    animation: ticketPulse 1s ease-in-out infinite;
+}
+@keyframes ticketPulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.ticket-toast-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ticket-toast-meta {
+    font-size: 10px;
+    color: rgba(255,255,255,.6);
+    margin-top: 1px;
+}
+.ticket-toast-btn {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #5b9aff, #2680d9);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.ticket-toast-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(91,154,255,0.4); }
+.ticket-toast-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ticket-toast-close {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: rgba(255,255,255,0.55);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    line-height: 1;
+    font-size: 14px;
+    transition: all 0.15s;
+}
+.ticket-toast-close:hover { background: rgba(255,82,82,0.4); color: #fff; transform: scale(1.1); }
+.ticket-toast.taken {
+    border-color: rgba(34, 197, 94, 0.55) !important;
+    background: linear-gradient(135deg, rgba(34,197,94,.25), rgba(22,163,74,.12)) !important;
+    filter: saturate(0.85);
+}
+.ticket-toast.taken .ticket-toast-title { color: #4ade80; }
+.ticket-toast.taken .ticket-toast-title::before { background: #22c55e; animation: none; }
+
+/* Live-Chat-Panel (rechts wie TikTok-Panel) */
+#ticket-chat-slide {
+    position: fixed;
+    top: 140px;
+    bottom: 80px;
+    right: 0;
+    width: 380px;
+    z-index: 9998;
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(.16,1,.3,1);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    --tc-alpha: 0.45;
+}
+#ticket-chat-slide.open { transform: translateX(0); }
+body.mod-open #ticket-chat-slide { z-index: 200 !important; }
+#ticket-chat-slide > .tc-body {
+    flex: 1;
+    background: linear-gradient(135deg,
+        rgba(8, 14, 32, var(--tc-alpha)) 0%,
+        rgba(6, 22, 32, var(--tc-alpha)) 100%);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border-radius: 16px 0 0 16px;
+    box-shadow: -12px 0 40px rgba(0,0,0,0.35);
+    overflow: hidden;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+#ticket-chat-slide .tc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+#ticket-chat-slide .tc-title {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 13px; color: #fff;
+    overflow: hidden;
+}
+#ticket-chat-slide .tc-title-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#ticket-chat-slide .tc-icon {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: rgba(91,154,255,.2);
+    color: #5b9aff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+#ticket-chat-slide .tc-close {
+    cursor: pointer;
+    color: rgba(255,255,255,0.4);
+    font-size: 22px;
+    padding: 4px 8px;
+    line-height: 1;
+}
+#ticket-chat-slide .tc-close:hover { color: #fff; }
+#ticket-chat-slide .tc-feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(91,154,255,.35) transparent;
+}
+#ticket-chat-slide .tc-feed::-webkit-scrollbar { width: 5px; }
+#ticket-chat-slide .tc-feed::-webkit-scrollbar-thumb { background: rgba(91,154,255,.35); border-radius: 3px; }
+.tc-msg {
+    display: flex;
+    gap: 8px;
+    animation: tcMsgIn 0.2s ease-out;
+}
+@keyframes tcMsgIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+.tc-msg img, .tc-msg .tc-ava {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.55);
+}
+.tc-msg-body {
+    flex: 1; min-width: 0;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 6px 10px;
+}
+.tc-msg-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #5b9aff;
+    margin-bottom: 2px;
+}
+.tc-msg-text {
+    font-size: 12px;
+    color: rgba(255,255,255,0.92);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+.tc-msg.is-bot .tc-msg-name { color: #94a3b8; }
+.tc-msg.is-self .tc-msg-name { color: #4ade80; }
+.tc-msg.is-self .tc-msg-body { background: rgba(74, 222, 128, 0.08); }
+.tc-msg-att {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #5b9aff;
+    text-decoration: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(91,154,255,.1);
+}
+.tc-msg-time {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 2px;
+}
+#ticket-chat-slide .tc-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+#ticket-chat-slide .tc-input {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    resize: none;
+    max-height: 80px;
+}
+#ticket-chat-slide .tc-input:focus { border-color: rgba(91,154,255,.5); }
+#ticket-chat-slide .tc-send {
+    padding: 0 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #5b9aff, #2680d9);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+}
+#ticket-chat-slide .tc-send:disabled { opacity: 0.5; cursor: not-allowed; }
+#ticket-chat-slide .tc-claim-banner {
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#ticket-chat-slide .tc-claim-banner.unclaimed { color: #fbbf24; background: rgba(251,191,36,.06); }
+#ticket-chat-slide .tc-claim-banner.claimed-other { color: #f87171; background: rgba(248,113,113,.06); }
+#ticket-chat-slide .tc-claim-banner.claimed-self { color: #4ade80; background: rgba(74,222,128,.06); }
+
 /* Settings-Bereich unten */
 #tt-settings {
   border-top: 1px solid rgba(255,255,255,0.06);
@@ -2278,6 +2563,32 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <div id="gsg9Content" style="display:flex;flex-direction:column;gap:12px;">
       <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.3);font-size:11px;">Lade...</div>
     </div>
+    </div>
+  </div>
+</div>
+
+<!-- TICKET TOAST STACK (top-center) -->
+<div id="ticket-toast-stack"></div>
+
+<!-- TICKET LIVE-CHAT PANEL (right-side slide) -->
+<div id="ticket-chat-slide"
+     onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
+  <div class="tc-body">
+    <div class="tc-header">
+      <div class="tc-title">
+        <div class="tc-icon">🎫</div>
+        <span class="tc-title-name" id="tc-title-name">Ticket</span>
+      </div>
+      <span class="tc-close" onclick="Overlay.ticketCloseChat()">&times;</span>
+    </div>
+    <div id="tc-claim-banner" class="tc-claim-banner unclaimed" style="display:none;"></div>
+    <div id="tc-feed" class="tc-feed">
+      <div style="text-align:center;padding:30px 16px;color:rgba(255,255,255,.3);font-size:11px;">Lade Verlauf...</div>
+    </div>
+    <div class="tc-input-row">
+      <textarea id="tc-input" class="tc-input" placeholder="Nachricht..." rows="1"></textarea>
+      <button id="tc-send" class="tc-send" onclick="Overlay.ticketSend()">Senden</button>
     </div>
   </div>
 </div>

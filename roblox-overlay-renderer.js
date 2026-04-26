@@ -834,10 +834,14 @@ const Overlay = (() => {
         socket.on(`overlay_notification_${discordId}`, handleNotif);
         socket.on('overlay_big_announcement', bigAnnounce);
 
-        socket.on('overlay_new_ticket', ({ ticketId, reason, channelName }) => {
+        socket.on('overlay_new_ticket', (data) => {
+            const { ticketId, reason, channelName } = data || {};
             notify({ title: `📩 Neues Ticket`, text: `#${channelName || ticketId} — ${reason || 'Neues Ticket'}`, type: 'ticket', duration: 15000 });
-            try { const a = new Audio('./ticketsound.mp3'); a.volume = 0.5; a.play().catch(()=>{}); } catch(e) {}
+            // Neuer Ticket-Toast mit Claim-Button (wenn channelId vorhanden)
+            if (data?.channelId) TicketCtrl.onNewTicket(data);
         });
+        socket.on('ticket_claimed', (data) => TicketCtrl.onClaimed(data));
+        socket.on('ticket_message', (data) => TicketCtrl.onMessage(data));
 
         // Persönliche Mention
         socket.on(`dc_mention_${discordId}`, (data) => {
@@ -2726,6 +2730,312 @@ const SupportOverlay = (() => {
 window.SupportOverlay = SupportOverlay;
 // Debug: window._testSupport() → fake Case spawnen
 window._testSupport = () => SupportOverlay._testFake();
+
+// ════════════════════════════════════════════════════════════════
+// TICKET CLAIM + LIVE-CHAT — In-Game Ticket-Bearbeitung
+// Notifications + Claim-Button + Live-Chat-Panel rechts
+// ════════════════════════════════════════════════════════════════
+const TicketCtrl = (() => {
+    const tickets = new Map();    // channelId → { channelId, channelName, ticketId, reason, claim?, dismissed }
+    let chatChannelId = null;     // aktuell offener Chat
+    let chatMessages = [];        // [{ messageId, ... }]
+    let chatClaim = null;
+
+    function $(id) { return document.getElementById(id); }
+    function escapeHtml(s) {
+        if (typeof s !== 'string') return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function getMyDiscordId() {
+        let id = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
+        if (id) return id;
+        try { const s = JSON.parse(localStorage.getItem('en_session') || 'null'); if (s?.user?.discordId) return s.user.discordId; } catch(_) {}
+        return null;
+    }
+    function isStaff() { return !!window._isStaff; }
+
+    // Toast-Stack rendern
+    function renderToasts() {
+        const stack = $('ticket-toast-stack');
+        if (!stack) return;
+        if (!isStaff()) { stack.innerHTML = ''; return; }
+        const visible = Array.from(tickets.values()).filter(t => !t.dismissed);
+        if (visible.length === 0) { stack.innerHTML = ''; return; }
+        stack.innerHTML = visible.map(t => {
+            const taken = !!t.claim;
+            const claimText = taken
+                ? `<span style="color:#4ade80;font-weight:600;">✓ ${escapeHtml(t.claim.claimerName)}</span>`
+                : 'unclaimed';
+            return `
+                <div class="ticket-toast show ${taken ? 'taken' : ''}" data-channel-id="${escapeHtml(t.channelId)}">
+                    <div class="ticket-toast-icon">🎫</div>
+                    <div class="ticket-toast-body">
+                        <div class="ticket-toast-title">Ticket · ${escapeHtml(t.reason || '')}</div>
+                        <div class="ticket-toast-name">#${escapeHtml(t.channelName)}</div>
+                        <div class="ticket-toast-meta">${claimText}</div>
+                    </div>
+                    ${taken
+                        ? `<button class="ticket-toast-btn" onclick="Overlay.ticketOpenChat('${escapeHtml(t.channelId)}')">→ Chat</button>`
+                        : `<button class="ticket-toast-btn" onclick="Overlay.ticketClaim('${escapeHtml(t.channelId)}', this)">→ Claim</button>`
+                    }
+                    <button class="ticket-toast-close" onclick="Overlay.ticketDismiss('${escapeHtml(t.channelId)}')">×</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Cursor-Tracker Focus fuer Toasts (wie SupportOverlay)
+    let _focusGranted = false;
+    function trackToastCursor() {
+        document.addEventListener('mousemove', (e) => {
+            const stack = $('ticket-toast-stack');
+            const chat = $('ticket-chat-slide');
+            if (!stack && !chat) return;
+            let over = false;
+            const BUFFER = 40;
+            const checkRect = (el) => {
+                if (!el) return false;
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) return false;
+                return e.clientX >= r.left - BUFFER && e.clientX <= r.right + BUFFER &&
+                       e.clientY >= r.top - BUFFER && e.clientY <= r.bottom + BUFFER;
+            };
+            // Toasts
+            stack?.querySelectorAll('.ticket-toast').forEach(t => { if (checkRect(t)) over = true; });
+            // Chat-Panel wenn offen
+            if (chat?.classList.contains('open')) { if (checkRect(chat.querySelector('.tc-body'))) over = true; }
+            if (over && !_focusGranted) { window.electronAPI?.requestOverlayFocus?.(true); _focusGranted = true; }
+            else if (!over && _focusGranted) { window.electronAPI?.requestOverlayFocus?.(false); _focusGranted = false; }
+        });
+    }
+
+    // ─── Events ────────────────────────────────────────────
+    function onNewTicket(data) {
+        if (!data?.channelId) return;
+        if (tickets.has(data.channelId)) return;
+        tickets.set(data.channelId, {
+            channelId: data.channelId,
+            channelName: data.channelName,
+            ticketId: data.ticketId,
+            reason: data.reason,
+            claim: null,
+            dismissed: false,
+        });
+        renderToasts();
+        // Sound
+        try { const a = new Audio('ticketsound.mp3'); a.volume = 0.4; a.play().catch(()=>{}); } catch(_) {}
+    }
+
+    function onClaimed(data) {
+        if (!data?.channelId) return;
+        const t = tickets.get(data.channelId) || { channelId: data.channelId, channelName: data.channelName, dismissed: false };
+        t.claim = {
+            claimerDiscordId: data.claimerDiscordId,
+            claimerName: data.claimerName,
+            claimerAvatar: data.claimerAvatar,
+            claimedAt: data.claimedAt,
+        };
+        tickets.set(data.channelId, t);
+        renderToasts();
+        // Wenn Chat offen ist auf diesem Channel → Banner aktualisieren
+        if (chatChannelId === data.channelId) {
+            chatClaim = t.claim;
+            updateChatBanner();
+        }
+    }
+
+    function onMessage(payload) {
+        if (!payload?.channelId) return;
+        // Nur in Live-Chat einfuegen wenn passender Channel offen
+        if (chatChannelId !== payload.channelId) return;
+        chatMessages.push(payload);
+        if (chatMessages.length > 200) chatMessages = chatMessages.slice(-200);
+        appendMessageToFeed(payload, true);
+    }
+
+    // ─── Actions ────────────────────────────────────────────
+    async function claim(channelId, btnEl) {
+        const myId = getMyDiscordId();
+        if (!myId) return alert('Keine Discord-ID — neu einloggen.');
+        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId, discordId: myId }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) {
+                if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Claim'; }
+                alert('Fehler: ' + (d.error || ('HTTP ' + r.status)));
+                return;
+            }
+            // Direkt Chat oeffnen
+            openChat(channelId);
+        } catch(e) {
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Claim'; }
+            alert('Netzwerk-Fehler: ' + (e.message || e));
+        }
+    }
+
+    function dismiss(channelId) {
+        const t = tickets.get(channelId);
+        if (t) { t.dismissed = true; renderToasts(); }
+    }
+
+    // ─── Chat-Panel ─────────────────────────────────────────
+    async function openChat(channelId) {
+        chatChannelId = channelId;
+        chatMessages = [];
+        const t = tickets.get(channelId);
+        const titleEl = $('tc-title-name');
+        if (titleEl) titleEl.textContent = '#' + (t?.channelName || channelId);
+        $('tc-feed').innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.3);font-size:11px;">Lade Verlauf...</div>';
+        $('ticket-chat-slide')?.classList.add('open');
+        const myId = getMyDiscordId();
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/history?channelId=${encodeURIComponent(channelId)}&discordId=${encodeURIComponent(myId)}`, {
+                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
+            });
+            if (!r.ok) {
+                $('tc-feed').innerHTML = `<div style="text-align:center;padding:30px;color:#f87171;font-size:11px;">Fehler: HTTP ${r.status}</div>`;
+                return;
+            }
+            const d = await r.json();
+            chatClaim = d.claim || null;
+            chatMessages = d.messages || [];
+            $('tc-feed').innerHTML = '';
+            for (const m of chatMessages) appendMessageToFeed(m, false);
+            updateChatBanner();
+            scrollFeedToBottom();
+        } catch(e) {
+            $('tc-feed').innerHTML = `<div style="text-align:center;padding:30px;color:#f87171;font-size:11px;">Fehler: ${escapeHtml(e.message || e)}</div>`;
+        }
+    }
+
+    function closeChat() {
+        $('ticket-chat-slide')?.classList.remove('open');
+        chatChannelId = null;
+        chatMessages = [];
+        chatClaim = null;
+    }
+
+    function updateChatBanner() {
+        const banner = $('tc-claim-banner');
+        if (!banner) return;
+        const myId = getMyDiscordId();
+        if (!chatClaim) {
+            banner.style.display = 'block';
+            banner.className = 'tc-claim-banner unclaimed';
+            banner.innerHTML = `⚠ Noch nicht geclaimt — <a href="#" onclick="event.preventDefault();Overlay.ticketClaim('${escapeHtml(chatChannelId)}')" style="color:#5b9aff;">jetzt claimen</a>`;
+        } else if (chatClaim.claimerDiscordId === myId) {
+            banner.style.display = 'block';
+            banner.className = 'tc-claim-banner claimed-self';
+            banner.innerHTML = `✓ Du bearbeitest dieses Ticket`;
+        } else {
+            banner.style.display = 'block';
+            banner.className = 'tc-claim-banner claimed-other';
+            banner.innerHTML = `Geclaimt von ${escapeHtml(chatClaim.claimerName)} — du kannst lesen + schreiben`;
+        }
+    }
+
+    function appendMessageToFeed(msg, scroll) {
+        const feed = $('tc-feed');
+        if (!feed) return;
+        const myId = getMyDiscordId();
+        const isSelf = msg.authorId === myId;
+        const isBot = !!msg.authorIsBot;
+        const av = msg.authorAvatar
+            ? `<img src="${escapeHtml(msg.authorAvatar)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tc-ava',textContent:'?'}))">`
+            : `<div class="tc-ava">${escapeHtml((msg.authorName || '?').charAt(0).toUpperCase())}</div>`;
+        const time = msg.ts ? new Date(msg.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+        const attachments = (msg.attachments || []).map(a => `<a href="${escapeHtml(a.url)}" class="tc-msg-att" target="_blank">📎 ${escapeHtml(a.name || 'Anhang')}</a>`).join(' ');
+        const div = document.createElement('div');
+        div.className = 'tc-msg' + (isSelf ? ' is-self' : '') + (isBot ? ' is-bot' : '');
+        div.dataset.messageId = msg.messageId || '';
+        div.innerHTML = `
+            ${av}
+            <div class="tc-msg-body">
+                <div class="tc-msg-name">${escapeHtml(msg.authorName || 'User')}${isBot ? ' <span style="color:rgba(255,255,255,.3);font-weight:400;">(Bot)</span>' : ''}</div>
+                <div class="tc-msg-text">${escapeHtml(msg.content || '')}</div>
+                ${attachments ? `<div>${attachments}</div>` : ''}
+                ${time ? `<div class="tc-msg-time">${time}</div>` : ''}
+            </div>
+        `;
+        feed.appendChild(div);
+        if (scroll) {
+            const nearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 100;
+            if (nearBottom) scrollFeedToBottom();
+        }
+    }
+
+    function scrollFeedToBottom() {
+        const feed = $('tc-feed');
+        if (feed) feed.scrollTop = feed.scrollHeight;
+    }
+
+    async function send() {
+        const input = $('tc-input');
+        if (!input || !chatChannelId) return;
+        const text = input.value.trim();
+        if (!text) return;
+        const myId = getMyDiscordId();
+        if (!myId) return alert('Keine Discord-ID');
+        const btn = $('tc-send');
+        if (btn) btn.disabled = true;
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/reply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId: chatChannelId, discordId: myId, text }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) {
+                alert('Fehler: ' + (d.error || ('HTTP ' + r.status)));
+                return;
+            }
+            input.value = '';
+            input.style.height = 'auto';
+        } catch(e) {
+            alert('Netzwerk: ' + (e.message || e));
+        } finally {
+            if (btn) btn.disabled = false;
+            input.focus();
+        }
+    }
+
+    function init() {
+        // Auto-resize Textarea
+        const input = $('tc-input');
+        if (input) {
+            input.addEventListener('input', () => {
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 80) + 'px';
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+            });
+        }
+        trackToastCursor();
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+
+    return {
+        onNewTicket, onClaimed, onMessage,
+        claim, dismiss, openChat, closeChat, send,
+    };
+})();
+window.TicketCtrl = TicketCtrl;
+
+// Overlay-API (fuer onclick handlers im HTML)
+Object.assign(Overlay, {
+    ticketClaim: (channelId, btnEl) => TicketCtrl.claim(channelId, btnEl),
+    ticketDismiss: (channelId) => TicketCtrl.dismiss(channelId),
+    ticketOpenChat: (channelId) => TicketCtrl.openChat(channelId),
+    ticketCloseChat: () => TicketCtrl.closeChat(),
+    ticketSend: () => TicketCtrl.send(),
+});
 
 window.addEventListener('DOMContentLoaded', () => {
     Overlay.init();

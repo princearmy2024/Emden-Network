@@ -1,6 +1,6 @@
 {
-    "version": "4.67.5",
-    "releaseDate": "2026-04-24",
-    "notes": "v4.67.5: Support-Cases Stale-State-Fix (Mobile + Desktop). Bug: nach Reconnect oder App-Background bleiben uebernommene Cases als Ghost stehen. Fix: re-fetch /api/support-cases/open bei jedem Socket-connect (komplette State-Erneuerung). Auto-Dismiss nach 2.5s wenn Case auf taken wechselt. Polling-Backup alle 60s falls Sockets stumm sind. Bug bei loadInitial: nutzte CONFIG.API_SECRET statt API_KEY → 401 Unauthorized → Initial-Load schlug stumm fehl. Jetzt API_KEY korrekt.",
+    "version": "4.68.0",
+    "releaseDate": "2026-04-26",
+    "notes": "v4.68.0: TICKET CLAIM + LIVE-CHAT IM OVERLAY. Bot detect neue Ticket-Channels → Toast oben mittig im Overlay mit CLAIM-Button. Click → Bot postet via Webhook 'X hat geclaimt' direkt im Ticket (mit deinem Avatar). Andere Staff sehen Toast 'taken'. Click → Live-Chat-Panel rechts oeffnet sich (wie TikTok-Style): Verlauf der letzten 30 Messages + neue live, Input zum Antworten — deine Reply geht via Webhook ins Ticket mit deinem Avatar+Name. WICHTIG: Bot braucht Manage Webhooks Permission im Ticket-Channel + Bot-Upload auf Cybrancee.",
     "forceUpdate": false
 }
