@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.67.4'; // Stand: 24.04.2026
+let CURRENT_VERSION = '4.67.5'; // Stand: 24.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -218,6 +218,10 @@ const WebSocketService = {
                 if (u) this.socket.emit('chat_register', { discordId: u.discordId, username: u.username });
                 setTimeout(() => this._fetchStatus(), 2000);
                 App.initVoiceSocketEvents(this.socket);
+                // Stale-State Fix: Support-Cases neu laden bei Reconnect
+                if (window.SupportCases?.refresh) {
+                    setTimeout(() => SupportCases.refresh(), 500);
+                }
             });
 
             this.socket.on('disconnect', () => {
@@ -5524,6 +5528,16 @@ const SupportCases = (() => {
         const prev = cases.get(c.caseId);
         cases.set(c.caseId, { ...(prev || {}), ...c });
         render();
+        // Auto-Dismiss bei "taken" — ueberbluemt nicht alle Karten lange
+        if (c.status === 'taken') {
+            setTimeout(() => {
+                const cur = cases.get(c.caseId);
+                if (cur && cur.status === 'taken') {
+                    cases.delete(c.caseId);
+                    render();
+                }
+            }, 2500);
+        }
     }
     function remove(caseId) {
         if (!caseId) return;
@@ -5561,35 +5575,39 @@ const SupportCases = (() => {
         }
     }
 
-    async function loadInitial() {
-        if (initialLoadDone) return;
+    async function refresh() {
         const u = (window.AuthService && AuthService.getUser()) || null;
         if (!u || !isStaff()) return;
         try {
             const resp = await fetch(
                 CONFIG.API_URL + '/api/support-cases/open?discordId=' + encodeURIComponent(u.discordId),
-                { headers: { 'x-api-key': CONFIG.API_SECRET } }
+                { headers: { 'x-api-key': CONFIG.API_KEY } }
             );
             if (!resp.ok) return;
             const data = await resp.json();
             if (Array.isArray(data.cases)) {
+                // Komplett neuen State setzen — Bot ist die Wahrheit
                 cases.clear();
                 data.cases.forEach(c => cases.set(c.caseId, c));
                 render();
             }
             initialLoadDone = true;
         } catch (e) {
-            console.warn('[SupportCases] loadInitial fail:', e.message);
+            console.warn('[SupportCases] refresh fail:', e.message);
         }
     }
+    // Backwards-Compat: loadInitial → refresh
+    async function loadInitial() { return refresh(); }
 
     function init() {
         setInterval(tickWaitingTimes, 1000);
         // Initial-Load leicht verzoegert, damit Socket + Auth bereit sind
         setTimeout(loadInitial, 3500);
+        // Polling-Backup: alle 60s state-refresh (falls Sockets stumm)
+        setInterval(refresh, 60 * 1000);
     }
 
-    return { init, add, update, remove, take, render, loadInitial };
+    return { init, add, update, remove, take, render, loadInitial, refresh };
 })();
 
 window.SupportCases = SupportCases;

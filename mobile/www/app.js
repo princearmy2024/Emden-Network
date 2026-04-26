@@ -1,5 +1,5 @@
 // Emden Network Mobile — app.js
-const MOBILE_VERSION = '4.67.4'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
+const MOBILE_VERSION = '4.67.5'; // Synchron mit Repo-Tag (api.php liest GitHub latest)
 const CONFIG = {
     // PHP-Proxy ueber HTTPS — umgeht Cleartext + CORS Probleme auf Android
     API_URL: 'https://enrp.net/api.php',
@@ -49,6 +49,11 @@ function connectSocket() {
         if (u) {
             socket.emit('client_online', { discordId: u.discordId, username: u.username, avatar: u.avatar, role: u.role });
             socket.emit('chat_register', { discordId: u.discordId, username: u.username });
+        }
+        // Stale-State Fix: re-fetch open Support-Cases bei jedem Connect
+        // (auch nach Reconnect — sonst bleiben uebernommene Cases als Ghost stehen)
+        if (window.SupportMobile?.refresh) {
+            setTimeout(() => SupportMobile.refresh(), 500);
         }
     });
 
@@ -1558,10 +1563,20 @@ const SupportMobile = (() => {
         const prev = cases.get(c.caseId);
         cases.set(c.caseId, { ...(prev || {}), ...c });
         render();
+        // Auto-Dismiss bei "taken" — andere Staff sehen kurz "uebernommen" dann weg
+        if (c.status === 'taken') {
+            setTimeout(() => {
+                const cur = cases.get(c.caseId);
+                if (cur && cur.status === 'taken') {
+                    cases.delete(c.caseId);
+                    render();
+                }
+            }, 2500);
+        }
     }
     function remove(caseId) { if (!caseId) return; cases.delete(caseId); render(); }
 
-    async function loadInitial() {
+    async function refresh() {
         const u = Auth?.user;
         if (!u || !App._isStaff()) return;
         try {
@@ -1572,6 +1587,8 @@ const SupportMobile = (() => {
             if (!r.ok) return;
             const d = await r.json();
             if (Array.isArray(d.cases)) {
+                // Komplett neuen State setzen — Bot kennt die Wahrheit, alles
+                // andere ist potentiell stale (Reconnect / Background / Crash).
                 cases.clear();
                 d.cases.forEach(c => cases.set(c.caseId, c));
                 render();
@@ -1581,10 +1598,12 @@ const SupportMobile = (() => {
 
     function init() {
         setInterval(tickTimes, 1000);
-        setTimeout(loadInitial, 3500);
+        setTimeout(refresh, 3500);
+        // Polling als Backup falls Sockets stumm sind (z.B. Mobile-Sleep)
+        setInterval(refresh, 60 * 1000);
     }
 
-    return { init, add, update, remove, take, render };
+    return { init, add, update, remove, take, render, refresh };
 })();
 window.SupportMobile = SupportMobile;
 

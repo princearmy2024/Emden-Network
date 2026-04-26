@@ -770,6 +770,10 @@ const Overlay = (() => {
                 username:  voiceUsername,
                 discordId: voiceDiscordId,
             });
+            // Stale-State Fix: Support-Cases bei jedem Reconnect re-fetchen
+            if (window.SupportOverlay?.loadInitial) {
+                setTimeout(() => SupportOverlay.loadInitial(), 500);
+            }
         });
 
         socket.on('overlay_supporter_count', ({ count }) => setSupporter(count));
