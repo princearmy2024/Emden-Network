@@ -50,7 +50,9 @@ const Overlay = (() => {
         robloxId   = p.get('robloxId')  || '';
         isAdmin    = p.get('admin') === '1';
         const isStaff = p.get('staff') === '1';
-        window._isStaff = isStaff;
+        // Admins gelten als Staff (Tickets/Support/etc) — sonst gated overlay-Funktionen
+        window._isStaff = isStaff || isAdmin;
+        window._isAdmin = isAdmin;
         voiceDiscordId = discordId;
 
         // User-Info aus dem Dashboard localStorage lesen
@@ -970,6 +972,15 @@ const Overlay = (() => {
         document.body.classList.toggle('mod-open', modSlideOpen);
 
         if (modSlideOpen) {
+            // Andere Panels schliessen — nur eines gleichzeitig
+            try {
+                const tk = document.getElementById('ticket-overlay');
+                if (tk && tk.classList.contains('open') && window.TicketCtrl?.close) TicketCtrl.close();
+                const gsg9 = document.getElementById('gsg9-slide');
+                if (gsg9 && gsg9.classList.contains('open') && window.Overlay?.toggleGSG9) Overlay.toggleGSG9();
+                const tt = document.getElementById('tiktok-slide');
+                if (tt && tt.classList.contains('open') && window.Overlay?.toggleTiktok) Overlay.toggleTiktok();
+            } catch(_) {}
             requestFocus(true);
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
             loadModHistory();
@@ -2833,9 +2844,17 @@ const TicketCtrl = (() => {
         if (target) target.classList.add('active');
     }
     function open() {
-        if (!isStaff()) return;
         const ov = $('ticket-overlay');
         if (!ov) return;
+        // Andere Panels schliessen damit nichts uebereinander stapelt
+        try {
+            const mod = document.getElementById('mod-slide');
+            if (mod && mod.classList.contains('open') && window.Overlay?.toggleModSlide) Overlay.toggleModSlide();
+            const gsg9 = document.getElementById('gsg9-slide');
+            if (gsg9 && gsg9.classList.contains('open') && window.Overlay?.toggleGSG9) Overlay.toggleGSG9();
+            const tt = document.getElementById('tiktok-slide');
+            if (tt && tt.classList.contains('open') && window.Overlay?.toggleTiktok) Overlay.toggleTiktok();
+        } catch(_) {}
         ov.classList.add('open');
         setView('list');
         loadAll();
@@ -3319,10 +3338,13 @@ const TicketCtrl = (() => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
             });
         }
-        trackCursor();
-        // Beim Start einmal laden (falls Staff)
-        setTimeout(() => { if (isStaff()) loadAll(); }, 2500);
-        setInterval(() => { if (isStaff()) loadAll(); }, 60000);
+        // Cursor-Tracker absichtlich entfernt — die inline onmouseenter/leave auf
+        // dem Overlay-Element (#ticket-overlay) und dem Trigger reichen.
+        // Mehrere Tracker konkurrieren um den Focus-State und revoken sich gegenseitig
+        // → Click leakt zur Roblox-Map. Stattdessen verlassen wir uns auf inline-Handler.
+        // Beim Start einmal laden — server-side Staff-Check entscheidet was zurueckkommt
+        setTimeout(() => loadAll(), 2500);
+        setInterval(() => loadAll(), 60000);
     }
     window.addEventListener('DOMContentLoaded', init);
 

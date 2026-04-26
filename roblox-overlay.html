@@ -423,7 +423,8 @@ body.overlay-active .tiktok-btn { display: flex !important; }
 }
 #ticket-overlay.side-left { right: auto; left: 0; transform: translateX(-100%); }
 #ticket-overlay.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
-body.mod-open #ticket-overlay { z-index: 200 !important; }
+/* z-index NICHT mehr droppen wenn mod-slide offen — Tickets/Eintragen schliessen sich ggT.
+   gegenseitig automatisch (siehe TicketCtrl.open + toggleModSlide in renderer.js). */
 #ticket-overlay-bg {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   background: linear-gradient(to left,
