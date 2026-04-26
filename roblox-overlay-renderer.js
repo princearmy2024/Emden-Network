@@ -842,6 +842,7 @@ const Overlay = (() => {
         });
         socket.on('ticket_claimed', (data) => TicketCtrl.onClaimed(data));
         socket.on('ticket_message', (data) => TicketCtrl.onMessage(data));
+        socket.on('ticket_closed',  (data) => TicketCtrl.onClosed(data));
 
         // Persönliche Mention
         socket.on(`dc_mention_${discordId}`, (data) => {
@@ -2790,7 +2791,9 @@ const TicketCtrl = (() => {
         document.addEventListener('mousemove', (e) => {
             const stack = $('ticket-toast-stack');
             const chat = $('ticket-chat-slide');
-            if (!stack && !chat) return;
+            const panel = $('tickets-panel');
+            const trigger = $('tickets-trigger');
+            if (!stack && !chat && !panel) return;
             let over = false;
             const BUFFER = 40;
             const checkRect = (el) => {
@@ -2804,6 +2807,10 @@ const TicketCtrl = (() => {
             stack?.querySelectorAll('.ticket-toast').forEach(t => { if (checkRect(t)) over = true; });
             // Chat-Panel wenn offen
             if (chat?.classList.contains('open')) { if (checkRect(chat.querySelector('.tc-body'))) over = true; }
+            // Tickets-Panel wenn offen
+            if (panel?.classList.contains('open')) { if (checkRect(panel.querySelector('.tp-body'))) over = true; }
+            // Tickets-Button selbst (Hover für Klick)
+            if (trigger && checkRect(trigger)) over = true;
             if (over && !_focusGranted) { window.electronAPI?.requestOverlayFocus?.(true); _focusGranted = true; }
             else if (!over && _focusGranted) { window.electronAPI?.requestOverlayFocus?.(false); _focusGranted = false; }
         });
@@ -3004,6 +3011,160 @@ const TicketCtrl = (() => {
         }
     }
 
+    // ─── Tickets-Panel (Liste der Claims) ───────────────────
+    let myClaims = [];
+    let panelOpen = false;
+
+    async function loadMyClaims() {
+        const myId = getMyDiscordId();
+        if (!myId) return;
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/my-claims?discordId=${encodeURIComponent(myId)}`, {
+                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
+            });
+            if (!r.ok) return;
+            const d = await r.json();
+            myClaims = d.items || [];
+            renderClaimsBadge();
+            if (panelOpen) renderClaimsPanel();
+        } catch (e) {
+            console.warn('[Tickets] my-claims fetch failed:', e.message || e);
+        }
+    }
+
+    function renderClaimsBadge() {
+        const btn = $('tickets-trigger');
+        const badge = $('tickets-badge');
+        if (!btn || !badge) return;
+        const n = myClaims.length;
+        badge.textContent = n;
+        btn.classList.toggle('has-claims', n > 0);
+    }
+
+    function renderClaimsPanel() {
+        const list = $('tp-list');
+        if (!list) return;
+        if (myClaims.length === 0) {
+            list.innerHTML = '<div class="tp-empty">Keine aktiven Tickets — claime eins um es hier zu verwalten.</div>';
+            return;
+        }
+        list.innerHTML = myClaims.map(c => {
+            const since = c.claimedAt ? timeAgo(c.claimedAt) : '';
+            return `
+                <div class="tp-item">
+                    <div class="tp-item-name">#${escapeHtml(c.channelName || c.channelId)}</div>
+                    <div class="tp-item-meta">geclaimt ${escapeHtml(since)}</div>
+                    <div class="tp-item-actions">
+                        <button class="tp-action" onclick="Overlay.ticketOpenChat('${escapeHtml(c.channelId)}')">→ Chat</button>
+                        <button class="tp-action warn" onclick="Overlay.ticketRequestTransferFor('${escapeHtml(c.channelId)}')">↪️ Übergeben</button>
+                        <button class="tp-action danger" onclick="Overlay.ticketRequestCloseFor('${escapeHtml(c.channelId)}')">🔒 Schließen</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function timeAgo(ts) {
+        const s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60) return 'gerade eben';
+        if (s < 3600) return Math.floor(s / 60) + 'm';
+        if (s < 86400) return Math.floor(s / 3600) + 'h';
+        return Math.floor(s / 86400) + 'd';
+    }
+
+    function togglePanel() {
+        if (!isStaff()) return;
+        const panel = $('tickets-panel');
+        if (!panel) return;
+        panelOpen = !panel.classList.contains('open');
+        if (panelOpen) {
+            panel.classList.add('open');
+            loadMyClaims();
+            renderClaimsPanel();
+        } else {
+            panel.classList.remove('open');
+        }
+    }
+
+    // ─── Menü im Chat-Header (Übergeben / Schließen) ────────
+    function toggleMenu() {
+        const pop = $('tc-menu-pop');
+        if (!pop) return;
+        pop.classList.toggle('open');
+    }
+    function closeMenu() {
+        const pop = $('tc-menu-pop');
+        if (pop) pop.classList.remove('open');
+    }
+
+    async function requestCloseFor(channelId) {
+        if (!channelId) return;
+        if (!confirm('Ticket schließen? Channel wird in 30s gelöscht (cancel im Chat möglich).')) return;
+        const myId = getMyDiscordId();
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId, discordId: myId }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) { alert('Fehler: ' + (d.error || ('HTTP ' + r.status))); return; }
+            closeMenu();
+            // Falls Chat dieses Channels offen ist → schließen
+            if (chatChannelId === channelId) closeChat();
+            // Aus my-claims entfernen
+            myClaims = myClaims.filter(c => c.channelId !== channelId);
+            renderClaimsBadge();
+            if (panelOpen) renderClaimsPanel();
+        } catch(e) {
+            alert('Netzwerk: ' + (e.message || e));
+        }
+    }
+    function requestClose() { if (chatChannelId) requestCloseFor(chatChannelId); }
+
+    async function requestTransferFor(channelId) {
+        if (!channelId) return;
+        if (!confirm('Ticket zur Übernahme freigeben? Andere Staff sehen wieder einen Toast.')) return;
+        const myId = getMyDiscordId();
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/transfer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId, discordId: myId }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) { alert('Fehler: ' + (d.error || ('HTTP ' + r.status))); return; }
+            closeMenu();
+            if (chatChannelId === channelId) closeChat();
+            myClaims = myClaims.filter(c => c.channelId !== channelId);
+            renderClaimsBadge();
+            if (panelOpen) renderClaimsPanel();
+        } catch(e) {
+            alert('Netzwerk: ' + (e.message || e));
+        }
+    }
+    function requestTransfer() { if (chatChannelId) requestTransferFor(chatChannelId); }
+
+    // Listener: ticket_closed → aus claims entfernen
+    function onClosed(data) {
+        if (!data?.channelId) return;
+        myClaims = myClaims.filter(c => c.channelId !== data.channelId);
+        tickets.delete(data.channelId);
+        renderClaimsBadge();
+        renderToasts();
+        if (panelOpen) renderClaimsPanel();
+        if (chatChannelId === data.channelId) closeChat();
+    }
+
+    // Wenn ein Ticket geclaimt/freigegeben wird → my-claims aktualisieren
+    const _origOnClaimed = onClaimed;
+    function onClaimedExt(data) {
+        _origOnClaimed(data);
+        // Nach kurzer Verzögerung neu laden (eigene Claims könnten sich geändert haben)
+        clearTimeout(window.__tk_reload);
+        window.__tk_reload = setTimeout(loadMyClaims, 300);
+    }
+
     function init() {
         // Auto-resize Textarea
         const input = $('tc-input');
@@ -3017,13 +3178,28 @@ const TicketCtrl = (() => {
             });
         }
         trackToastCursor();
+        // Klick außerhalb des Menüs → schließen
+        document.addEventListener('click', (e) => {
+            const pop = $('tc-menu-pop');
+            const btn = $('tc-menu-btn');
+            if (!pop || !btn) return;
+            if (pop.contains(e.target) || btn.contains(e.target)) return;
+            pop.classList.remove('open');
+        });
+        // Initial my-claims laden, dann periodisch
+        setTimeout(loadMyClaims, 2500);
+        setInterval(loadMyClaims, 60000);
     }
 
     window.addEventListener('DOMContentLoaded', init);
 
     return {
-        onNewTicket, onClaimed, onMessage,
+        onNewTicket, onClaimed: onClaimedExt, onMessage, onClosed,
         claim, dismiss, openChat, closeChat, send,
+        togglePanel, toggleMenu,
+        requestClose, requestCloseFor,
+        requestTransfer, requestTransferFor,
+        loadMyClaims,
     };
 })();
 window.TicketCtrl = TicketCtrl;
@@ -3035,6 +3211,12 @@ Object.assign(Overlay, {
     ticketOpenChat: (channelId) => TicketCtrl.openChat(channelId),
     ticketCloseChat: () => TicketCtrl.closeChat(),
     ticketSend: () => TicketCtrl.send(),
+    toggleTicketsPanel: () => TicketCtrl.togglePanel(),
+    ticketToggleMenu: () => TicketCtrl.toggleMenu(),
+    ticketRequestClose: () => TicketCtrl.requestClose(),
+    ticketRequestTransfer: () => TicketCtrl.requestTransfer(),
+    ticketRequestCloseFor: (id) => TicketCtrl.requestCloseFor(id),
+    ticketRequestTransferFor: (id) => TicketCtrl.requestTransferFor(id),
 });
 
 window.addEventListener('DOMContentLoaded', () => {

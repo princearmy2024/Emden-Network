@@ -1792,14 +1792,14 @@ const apiServer = http.createServer(async (req, res) => {
                     claimedAt: Date.now(),
                 };
                 saveTicketClaims();
-                // Webhook-Post: "✅ @user hat den Ticket geclaimt"
+                // Webhook-Post: "✅ @user hat das Ticket geclaimt"
                 try {
                     const hook = await getOrCreateTicketWebhook(ch);
                     if (hook) {
                         await hook.send({
                             username: claimerName,
                             avatarURL: m.user.displayAvatarURL({ size: 128, extension: 'png' }),
-                            content: `✅ **${claimerName}** hat den Ticket geclaimt.\n-# Bearbeitet via Emden Network Overlay`,
+                            content: `✅ **${claimerName}** hat das Ticket übernommen.\n-# Bearbeitet via Emden Network Overlay`,
                         });
                     }
                 } catch(e) { console.warn('[Ticket] Webhook claim-post:', e.message); }
@@ -1847,11 +1847,174 @@ const apiServer = http.createServer(async (req, res) => {
                 if (!hook) { res.writeHead(503); return res.end(JSON.stringify({ ok: false, error: "Kann Webhook nicht erstellen (Bot-Permissions: Manage Webhooks?)" })); }
                 const name = m.displayName || m.user.username;
                 const avatarURL = m.user.displayAvatarURL({ size: 128, extension: 'png' });
-                await hook.send({ username: name, avatarURL, content: text });
+                const sentMsg = await hook.send({ username: name, avatarURL, content: text });
+                // Live-Broadcast (messageCreate skipt webhooks → wir broadcasten manuell mit Staff-Discord-ID)
+                try {
+                    io.emit("ticket_message", {
+                        channelId: ch.id,
+                        channelName: ch.name,
+                        messageId: sentMsg?.id || ('local-' + Date.now()),
+                        authorId: discordId,
+                        authorName: name,
+                        authorAvatar: avatarURL,
+                        authorIsBot: false,
+                        content: text,
+                        attachments: [],
+                        ts: Date.now(),
+                        claimerDiscordId: ticketClaims[ch.id]?.claimerDiscordId || null,
+                    });
+                } catch(_) {}
                 res.writeHead(200);
                 res.end(JSON.stringify({ ok: true }));
             } catch (e) {
                 console.error('[Ticket] /reply:', e);
+                res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // GET /api/ticket/my-claims?discordId=... → Aktive Claims dieses Staff-Members
+    if (req.method === "GET" && url.pathname === "/api/ticket/my-claims") {
+        try {
+            const discordId = url.searchParams.get("discordId");
+            if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: "discordId" })); }
+            const guild = client.guilds.cache.get(GUILD_ID);
+            const items = [];
+            for (const [chId, claim] of Object.entries(ticketClaims)) {
+                if (claim.claimerDiscordId !== discordId) continue;
+                const ch = guild?.channels?.cache?.get(chId);
+                if (!ch) {
+                    delete ticketClaims[chId];
+                    continue;
+                }
+                items.push({
+                    channelId: chId,
+                    channelName: ch.name,
+                    claimedAt: claim.claimedAt,
+                    lastActivity: ch.lastMessage?.createdTimestamp || claim.claimedAt,
+                });
+            }
+            saveTicketClaims();
+            items.sort((a, b) => b.lastActivity - a.lastActivity);
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true, items }));
+        } catch (e) {
+            console.error('[Ticket] /my-claims:', e);
+            res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+        return;
+    }
+
+    // POST /api/ticket/close — body: { channelId, discordId } → Channel nach Bestätigung schließen
+    if (req.method === "POST" && url.pathname === "/api/ticket/close") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", async () => {
+            try {
+                const { channelId, discordId } = JSON.parse(body || "{}");
+                if (!channelId || !discordId) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: "channelId + discordId" })); }
+                const guild = client.guilds.cache.get(GUILD_ID);
+                const ch = guild?.channels?.cache?.get(channelId);
+                if (!ch || !isTicketChannel(ch)) { res.writeHead(404); return res.end(JSON.stringify({ ok: false, error: "Kein Ticket-Channel" })); }
+                const EN_TEAM = "1365083291044282389";
+                const m = guild.members.cache.get(discordId) || await guild.members.fetch(discordId).catch(() => null);
+                if (!m || !m.roles.cache.has(EN_TEAM)) { res.writeHead(403); return res.end(JSON.stringify({ ok: false, error: "Nur Staff" })); }
+                const claim = ticketClaims[channelId];
+                if (claim && claim.claimerDiscordId !== discordId) {
+                    res.writeHead(403); return res.end(JSON.stringify({ ok: false, error: "Nicht dein Ticket" }));
+                }
+                // Posten via Webhook als Staff: "Ticket wird in 30s geschlossen"
+                const hook = await getOrCreateTicketWebhook(ch);
+                const name = m.displayName || m.user.username;
+                const avatarURL = m.user.displayAvatarURL({ size: 128, extension: 'png' });
+                if (hook) {
+                    await hook.send({
+                        username: name,
+                        avatarURL,
+                        content: '🔒 **Dieses Ticket wird in 30 Sekunden geschlossen.** Antworte mit `cancel` um abzubrechen.'
+                    }).catch(() => {});
+                }
+                // Schedule deletion
+                const cancelKey = '__close_' + channelId;
+                if (global[cancelKey]) clearTimeout(global[cancelKey]);
+                global[cancelKey] = setTimeout(async () => {
+                    try {
+                        const cur = guild?.channels?.cache?.get(channelId);
+                        if (!cur) return;
+                        delete ticketClaims[channelId];
+                        saveTicketClaims();
+                        io.emit("ticket_closed", { channelId });
+                        await cur.delete('Ticket geschlossen via Overlay').catch(() => {});
+                    } catch (e) { console.error('[Ticket] close timer:', e); }
+                    delete global[cancelKey];
+                }, 30000);
+                // Listener für 'cancel' Nachricht (einmalig)
+                const cancelListener = (m2) => {
+                    if (m2.channel.id !== channelId) return;
+                    if ((m2.content || '').trim().toLowerCase() === 'cancel') {
+                        if (global[cancelKey]) {
+                            clearTimeout(global[cancelKey]);
+                            delete global[cancelKey];
+                            if (hook) hook.send({ username: name, avatarURL, content: '✅ Schließung abgebrochen.' }).catch(() => {});
+                            client.off('messageCreate', cancelListener);
+                        }
+                    }
+                };
+                client.on('messageCreate', cancelListener);
+                setTimeout(() => client.off('messageCreate', cancelListener), 35000);
+                res.writeHead(200);
+                res.end(JSON.stringify({ ok: true, scheduledIn: 30 }));
+            } catch (e) {
+                console.error('[Ticket] /close:', e);
+                res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // POST /api/ticket/transfer — body: { channelId, discordId } → Claim freigeben + neuen Toast für andere Staff
+    if (req.method === "POST" && url.pathname === "/api/ticket/transfer") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", async () => {
+            try {
+                const { channelId, discordId } = JSON.parse(body || "{}");
+                if (!channelId || !discordId) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: "channelId + discordId" })); }
+                const guild = client.guilds.cache.get(GUILD_ID);
+                const ch = guild?.channels?.cache?.get(channelId);
+                if (!ch || !isTicketChannel(ch)) { res.writeHead(404); return res.end(JSON.stringify({ ok: false, error: "Kein Ticket-Channel" })); }
+                const claim = ticketClaims[channelId];
+                if (!claim || claim.claimerDiscordId !== discordId) {
+                    res.writeHead(403); return res.end(JSON.stringify({ ok: false, error: "Nicht dein Ticket" }));
+                }
+                const m = guild.members.cache.get(discordId) || await guild.members.fetch(discordId).catch(() => null);
+                const name = m?.displayName || m?.user?.username || claim.claimerName || 'Staff';
+                const avatarURL = m?.user?.displayAvatarURL({ size: 128, extension: 'png' }) || claim.claimerAvatar;
+                // Claim entfernen
+                delete ticketClaims[channelId];
+                saveTicketClaims();
+                // Webhook-Hinweis im Channel
+                const hook = await getOrCreateTicketWebhook(ch);
+                if (hook) {
+                    await hook.send({
+                        username: name, avatarURL,
+                        content: '↪️ **Ticket zur Übernahme freigegeben.** Anderer Staff kann jetzt claimen.'
+                    }).catch(() => {});
+                }
+                // Broadcast: Toast wieder anzeigen für alle Staff
+                io.emit("ticket_claimed", {
+                    channelId, channelName: ch.name,
+                    claimerDiscordId: null, claimerName: null, claimerAvatar: null, claimedAt: null,
+                });
+                io.emit("overlay_new_ticket", {
+                    channelId, channelName: ch.name,
+                    ticketId: ch.name, reason: 'Übernahme angefragt',
+                });
+                res.writeHead(200);
+                res.end(JSON.stringify({ ok: true }));
+            } catch (e) {
+                console.error('[Ticket] /transfer:', e);
                 res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
             }
         });

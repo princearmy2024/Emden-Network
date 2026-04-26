@@ -267,32 +267,42 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 #panel-left.collapsed .panel-pin-wrap,
 #panel-left.collapsed .grid-pattern { opacity: 0; pointer-events: none; }
 
-/* Eintragen Button — smooth integriert in Bottom-Fade */
-#mod-trigger {
+/* ── BOTTOM-DOCK BUTTONS — Unified Style ── */
+/* Alle Bottom-Trigger (GSG9, Eintragen, Tickets, TikTok) teilen dieselbe Form/Padding/Gradient */
+#mod-trigger,
+.gsg9-btn,
+.tickets-btn,
+.tiktok-btn {
   position: fixed;
   bottom: 0;
-  right: clamp(120px, 10vw, 200px);
-  padding: clamp(14px, 1.4vh, 22px) clamp(28px, 2.5vw, 44px) clamp(10px, 1vh, 16px);
+  padding: clamp(12px, 1.2vh, 18px) clamp(20px, 1.8vw, 30px) clamp(8px, 0.9vh, 12px);
   border-radius: 14px 14px 0 0;
-  background: linear-gradient(to top,
-    rgba(6, 8, 18, 0.5) 0%,
-    rgba(8, 14, 32, 0.2) 50%,
-    transparent 100%
-  );
   border: none;
-  display: none; flex-direction: column; align-items: center;
+  display: none;
+  flex-direction: column;
+  align-items: center;
   gap: 0;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.6);
   z-index: 200;
   pointer-events: auto;
-  transition: color 0.3s ease;
+  -webkit-app-region: no-drag;
+  transition: color 0.3s ease, filter 0.3s ease;
   font-family: 'Inter', sans-serif;
+  background: linear-gradient(to top,
+    rgba(6, 8, 18, 0.5) 0%,
+    rgba(8, 14, 32, 0.2) 50%,
+    transparent 100%);
+  min-width: 108px;
 }
-#mod-trigger:hover {
-  color: #fff;
+#mod-trigger:hover,
+.gsg9-btn:hover,
+.tickets-btn:hover,
+.tiktok-btn:hover { color: #fff; }
+/* Eintragen Button — smooth integriert in Bottom-Fade */
+#mod-trigger {
+  right: 248px;
 }
-
 /* Hover Line Animation */
 #mod-trigger::after {
   content: '';
@@ -325,49 +335,33 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
 body.overlay-active.is-admin #mod-trigger,
 body.overlay-active.is-staff #mod-trigger { display: flex; }
 body.overlay-active.is-staff .gsg9-btn { display: flex !important; }
+body.overlay-active.is-staff .tickets-btn { display: flex !important; }
 body.overlay-active .tiktok-btn { display: flex !important; }
-.gsg9-btn {
-  position: fixed;
-  bottom: 0;
-  right: clamp(280px, 20vw, 400px);
-  padding: clamp(10px, 1.3vw, 18px) clamp(16px, 2vw, 28px) clamp(6px, 0.8vw, 12px);
-  border-radius: 14px 14px 0 0;
-  background: linear-gradient(to top, rgba(6, 8, 18, 0.5) 0%, rgba(8, 14, 32, 0.2) 50%, transparent 100%);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.6);
-  z-index: 200;
-  pointer-events: auto !important;
-  -webkit-app-region: no-drag;
-  transition: color 0.3s;
-  font-family: 'Inter', sans-serif;
+/* Position-Overrides für Bottom-Dock — von rechts nach links: TikTok | Tickets | Eintragen | GSG9 */
+.tiktok-btn  { right: 16px; }
+.tickets-btn { right: 132px; }
+/* #mod-trigger right: 248px (oben gesetzt) */
+.gsg9-btn    { right: 364px; }
+.tiktok-btn:hover { filter: drop-shadow(0 0 8px rgba(254,44,85,0.6)); }
+.tickets-btn .tk-icon-wrap {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: linear-gradient(135deg, #5b9aff 0%, #2680d9 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff;
 }
-.gsg9-btn:hover { color: #fff; }
+.tickets-btn .tk-badge {
+  position: absolute; top: 4px; right: 6px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; background: #ef4444; color: #fff;
+  font-size: 9px; font-weight: 800;
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 0 8px rgba(239,68,68,.6);
+}
+.tickets-btn.has-claims .tk-badge { display: flex; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 #gsg9-slide div::-webkit-scrollbar { display: none; }
 
-/* ── TIKTOK LIVE Button + Slide Panel ── */
-.tiktok-btn {
-  position: fixed;
-  bottom: 0;
-  right: 16px;
-  padding: clamp(10px, 1.3vw, 18px) clamp(16px, 2vw, 28px) clamp(6px, 0.8vw, 12px);
-  border-radius: 14px 14px 0 0;
-  background: linear-gradient(to top, rgba(254, 44, 85, 0.35) 0%, rgba(37, 244, 238, 0.1) 50%, transparent 100%);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.75);
-  z-index: 200;
-  pointer-events: auto !important;
-  -webkit-app-region: no-drag;
-  transition: color 0.3s, filter 0.3s;
-  font-family: 'Inter', sans-serif;
-}
-.tiktok-btn:hover { color: #fff; filter: drop-shadow(0 0 8px rgba(254,44,85,0.6)); }
+/* ── TIKTOK LIVE Button — TT-Logo behält pinken Akzent ── */
 .tiktok-btn.live::after {
   content: '';
   position: absolute;
@@ -380,6 +374,106 @@ body.overlay-active .tiktok-btn { display: flex !important; }
   box-shadow: 0 0 8px #fe2c55;
   animation: tiktokPulseDot 1.1s ease-in-out infinite;
 }
+/* Tickets-Panel (slide rechts) — Liste deiner Claims */
+#tickets-panel {
+  position: fixed;
+  top: 140px;
+  bottom: 80px;
+  right: 0;
+  width: 340px;
+  z-index: 9997;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(.16,1,.3,1);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+#tickets-panel.open { transform: translateX(0); }
+body.mod-open #tickets-panel { z-index: 200 !important; }
+#tickets-panel > .tp-body {
+  flex: 1;
+  background: linear-gradient(135deg, rgba(8, 14, 32, .55) 0%, rgba(6, 22, 32, .55) 100%);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border-radius: 16px 0 0 16px;
+  box-shadow: -12px 0 40px rgba(0,0,0,0.35);
+  overflow: hidden;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+}
+#tickets-panel .tp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+#tickets-panel .tp-title { font-weight: 700; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 8px; }
+#tickets-panel .tp-close { cursor: pointer; color: rgba(255,255,255,.4); font-size: 22px; padding: 4px 8px; line-height: 1; }
+#tickets-panel .tp-close:hover { color: #fff; }
+#tickets-panel .tp-list {
+  flex: 1; overflow-y: auto;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  scrollbar-width: thin; scrollbar-color: rgba(91,154,255,.35) transparent;
+}
+#tickets-panel .tp-list::-webkit-scrollbar { width: 5px; }
+#tickets-panel .tp-list::-webkit-scrollbar-thumb { background: rgba(91,154,255,.35); border-radius: 3px; }
+.tp-item {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: background .2s;
+}
+.tp-item:hover { background: rgba(91,154,255,.08); border-color: rgba(91,154,255,.25); }
+.tp-item-name { font-weight: 700; font-size: 12px; color: #fff; }
+.tp-item-meta { font-size: 10px; color: rgba(255,255,255,.45); }
+.tp-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tp-action {
+  flex: 1;
+  font-size: 10px; font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.85);
+  cursor: pointer;
+  transition: all .15s;
+}
+.tp-action:hover { background: rgba(91,154,255,.15); border-color: rgba(91,154,255,.4); color: #fff; }
+.tp-action.danger:hover { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.4); color: #fca5a5; }
+.tp-action.warn:hover  { background: rgba(251,191,36,.15); border-color: rgba(251,191,36,.4); color: #fde68a; }
+.tp-empty { text-align: center; padding: 30px 16px; color: rgba(255,255,255,.3); font-size: 11px; }
+/* Header-Menü im Chat-Slide für Schließen/Übergeben */
+.tc-menu-btn {
+  cursor: pointer; color: rgba(255,255,255,.45);
+  font-size: 18px; line-height: 1; padding: 4px 8px;
+  user-select: none;
+}
+.tc-menu-btn:hover { color: #fff; }
+.tc-menu-pop {
+  position: absolute; top: calc(100% + 4px); right: 12px;
+  background: rgba(12,18,38,.95);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  min-width: 200px;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.tc-menu-pop.open { display: flex; }
+.tc-menu-item {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,.85);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tc-menu-item:hover { background: rgba(91,154,255,.15); color: #fff; }
+.tc-menu-item.danger:hover { background: rgba(239,68,68,.15); color: #fca5a5; }
 @keyframes tiktokPulseDot { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
 /* Slide-Panel: rechts, weiter unten starten, transparent Glass, keine Linie links */
@@ -2575,12 +2669,19 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
      onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
      onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
   <div class="tc-body">
-    <div class="tc-header">
+    <div class="tc-header" style="position:relative;">
       <div class="tc-title">
         <div class="tc-icon">🎫</div>
         <span class="tc-title-name" id="tc-title-name">Ticket</span>
       </div>
-      <span class="tc-close" onclick="Overlay.ticketCloseChat()">&times;</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span class="tc-menu-btn" id="tc-menu-btn" onclick="event.stopPropagation();Overlay.ticketToggleMenu()" title="Optionen">⋯</span>
+        <span class="tc-close" onclick="Overlay.ticketCloseChat()">&times;</span>
+      </div>
+      <div class="tc-menu-pop" id="tc-menu-pop">
+        <div class="tc-menu-item" onclick="Overlay.ticketRequestTransfer()">↪️ Übergeben (anderer Staff)</div>
+        <div class="tc-menu-item danger" onclick="Overlay.ticketRequestClose()">🔒 Ticket schließen</div>
+      </div>
     </div>
     <div id="tc-claim-banner" class="tc-claim-banner unclaimed" style="display:none;"></div>
     <div id="tc-feed" class="tc-feed">
@@ -2589,6 +2690,35 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     <div class="tc-input-row">
       <textarea id="tc-input" class="tc-input" placeholder="Nachricht..." rows="1"></textarea>
       <button id="tc-send" class="tc-send" onclick="Overlay.ticketSend()">Senden</button>
+    </div>
+  </div>
+</div>
+
+<!-- TICKETS BUTTON (position aus .tickets-btn) -->
+<div id="tickets-trigger" class="tickets-btn" onclick="event.stopPropagation();Overlay.toggleTicketsPanel()"
+     onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
+  <span class="tk-badge" id="tickets-badge">0</span>
+  <div style="display:flex;align-items:center;gap:7px;">
+    <div class="tk-icon-wrap">🎫</div>
+    <span style="font-size:11px;font-weight:700;letter-spacing:.04em;">TICKETS</span>
+  </div>
+</div>
+
+<!-- TICKETS PANEL (slide rechts — Liste deiner Claims) -->
+<div id="tickets-panel"
+     onmouseenter="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)"
+     onmouseleave="if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)">
+  <div class="tp-body">
+    <div class="tp-header">
+      <div class="tp-title">
+        <div style="width:24px;height:24px;border-radius:6px;background:rgba(91,154,255,.2);color:#5b9aff;display:flex;align-items:center;justify-content:center;font-size:14px;">🎫</div>
+        <span>Meine Tickets</span>
+      </div>
+      <span class="tp-close" onclick="Overlay.toggleTicketsPanel()">&times;</span>
+    </div>
+    <div id="tp-list" class="tp-list">
+      <div class="tp-empty">Lade...</div>
     </div>
   </div>
 </div>

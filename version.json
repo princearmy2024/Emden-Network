@@ -1,6 +1,6 @@
 {
-    "version": "4.68.0",
+    "version": "4.69.0",
     "releaseDate": "2026-04-26",
-    "notes": "v4.68.0: TICKET CLAIM + LIVE-CHAT IM OVERLAY. Bot detect neue Ticket-Channels → Toast oben mittig im Overlay mit CLAIM-Button. Click → Bot postet via Webhook 'X hat geclaimt' direkt im Ticket (mit deinem Avatar). Andere Staff sehen Toast 'taken'. Click → Live-Chat-Panel rechts oeffnet sich (wie TikTok-Style): Verlauf der letzten 30 Messages + neue live, Input zum Antworten — deine Reply geht via Webhook ins Ticket mit deinem Avatar+Name. WICHTIG: Bot braucht Manage Webhooks Permission im Ticket-Channel + Bot-Upload auf Cybrancee.",
+    "notes": "v4.69.0: TICKETS-DOCK + LIVE-FIX + TICKET-CONFIG. (1) Live-Chat: Staff-Replies erscheinen jetzt OHNE Refresh sofort im Overlay — auch fuer andere Staff die mitlesen. (2) Bottom-Bar: GSG9 / EINTRAGEN / TICKETS / TIKTOK haben jetzt einheitlichen Style + gleichmaessige Abstaende. (3) Neuer TICKETS-Button mit Badge: zeigt deine aktiven Claims. Click oeffnet Panel rechts mit Liste — pro Ticket: Chat oeffnen / Uebergeben / Schliessen. (4) Im Chat-Header: ⋯ Menu mit 'Uebergeben' (Claim freigeben → andere Staff sehen wieder Toast) und 'Schliessen' (Channel wird in 30s geloescht, 'cancel' im Discord-Chat bricht ab). (5) Grammar-Fix: 'das Ticket uebernommen' statt 'den Ticket geclaimt'.",
     "forceUpdate": false
 }
