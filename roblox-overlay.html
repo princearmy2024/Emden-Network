@@ -1157,6 +1157,34 @@ body.mod-open #tiktok-slide { z-index: 200 !important; }
 }
 .ticket-toast-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(91,154,255,0.4); }
 .ticket-toast-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ticket-toast-timer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 800;
+    color: rgba(255,255,255,.85);
+    font-variant-numeric: tabular-nums;
+    margin-right: 4px;
+}
+.ticket-toast-timer-num {
+    line-height: 1;
+}
+.ticket-toast-timer-bar {
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,.12);
+    overflow: hidden;
+}
+.ticket-toast-timer-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #5b9aff, #2680d9);
+    transition: none;
+}
 .ticket-toast-close {
     background: rgba(255,255,255,0.08);
     border: none;

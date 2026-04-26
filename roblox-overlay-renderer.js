@@ -3182,6 +3182,8 @@ const TicketCtrl = (() => {
         if (!root) return;
         const el = document.createElement('div');
         el.className = 'tk-mini ' + (kind || '');
+        el.setAttribute('onmouseenter', 'if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)');
+        el.setAttribute('onmouseleave', 'if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)');
         const icon = kind === 'danger' ? '⚠' : kind === 'success' ? '✓' : 'ℹ';
         el.innerHTML = `<span class="tk-mini-ico">${icon}</span><span>${esc(text)}</span>`;
         root.appendChild(el);
@@ -3193,6 +3195,7 @@ const TicketCtrl = (() => {
     }
 
     // ─── ANNOUNCER (top-toast für neue/freie Tickets) ────
+    const ANNOUNCE_DURATION_MS = 30 * 1000;
     function showAnnounce(t, withSound) {
         const stack = $('ticket-toast-stack');
         if (!stack || !isStaff()) return;
@@ -3201,6 +3204,9 @@ const TicketCtrl = (() => {
         const el = document.createElement('div');
         el.className = 'ticket-toast show';
         el.dataset.annChannel = t.channelId;
+        // Inline Focus-Handler — sonst geht der Click ins Leere bei Roblox-Overlay
+        el.setAttribute('onmouseenter', 'if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(true)');
+        el.setAttribute('onmouseleave', 'if(window.electronAPI?.overlayRequestFocus)electronAPI.overlayRequestFocus(false)');
         el.innerHTML = `
             <div class="ticket-toast-icon">🎫</div>
             <div class="ticket-toast-body">
@@ -3208,13 +3214,33 @@ const TicketCtrl = (() => {
                 <div class="ticket-toast-name">#${esc(t.channelName)}</div>
                 <div class="ticket-toast-meta">${esc(t.reason || 'Klicke um zu öffnen')}</div>
             </div>
-            <button class="ticket-toast-btn" onclick="event.stopPropagation();Overlay.tkOpenAnn('${esc(t.channelId)}')">→ Öffnen</button>
-            <button class="ticket-toast-close" onclick="event.stopPropagation();this.parentElement.remove();">×</button>`;
+            <div class="ticket-toast-timer">
+                <span class="ticket-toast-timer-num">30</span><span style="opacity:.5;">s</span>
+                <div class="ticket-toast-timer-bar"><div class="ticket-toast-timer-fill"></div></div>
+            </div>
+            <button class="ticket-toast-btn" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();Overlay.tkOpenAnn('${esc(t.channelId)}')">→ Öffnen</button>
+            <button class="ticket-toast-close" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();this.parentElement.remove();">×</button>`;
         stack.appendChild(el);
+        // Countdown-Animation
+        const fill = el.querySelector('.ticket-toast-timer-fill');
+        const num = el.querySelector('.ticket-toast-timer-num');
+        if (fill) {
+            // Force reflow then start animation
+            requestAnimationFrame(() => {
+                fill.style.transition = `width ${ANNOUNCE_DURATION_MS}ms linear`;
+                fill.style.width = '0%';
+            });
+        }
+        const startedAt = Date.now();
+        const tickInterval = setInterval(() => {
+            const remaining = Math.max(0, ANNOUNCE_DURATION_MS - (Date.now() - startedAt));
+            if (num) num.textContent = String(Math.ceil(remaining / 1000));
+            if (remaining <= 0) clearInterval(tickInterval);
+        }, 250);
         if (withSound) {
             try { const a = new Audio('ticketsound.mp3'); a.volume = 0.4; a.play().catch(()=>{}); } catch(_) {}
         }
-        setTimeout(() => { el.remove(); }, 25000);
+        setTimeout(() => { clearInterval(tickInterval); el.remove(); }, ANNOUNCE_DURATION_MS);
     }
     function removeAnnounce(channelId) {
         const stack = $('ticket-toast-stack');

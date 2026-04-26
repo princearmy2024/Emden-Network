@@ -1,6 +1,6 @@
 {
-    "version": "4.70.1",
+    "version": "4.70.2",
     "releaseDate": "2026-04-26",
-    "notes": "v4.70.1: HOTFIX fuer Admins + Panel-Stacking. (1) Admins (admin=1 in URL) gelten jetzt auch als _isStaff — Ticket-Overlay laesst sich oeffnen. Vorher: nur staff=1 wurde geprueft, Admins blieben gegated. (2) Panels schliessen sich gegenseitig: Eintragen oeffnet → Tickets/GSG9/TikTok zu, und umgekehrt. Verhindert Stapel-Bug wo eines hinter dem anderen verschwand. (3) z-index-Drop bei body.mod-open entfernt — Tickets-Overlay versteckte sich sonst hinter Eintragen. (4) Cursor-Tracker im TicketCtrl entfernt — konkurrierte mit anderen Modulen und konnte Click-Focus revoken bevor Klick durchging.",
+    "notes": "v4.70.2: ANNOUNCEMENT-FIX. (1) Click-Bug auf Announcement-Toasts (oben) gefixt: hatten keine inline mouseenter/leave-Handler → Focus wurde nicht granted → Click leakte zur Roblox-Map. (2) Auto-Dismiss-Timer auf 30s mit sichtbarem Countdown (Ziffer + Progress-Bar). (3) Mini-Notifs rechts unten kriegen denselben Focus-Fix.",
     "forceUpdate": false
 }
