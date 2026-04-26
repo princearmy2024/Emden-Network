@@ -1,6 +1,6 @@
 {
-    "version": "4.70.3",
+    "version": "4.70.4",
     "releaseDate": "2026-04-26",
-    "notes": "v4.70.3: NEUE SOUNDS + EINTRAGEN-BUTTON-HOEHE. (1) Eintragen-Button war 7px hoeher als die anderen wegen ::after Pseudo-Element. Jetzt: alle 4 Bottom-Dock-Buttons haben dieselbe Hover-Linie und identische Hoehe. (2) Neue Sounds eingebunden: smsmessages.mp3 fuer Pings/Mentions, supportwarteraum.mp3 fuer Warteraum, ticketöffnen.mp3 NUR fuer NEUE Tickets, notification.mp3 als Standard. Bei Ticket-Freigabe (Transfer) spielt notification.mp3, nicht ticketöffnen.mp3.",
+    "notes": "v4.70.4: Eintragen-Button hatte ein ::before Pseudo-Element (Klick-Area-Extender) das einen leichten dunklen Kasten dahinter sichtbar machte. Geloescht — alle 4 Bottom-Dock-Buttons haben jetzt identischen Hintergrund.",
     "forceUpdate": false
 }
