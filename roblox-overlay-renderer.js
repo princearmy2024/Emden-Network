@@ -855,7 +855,7 @@ const Overlay = (() => {
         socket.on('support_waiting', (data) => {
             if (data.action === 'join') {
                 notify({ title: '🎧 Support-Warteraum', text: `${data.username} wartet in ${data.channelName}`, type: 'support', duration: 15000 });
-                try { const a = new Audio('./supportwarteraumsound.mp3'); a.volume = 0.5; a.play().catch(()=>{}); } catch(e) {}
+                try { const a = new Audio('./supportwarteraum.mp3'); a.volume = 0.5; a.play().catch(()=>{}); } catch(e) {}
             }
         });
 
@@ -3196,7 +3196,8 @@ const TicketCtrl = (() => {
 
     // ─── ANNOUNCER (top-toast für neue/freie Tickets) ────
     const ANNOUNCE_DURATION_MS = 30 * 1000;
-    function showAnnounce(t, withSound) {
+    // soundFile: 'ticketöffnen.mp3' bei NEUEM Ticket, 'notification.mp3' bei Freigabe, false=kein Sound
+    function showAnnounce(t, soundFile) {
         const stack = $('ticket-toast-stack');
         if (!stack || !isStaff()) return;
         // Nicht doppelt anzeigen
@@ -3237,8 +3238,8 @@ const TicketCtrl = (() => {
             if (num) num.textContent = String(Math.ceil(remaining / 1000));
             if (remaining <= 0) clearInterval(tickInterval);
         }, 250);
-        if (withSound) {
-            try { const a = new Audio('ticketsound.mp3'); a.volume = 0.4; a.play().catch(()=>{}); } catch(_) {}
+        if (soundFile) {
+            try { const a = new Audio(soundFile); a.volume = 0.5; a.play().catch(()=>{}); } catch(_) {}
         }
         setTimeout(() => { clearInterval(tickInterval); el.remove(); }, ANNOUNCE_DURATION_MS);
     }
@@ -3252,11 +3253,13 @@ const TicketCtrl = (() => {
     // ─── SOCKET HANDLERS ──────────────────────────────────
     function onNewTicket(data) {
         if (!data?.channelId) return;
+        // Sound nur fuer ECHT neue Tickets; "Übernahme angefragt" = Transfer → leiser Sound
+        const isTransfer = (data.reason || '').toLowerCase().includes('übernahme');
         showAnnounce({
             channelId: data.channelId,
             channelName: data.channelName || data.ticketId || data.channelId,
             reason: data.reason || ''
-        }, true);
+        }, isTransfer ? 'notification.mp3' : 'ticketöffnen.mp3');
         loadAll();
     }
     function onClaimed(data) {
@@ -3290,13 +3293,13 @@ const TicketCtrl = (() => {
                 showMini('Du hast das Ticket übernommen', 'success');
             }
         } else {
-            // Transfer/Freigabe → wieder als Toast (mit Sound)
+            // Transfer/Freigabe → wieder als Toast, aber kein Ticketöffnen-Sound (das ist nur fuer neue Tickets)
             const tk = allTickets.find(x => x.channelId === data.channelId) || { channelId: data.channelId, channelName: data.channelName };
             showAnnounce({
                 channelId: tk.channelId,
                 channelName: tk.channelName,
                 reason: 'Übernahme angefragt'
-            }, true);
+            }, 'notification.mp3');
         }
     }
     function onMessage(payload) {

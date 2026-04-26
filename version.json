@@ -1,6 +1,6 @@
 {
-    "version": "4.70.2",
+    "version": "4.70.3",
     "releaseDate": "2026-04-26",
-    "notes": "v4.70.2: ANNOUNCEMENT-FIX. (1) Click-Bug auf Announcement-Toasts (oben) gefixt: hatten keine inline mouseenter/leave-Handler → Focus wurde nicht granted → Click leakte zur Roblox-Map. (2) Auto-Dismiss-Timer auf 30s mit sichtbarem Countdown (Ziffer + Progress-Bar). (3) Mini-Notifs rechts unten kriegen denselben Focus-Fix.",
+    "notes": "v4.70.3: NEUE SOUNDS + EINTRAGEN-BUTTON-HOEHE. (1) Eintragen-Button war 7px hoeher als die anderen wegen ::after Pseudo-Element. Jetzt: alle 4 Bottom-Dock-Buttons haben dieselbe Hover-Linie und identische Hoehe. (2) Neue Sounds eingebunden: smsmessages.mp3 fuer Pings/Mentions, supportwarteraum.mp3 fuer Warteraum, ticketöffnen.mp3 NUR fuer NEUE Tickets, notification.mp3 als Standard. Bei Ticket-Freigabe (Transfer) spielt notification.mp3, nicht ticketöffnen.mp3.",
     "forceUpdate": false
 }

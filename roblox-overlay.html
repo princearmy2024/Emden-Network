@@ -319,12 +319,11 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
   pointer-events: none;
   white-space: nowrap;
 }
-/* Eintragen Button — Position */
-#mod-trigger {
-  right: 0;
-}
-/* Hover Line Animation */
-#mod-trigger::after {
+/* Hover Line Animation — auf alle 4 Bottom-Dock-Buttons (gleiche Höhe) */
+#mod-trigger::after,
+.gsg9-btn::after,
+.tickets-btn::after,
+.tiktok-btn::after {
   content: '';
   display: block;
   width: 0;
@@ -339,7 +338,10 @@ body.overlay-active .panel-pin-wrap { pointer-events: auto; }
   );
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
-#mod-trigger:hover::after {
+#mod-trigger:hover::after,
+.gsg9-btn:hover::after,
+.tickets-btn:hover::after,
+.tiktok-btn:hover::after {
   width: 100%;
 }
 
@@ -3439,7 +3441,7 @@ body.mod-open #mod-trigger { opacity: 0; pointer-events: none; }
     </div>
     <div class="ov-mod-notif-bar" id="ovModNotifBar"></div>
 </div>
-<audio id="ovModNotifSound" preload="auto" src="notif.mp3"></audio>
+<audio id="ovModNotifSound" preload="auto" src="notification.mp3"></audio>
 <audio id="ovStartSound" preload="auto" src="startsound.mp3"></audio>
 
 <!-- PANIC ALERT OVERLAY -->

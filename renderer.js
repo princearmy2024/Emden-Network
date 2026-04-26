@@ -16,7 +16,7 @@ if (localStorage.getItem('perf_mode') === 'true') document.body.classList.add('p
 
 'use strict';
 
-let CURRENT_VERSION = '4.70.2'; // Stand: 26.04.2026
+let CURRENT_VERSION = '4.70.3'; // Stand: 26.04.2026
 
 // =============================================================
 // CONFIG — Bot-API
@@ -268,6 +268,7 @@ const WebSocketService = {
                     if (window.electronAPI?.showNativeNotification) {
                         window.electronAPI.showNativeNotification(data.title, data.message);
                     }
+                    try { const a = new Audio(App.getSoundFile('sound_mention')); a.volume = parseFloat(localStorage.getItem('notif_volume') ?? '0.5'); a.play().catch(()=>{}); } catch(e) {}
                 });
             }
 
@@ -3952,7 +3953,7 @@ Object.assign(App, {
     },
 
     testSoundAlert(key) {
-        const defaults = { sound_ticket: './ticketsound.mp3', sound_support: './supportwarteraumsound.mp3', sound_mention: './notif.mp3', sound_entry: './notif.mp3' };
+        const defaults = { sound_ticket: './ticketöffnen.mp3', sound_support: './supportwarteraum.mp3', sound_mention: './smsmessages.mp3', sound_entry: './notification.mp3' };
         const file = localStorage.getItem(key) || defaults[key] || './notif.mp3';
         const src = file.startsWith('http') ? file : './' + file.replace(/^\.\//, '');
         const vol = parseFloat(localStorage.getItem('notif_volume') ?? '0.5');
@@ -3960,7 +3961,7 @@ Object.assign(App, {
     },
 
     getSoundFile(key) {
-        const defaults = { sound_ticket: './ticketsound.mp3', sound_support: './supportwarteraumsound.mp3', sound_mention: './notif.mp3', sound_entry: './notif.mp3' };
+        const defaults = { sound_ticket: './ticketöffnen.mp3', sound_support: './supportwarteraum.mp3', sound_mention: './smsmessages.mp3', sound_entry: './notification.mp3' };
         const file = localStorage.getItem(key) || defaults[key] || './notif.mp3';
         return file.startsWith('http') ? file : './' + file.replace(/^\.\//, '');
     },
