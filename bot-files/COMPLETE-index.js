@@ -1874,6 +1874,71 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/tickets/all?discordId=... → ALLE offenen Tickets, gruppiert nach Kategorie
+    if (req.method === "GET" && url.pathname === "/api/tickets/all") {
+        try {
+            const callerDid = url.searchParams.get("discordId");
+            const guild = client.guilds.cache.get(GUILD_ID);
+            if (!guild) { res.writeHead(503); return res.end(JSON.stringify({ ok: false, error: "Guild nicht im Cache" })); }
+            // Optional Staff-Check (lax: wir filtern serverseitig nur was sichtbar ist)
+            // Sammle alle Channels die als Ticket gelten
+            const items = [];
+            for (const [, ch] of guild.channels.cache) {
+                if (ch.type !== 0) continue; // 0 = GuildText
+                if (!isTicketChannel(ch)) continue;
+                const claim = ticketClaims[ch.id] || null;
+                let creatorId = null, creatorName = null, creatorAvatar = null, createdAt = null;
+                // Heuristik: erste echte User-Message des Channels = Ersteller
+                try {
+                    const messages = await ch.messages.fetch({ limit: 5 }).catch(() => null);
+                    if (messages) {
+                        const arr = Array.from(messages.values()).reverse();
+                        // Mention im 1. Bot-Message → meist der Ersteller
+                        const firstBot = arr.find(m => m.author?.bot);
+                        if (firstBot && firstBot.mentions?.users?.size > 0) {
+                            const u = firstBot.mentions.users.first();
+                            creatorId = u.id; creatorName = u.displayName || u.username;
+                            creatorAvatar = u.displayAvatarURL({ size: 64, extension: 'png' });
+                            createdAt = firstBot.createdTimestamp;
+                        }
+                        // Fallback: erste Nicht-Bot-Message
+                        if (!creatorId) {
+                            const firstUser = arr.find(m => !m.author?.bot);
+                            if (firstUser) {
+                                creatorId = firstUser.author.id;
+                                creatorName = firstUser.member?.displayName || firstUser.author.displayName || firstUser.author.username;
+                                creatorAvatar = firstUser.author.displayAvatarURL({ size: 64, extension: 'png' });
+                                createdAt = firstUser.createdTimestamp;
+                            }
+                        }
+                    }
+                } catch(_) {}
+                items.push({
+                    channelId: ch.id,
+                    channelName: ch.name,
+                    category: ch.parent?.name || 'Allgemein',
+                    creatorId, creatorName, creatorAvatar,
+                    createdAt: createdAt || ch.createdTimestamp,
+                    lastMessageAt: ch.lastMessage?.createdTimestamp || createdAt || ch.createdTimestamp,
+                    claim,
+                });
+            }
+            // Sortierung: meine Claims oben, dann nach lastMessageAt desc
+            items.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+            // Stale claims aufräumen (Channel weg)
+            for (const chId of Object.keys(ticketClaims)) {
+                if (!guild.channels.cache.get(chId)) delete ticketClaims[chId];
+            }
+            saveTicketClaims();
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true, items, myDiscordId: callerDid || null }));
+        } catch (e) {
+            console.error('[Ticket] /tickets/all:', e);
+            res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+        return;
+    }
+
     // GET /api/ticket/my-claims?discordId=... → Aktive Claims dieses Staff-Members
     if (req.method === "GET" && url.pathname === "/api/ticket/my-claims") {
         try {

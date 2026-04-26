@@ -974,8 +974,9 @@ const Overlay = (() => {
             setTimeout(() => document.getElementById('modSearchInput')?.focus(), 350);
             loadModHistory();
         } else {
-            // IMMER Focus abgeben wenn Panel geschlossen wird
-            requestFocus(false);
+            // Focus erst nach kurzer Verzoegerung abgeben — verhindert dass Click-up auf X
+            // durch das Panel hindurch zur Roblox-Map geht (Mouse-Leak-Bug).
+            setTimeout(() => { requestFocus(false); }, 80);
             modPinned = false;
             const btn = document.getElementById('modPinBtn');
             if (btn) btn.classList.remove('pinned');
@@ -2733,373 +2734,413 @@ window.SupportOverlay = SupportOverlay;
 window._testSupport = () => SupportOverlay._testFake();
 
 // ════════════════════════════════════════════════════════════════
-// TICKET CLAIM + LIVE-CHAT — In-Game Ticket-Bearbeitung
-// Notifications + Claim-Button + Live-Chat-Panel rechts
+// TICKET SYSTEM v2 — Single Overlay, View-State-Machine
+// Views: list / detail / settings  +  confirm-close modal layer
 // ════════════════════════════════════════════════════════════════
 const TicketCtrl = (() => {
-    const tickets = new Map();    // channelId → { channelId, channelName, ticketId, reason, claim?, dismissed }
-    let chatChannelId = null;     // aktuell offener Chat
-    let chatMessages = [];        // [{ messageId, ... }]
+    const SETTINGS_KEY = 'ticket-overlay-settings-v1';
+    const DEFAULTS = { side: 'right', top: 0, bottom: 0, width: 440, alpha: 92 };
+
+    let allTickets = [];           // [{channelId, channelName, category, creator..., claim, ...}]
+    let myDiscordId = null;
+    let view = 'list';             // 'list' | 'detail' | 'settings'
+    let currentChannelId = null;   // bei 'detail' aktiv
+    let chatMessages = [];
     let chatClaim = null;
+    let pendingConfirm = null;     // { kind: 'close', channelId } für Confirm-Layer
+    let settings = { ...DEFAULTS };
 
     function $(id) { return document.getElementById(id); }
-    function escapeHtml(s) {
+    function esc(s) {
         if (typeof s !== 'string') return '';
         return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
     function getMyDiscordId() {
+        if (myDiscordId) return myDiscordId;
         let id = window.Overlay && Overlay.getDiscordId ? Overlay.getDiscordId() : null;
-        if (id) return id;
-        try { const s = JSON.parse(localStorage.getItem('en_session') || 'null'); if (s?.user?.discordId) return s.user.discordId; } catch(_) {}
-        return null;
+        if (!id) {
+            try { const s = JSON.parse(localStorage.getItem('en_session') || 'null'); if (s?.user?.discordId) id = s.user.discordId; } catch(_) {}
+        }
+        myDiscordId = id;
+        return id;
     }
     function isStaff() { return !!window._isStaff; }
-
-    // Toast-Stack rendern
-    function renderToasts() {
-        const stack = $('ticket-toast-stack');
-        if (!stack) return;
-        if (!isStaff()) { stack.innerHTML = ''; return; }
-        const visible = Array.from(tickets.values()).filter(t => !t.dismissed);
-        if (visible.length === 0) { stack.innerHTML = ''; return; }
-        stack.innerHTML = visible.map(t => {
-            const taken = !!t.claim;
-            const claimText = taken
-                ? `<span style="color:#4ade80;font-weight:600;">✓ ${escapeHtml(t.claim.claimerName)}</span>`
-                : 'unclaimed';
-            return `
-                <div class="ticket-toast show ${taken ? 'taken' : ''}" data-channel-id="${escapeHtml(t.channelId)}">
-                    <div class="ticket-toast-icon">🎫</div>
-                    <div class="ticket-toast-body">
-                        <div class="ticket-toast-title">Ticket · ${escapeHtml(t.reason || '')}</div>
-                        <div class="ticket-toast-name">#${escapeHtml(t.channelName)}</div>
-                        <div class="ticket-toast-meta">${claimText}</div>
-                    </div>
-                    ${taken
-                        ? `<button class="ticket-toast-btn" onclick="Overlay.ticketOpenChat('${escapeHtml(t.channelId)}')">→ Chat</button>`
-                        : `<button class="ticket-toast-btn" onclick="Overlay.ticketClaim('${escapeHtml(t.channelId)}', this)">→ Claim</button>`
-                    }
-                    <button class="ticket-toast-close" onclick="Overlay.ticketDismiss('${escapeHtml(t.channelId)}')">×</button>
-                </div>
-            `;
-        }).join('');
+    function timeAgo(ts) {
+        if (!ts) return '';
+        const s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60) return 'gerade';
+        if (s < 3600) return Math.floor(s / 60) + 'm';
+        if (s < 86400) return Math.floor(s / 3600) + 'h';
+        return Math.floor(s / 86400) + 'd';
     }
 
-    // Cursor-Tracker Focus fuer Toasts (wie SupportOverlay)
-    let _focusGranted = false;
-    function trackToastCursor() {
-        document.addEventListener('mousemove', (e) => {
-            const stack = $('ticket-toast-stack');
-            const chat = $('ticket-chat-slide');
-            const panel = $('tickets-panel');
-            const trigger = $('tickets-trigger');
-            if (!stack && !chat && !panel) return;
-            let over = false;
-            const BUFFER = 40;
-            const checkRect = (el) => {
-                if (!el) return false;
-                const r = el.getBoundingClientRect();
-                if (r.width === 0 || r.height === 0) return false;
-                return e.clientX >= r.left - BUFFER && e.clientX <= r.right + BUFFER &&
-                       e.clientY >= r.top - BUFFER && e.clientY <= r.bottom + BUFFER;
-            };
-            // Toasts
-            stack?.querySelectorAll('.ticket-toast').forEach(t => { if (checkRect(t)) over = true; });
-            // Chat-Panel wenn offen
-            if (chat?.classList.contains('open')) { if (checkRect(chat.querySelector('.tc-body'))) over = true; }
-            // Tickets-Panel wenn offen
-            if (panel?.classList.contains('open')) { if (checkRect(panel.querySelector('.tp-body'))) over = true; }
-            // Tickets-Button selbst (Hover für Klick)
-            if (trigger && checkRect(trigger)) over = true;
-            if (over && !_focusGranted) { window.electronAPI?.requestOverlayFocus?.(true); _focusGranted = true; }
-            else if (!over && _focusGranted) { window.electronAPI?.requestOverlayFocus?.(false); _focusGranted = false; }
-        });
+    // ─── SETTINGS ─────────────────────────────────────────
+    function loadSettings() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+            if (raw) settings = { ...DEFAULTS, ...raw };
+        } catch(_) {}
+        applySettingsToDOM();
     }
-
-    // ─── Events ────────────────────────────────────────────
-    function onNewTicket(data) {
-        if (!data?.channelId) return;
-        if (tickets.has(data.channelId)) return;
-        tickets.set(data.channelId, {
-            channelId: data.channelId,
-            channelName: data.channelName,
-            ticketId: data.ticketId,
-            reason: data.reason,
-            claim: null,
-            dismissed: false,
-        });
-        renderToasts();
-        // Sound
-        try { const a = new Audio('ticketsound.mp3'); a.volume = 0.4; a.play().catch(()=>{}); } catch(_) {}
+    function saveSettings() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(_) {}
     }
+    function applySettingsToDOM() {
+        const root = document.documentElement.style;
+        root.setProperty('--tk-panel-alpha', String(Math.max(0, Math.min(100, settings.alpha)) / 100));
+        root.setProperty('--tk-panel-top', settings.top + 'px');
+        root.setProperty('--tk-panel-bottom', settings.bottom + 'px');
+        root.setProperty('--tk-panel-width', settings.width + 'px');
+        const ov = $('ticket-overlay');
+        if (ov) ov.classList.toggle('side-left', settings.side === 'left');
+        // Sync UI
+        const top = $('tk-set-top'), bot = $('tk-set-bot'), w = $('tk-set-w'), a = $('tk-set-alpha');
+        if (top) { top.value = settings.top; const v = $('tk-set-top-val'); if (v) v.textContent = settings.top; }
+        if (bot) { bot.value = settings.bottom; const v = $('tk-set-bot-val'); if (v) v.textContent = settings.bottom; }
+        if (w)   { w.value = settings.width; const v = $('tk-set-w-val'); if (v) v.textContent = settings.width; }
+        if (a)   { a.value = settings.alpha; const v = $('tk-set-alpha-val'); if (v) v.textContent = settings.alpha + '%'; }
+        document.querySelectorAll('.tk-set-tog').forEach(b => b.classList.toggle('active', b.dataset.side === settings.side));
+    }
+    function setSide(side) { settings.side = side; saveSettings(); applySettingsToDOM(); }
+    function setTop(v) { settings.top = parseInt(v) || 0; saveSettings(); applySettingsToDOM(); }
+    function setBottom(v) { settings.bottom = parseInt(v) || 0; saveSettings(); applySettingsToDOM(); }
+    function setWidth(v) { settings.width = parseInt(v) || 440; saveSettings(); applySettingsToDOM(); }
+    function setAlpha(v) { settings.alpha = parseInt(v) || 92; saveSettings(); applySettingsToDOM(); }
+    function resetSettings() { settings = { ...DEFAULTS }; saveSettings(); applySettingsToDOM(); }
 
-    function onClaimed(data) {
-        if (!data?.channelId) return;
-        const t = tickets.get(data.channelId) || { channelId: data.channelId, channelName: data.channelName, dismissed: false };
-        t.claim = {
-            claimerDiscordId: data.claimerDiscordId,
-            claimerName: data.claimerName,
-            claimerAvatar: data.claimerAvatar,
-            claimedAt: data.claimedAt,
-        };
-        tickets.set(data.channelId, t);
-        renderToasts();
-        // Wenn Chat offen ist auf diesem Channel → Banner aktualisieren
-        if (chatChannelId === data.channelId) {
-            chatClaim = t.claim;
-            updateChatBanner();
+    // ─── OVERLAY OPEN/CLOSE/VIEW ──────────────────────────
+    function setView(v) {
+        view = v;
+        const ov = $('ticket-overlay');
+        if (!ov) return;
+        ov.dataset.view = v;
+        // Back-Button anzeigen wenn nicht 'list'
+        const back = $('tk-back');
+        if (back) back.style.display = (v === 'list') ? 'none' : 'flex';
+        // Title anpassen
+        const title = $('tk-title');
+        if (title) {
+            if (v === 'list') title.textContent = 'Tickets';
+            else if (v === 'settings') title.textContent = 'Einstellungen';
+            else if (v === 'detail') {
+                const t = allTickets.find(x => x.channelId === currentChannelId);
+                title.textContent = t ? '#' + t.channelName : 'Ticket';
+            }
+        }
+        // View-Toggle (CSS macht das, aber wir setzen .active für Animation)
+        document.querySelectorAll('#ticket-overlay .tk-view').forEach(el => el.classList.remove('active'));
+        const target = $('tk-view-' + v);
+        if (target) target.classList.add('active');
+    }
+    function open() {
+        if (!isStaff()) return;
+        const ov = $('ticket-overlay');
+        if (!ov) return;
+        ov.classList.add('open');
+        setView('list');
+        loadAll();
+    }
+    function close() {
+        const ov = $('ticket-overlay');
+        if (!ov) return;
+        ov.classList.remove('open');
+        ov.classList.remove('confirm-active');
+        // Mouse-Leak-Schutz: kurz Focus halten damit click nicht zu Roblox durchschlaegt
+        setTimeout(() => {
+            if (window.electronAPI?.requestOverlayFocus && _focusGranted) {
+                window.electronAPI.requestOverlayFocus(false);
+                _focusGranted = false;
+            }
+        }, 80);
+        // Zurück zu list als Default
+        setTimeout(() => { setView('list'); }, 400);
+    }
+    function toggle() {
+        const ov = $('ticket-overlay');
+        if (!ov) return;
+        if (ov.classList.contains('open')) close();
+        else open();
+    }
+    function back() {
+        if (view === 'detail' || view === 'settings') {
+            currentChannelId = null;
+            chatMessages = [];
+            chatClaim = null;
+            setView('list');
+            loadAll();
+        } else {
+            close();
         }
     }
+    function openSettings() { setView('settings'); }
 
-    function onMessage(payload) {
-        if (!payload?.channelId) return;
-        // Nur in Live-Chat einfuegen wenn passender Channel offen
-        if (chatChannelId !== payload.channelId) return;
-        chatMessages.push(payload);
-        if (chatMessages.length > 200) chatMessages = chatMessages.slice(-200);
-        appendMessageToFeed(payload, true);
-    }
-
-    // ─── Actions ────────────────────────────────────────────
-    async function claim(channelId, btnEl) {
+    // ─── DATA: ALL TICKETS ────────────────────────────────
+    async function loadAll() {
         const myId = getMyDiscordId();
-        if (!myId) return alert('Keine Discord-ID — neu einloggen.');
-        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
         try {
-            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/claim`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
-                body: JSON.stringify({ channelId, discordId: myId }),
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/tickets/all?discordId=${encodeURIComponent(myId || '')}`, {
+                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
             });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.ok) {
-                if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Claim'; }
-                alert('Fehler: ' + (d.error || ('HTTP ' + r.status)));
+            if (!r.ok) {
+                $('tk-list-scroll').innerHTML = `<div class="tk-list-empty">Fehler: HTTP ${r.status}</div>`;
                 return;
             }
-            // Direkt Chat oeffnen
-            openChat(channelId);
+            const d = await r.json();
+            allTickets = d.items || [];
+            updateBadge();
+            if (view === 'list') renderList();
         } catch(e) {
-            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '→ Claim'; }
-            alert('Netzwerk-Fehler: ' + (e.message || e));
+            const s = $('tk-list-scroll');
+            if (s) s.innerHTML = `<div class="tk-list-empty">Fehler: ${esc(e.message || String(e))}</div>`;
         }
     }
-
-    function dismiss(channelId) {
-        const t = tickets.get(channelId);
-        if (t) { t.dismissed = true; renderToasts(); }
+    function updateBadge() {
+        const trig = $('tickets-trigger');
+        const badge = $('tickets-badge');
+        const count = $('tickets-count');
+        const myId = getMyDiscordId();
+        const total = allTickets.length;
+        const mine = allTickets.filter(t => t.claim?.claimerDiscordId === myId).length;
+        if (trig) trig.classList.toggle('has-claims', total > 0);
+        if (badge) { badge.textContent = String(mine); badge.style.display = mine > 0 ? 'flex' : 'none'; }
+        if (count) count.textContent = String(total);
     }
 
-    // ─── Chat-Panel ─────────────────────────────────────────
-    async function openChat(channelId) {
-        chatChannelId = channelId;
+    // ─── LIST RENDER ──────────────────────────────────────
+    function renderList() {
+        const root = $('tk-list-scroll');
+        if (!root) return;
+        if (!allTickets || allTickets.length === 0) {
+            root.innerHTML = '<div class="tk-list-empty">Keine offenen Tickets</div>';
+            return;
+        }
+        const myId = getMyDiscordId();
+        const mine = allTickets.filter(t => t.claim?.claimerDiscordId === myId);
+        const others = allTickets.filter(t => t.claim?.claimerDiscordId !== myId);
+        // Gruppiere others nach Kategorie
+        const byCat = new Map();
+        for (const t of others) {
+            const cat = t.category || 'Allgemein';
+            if (!byCat.has(cat)) byCat.set(cat, []);
+            byCat.get(cat).push(t);
+        }
+        const cats = Array.from(byCat.keys()).sort();
+        let html = '';
+        if (mine.length > 0) {
+            html += `<div class="tk-cat">
+                <div class="tk-cat-title">📌 Meine Tickets <span class="tk-cat-count">${mine.length}</span></div>
+                <div class="tk-cat-list">${mine.map(t => itemHtml(t, true, myId)).join('')}</div>
+            </div>`;
+        }
+        for (const cat of cats) {
+            const items = byCat.get(cat);
+            html += `<div class="tk-cat">
+                <div class="tk-cat-title">${esc(cat)} <span class="tk-cat-count">${items.length}</span></div>
+                <div class="tk-cat-list">${items.map(t => itemHtml(t, false, myId)).join('')}</div>
+            </div>`;
+        }
+        root.innerHTML = html;
+    }
+    function itemHtml(t, isMine, myId) {
+        const claim = t.claim;
+        let status = 'open', statusText = 'OFFEN';
+        if (claim) {
+            if (claim.claimerDiscordId === myId) { status = 'mine'; statusText = '✓ MEINS'; }
+            else { status = 'claimed'; statusText = claim.claimerName ? esc(claim.claimerName) : 'CLAIMED'; }
+        }
+        const ava = t.creatorAvatar
+            ? `<img class="tk-item-ava" src="${esc(t.creatorAvatar)}" onerror="this.outerHTML='<div class=\\'tk-item-ava\\'>?</div>'">`
+            : `<div class="tk-item-ava">${esc((t.creatorName || '?').charAt(0).toUpperCase())}</div>`;
+        const meta = (t.creatorName ? esc(t.creatorName) + ' · ' : '') + timeAgo(t.lastMessageAt || t.createdAt);
+        return `
+            <div class="tk-item ${isMine ? 'mine' : ''}" data-channel-id="${esc(t.channelId)}" onclick="event.stopPropagation();Overlay.tkOpenDetail('${esc(t.channelId)}')">
+                ${ava}
+                <div class="tk-item-body">
+                    <div class="tk-item-name">#${esc(t.channelName)}</div>
+                    <div class="tk-item-meta">${meta}</div>
+                </div>
+                <div class="tk-item-status ${status}">${statusText}</div>
+            </div>`;
+    }
+
+    // ─── DETAIL VIEW (Chat) ───────────────────────────────
+    async function openDetail(channelId) {
+        currentChannelId = channelId;
         chatMessages = [];
-        const t = tickets.get(channelId);
-        const titleEl = $('tc-title-name');
-        if (titleEl) titleEl.textContent = '#' + (t?.channelName || channelId);
-        $('tc-feed').innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.3);font-size:11px;">Lade Verlauf...</div>';
-        $('ticket-chat-slide')?.classList.add('open');
+        const t = allTickets.find(x => x.channelId === channelId);
+        chatClaim = t?.claim || null;
+        setView('detail');
+        // Banner + Actions sofort rendern (mit aktuellem Stand)
+        renderBanner();
+        renderActions();
+        // History laden
+        const feed = $('tk-feed');
+        if (feed) feed.innerHTML = '<div class="tk-list-empty">Lade Verlauf...</div>';
         const myId = getMyDiscordId();
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/history?channelId=${encodeURIComponent(channelId)}&discordId=${encodeURIComponent(myId)}`, {
                 headers: { 'x-api-key': 'emden-super-secret-key-2026' },
             });
             if (!r.ok) {
-                $('tc-feed').innerHTML = `<div style="text-align:center;padding:30px;color:#f87171;font-size:11px;">Fehler: HTTP ${r.status}</div>`;
+                if (feed) feed.innerHTML = `<div class="tk-list-empty">Fehler: HTTP ${r.status}</div>`;
                 return;
             }
             const d = await r.json();
-            chatClaim = d.claim || null;
+            chatClaim = d.claim || chatClaim;
             chatMessages = d.messages || [];
-            $('tc-feed').innerHTML = '';
-            for (const m of chatMessages) appendMessageToFeed(m, false);
-            updateChatBanner();
-            scrollFeedToBottom();
+            if (feed) feed.innerHTML = '';
+            for (const m of chatMessages) appendMsg(m, false);
+            renderBanner();
+            scrollFeed();
         } catch(e) {
-            $('tc-feed').innerHTML = `<div style="text-align:center;padding:30px;color:#f87171;font-size:11px;">Fehler: ${escapeHtml(e.message || e)}</div>`;
+            if (feed) feed.innerHTML = `<div class="tk-list-empty">Fehler: ${esc(e.message || String(e))}</div>`;
         }
     }
-
-    function closeChat() {
-        $('ticket-chat-slide')?.classList.remove('open');
-        chatChannelId = null;
-        chatMessages = [];
-        chatClaim = null;
-    }
-
-    function updateChatBanner() {
-        const banner = $('tc-claim-banner');
+    function renderBanner() {
+        const banner = $('tk-claim-banner');
         if (!banner) return;
         const myId = getMyDiscordId();
         if (!chatClaim) {
             banner.style.display = 'block';
-            banner.className = 'tc-claim-banner unclaimed';
-            banner.innerHTML = `⚠ Noch nicht geclaimt — <a href="#" onclick="event.preventDefault();Overlay.ticketClaim('${escapeHtml(chatChannelId)}')" style="color:#5b9aff;">jetzt claimen</a>`;
+            banner.className = 'tk-claim-banner unclaimed';
+            banner.textContent = '⚠ Noch nicht geclaimt — du kannst es übernehmen';
         } else if (chatClaim.claimerDiscordId === myId) {
             banner.style.display = 'block';
-            banner.className = 'tc-claim-banner claimed-self';
-            banner.innerHTML = `✓ Du bearbeitest dieses Ticket`;
+            banner.className = 'tk-claim-banner claimed-self';
+            banner.textContent = '✓ Du bearbeitest dieses Ticket';
         } else {
             banner.style.display = 'block';
-            banner.className = 'tc-claim-banner claimed-other';
-            banner.innerHTML = `Geclaimt von ${escapeHtml(chatClaim.claimerName)} — du kannst lesen + schreiben`;
+            banner.className = 'tk-claim-banner claimed-other';
+            banner.textContent = `Geclaimt von ${chatClaim.claimerName || '?'} — du kannst lesen/schreiben`;
         }
     }
-
-    function appendMessageToFeed(msg, scroll) {
-        const feed = $('tc-feed');
+    function renderActions() {
+        const row = $('tk-actions-row');
+        if (!row) return;
+        const myId = getMyDiscordId();
+        const isMine = chatClaim && chatClaim.claimerDiscordId === myId;
+        const isClaimed = !!chatClaim;
+        let html = '';
+        if (!isClaimed) {
+            html += `<button class="tk-act-btn primary" onclick="Overlay.tkClaim()">✅ Claimen</button>`;
+        }
+        if (isMine) {
+            html += `<button class="tk-act-btn warn" onclick="Overlay.tkTransfer()">↪️ Übergeben</button>`;
+            html += `<button class="tk-act-btn danger" onclick="Overlay.tkAskClose()">🔒 Schließen</button>`;
+        }
+        row.innerHTML = html;
+    }
+    function appendMsg(m, animate) {
+        const feed = $('tk-feed');
         if (!feed) return;
         const myId = getMyDiscordId();
-        const isSelf = msg.authorId === myId;
-        const isBot = !!msg.authorIsBot;
-        const av = msg.authorAvatar
-            ? `<img src="${escapeHtml(msg.authorAvatar)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tc-ava',textContent:'?'}))">`
-            : `<div class="tc-ava">${escapeHtml((msg.authorName || '?').charAt(0).toUpperCase())}</div>`;
-        const time = msg.ts ? new Date(msg.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
-        const attachments = (msg.attachments || []).map(a => `<a href="${escapeHtml(a.url)}" class="tc-msg-att" target="_blank">📎 ${escapeHtml(a.name || 'Anhang')}</a>`).join(' ');
+        const isSelf = m.authorId === myId;
+        const isBot = !!m.authorIsBot;
+        const ava = m.authorAvatar
+            ? `<img src="${esc(m.authorAvatar)}" onerror="this.outerHTML='<div class=\\'tk-ava\\'>?</div>'">`
+            : `<div class="tk-ava">${esc((m.authorName || '?').charAt(0).toUpperCase())}</div>`;
+        const time = m.ts ? new Date(m.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+        const atts = (m.attachments || []).map(a => `<a class="tk-msg-att" target="_blank" href="${esc(a.url)}">📎 ${esc(a.name || 'Anhang')}</a>`).join(' ');
         const div = document.createElement('div');
-        div.className = 'tc-msg' + (isSelf ? ' is-self' : '') + (isBot ? ' is-bot' : '');
-        div.dataset.messageId = msg.messageId || '';
+        div.className = 'tk-msg' + (isSelf ? ' is-self' : '') + (isBot ? ' is-bot' : '');
+        div.dataset.messageId = m.messageId || '';
         div.innerHTML = `
-            ${av}
-            <div class="tc-msg-body">
-                <div class="tc-msg-name">${escapeHtml(msg.authorName || 'User')}${isBot ? ' <span style="color:rgba(255,255,255,.3);font-weight:400;">(Bot)</span>' : ''}</div>
-                <div class="tc-msg-text">${escapeHtml(msg.content || '')}</div>
-                ${attachments ? `<div>${attachments}</div>` : ''}
-                ${time ? `<div class="tc-msg-time">${time}</div>` : ''}
-            </div>
-        `;
+            ${ava}
+            <div class="tk-msg-body">
+                <div class="tk-msg-name">${esc(m.authorName || 'User')}${isBot ? ' <span style="color:rgba(255,255,255,.3);font-weight:400;">(Bot)</span>' : ''}</div>
+                <div class="tk-msg-text">${esc(m.content || '')}</div>
+                ${atts ? `<div>${atts}</div>` : ''}
+                ${time ? `<div class="tk-msg-time">${time}</div>` : ''}
+            </div>`;
         feed.appendChild(div);
-        if (scroll) {
-            const nearBottom = (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 100;
-            if (nearBottom) scrollFeedToBottom();
-        }
     }
-
-    function scrollFeedToBottom() {
-        const feed = $('tc-feed');
+    function scrollFeed() {
+        const feed = $('tk-feed');
         if (feed) feed.scrollTop = feed.scrollHeight;
     }
 
+    // ─── ACTIONS ──────────────────────────────────────────
     async function send() {
-        const input = $('tc-input');
-        if (!input || !chatChannelId) return;
+        const input = $('tk-input');
+        const btn = $('tk-send');
+        if (!input || !currentChannelId) return;
         const text = input.value.trim();
         if (!text) return;
         const myId = getMyDiscordId();
-        if (!myId) return alert('Keine Discord-ID');
-        const btn = $('tc-send');
+        if (!myId) return showMini('Keine Discord-ID', 'danger');
         if (btn) btn.disabled = true;
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/reply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
-                body: JSON.stringify({ channelId: chatChannelId, discordId: myId, text }),
+                body: JSON.stringify({ channelId: currentChannelId, discordId: myId, text }),
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.ok) {
-                alert('Fehler: ' + (d.error || ('HTTP ' + r.status)));
-                return;
-            }
+            if (!r.ok || !d.ok) { showMini('Fehler: ' + (d.error || ('HTTP ' + r.status)), 'danger'); return; }
             input.value = '';
             input.style.height = 'auto';
         } catch(e) {
-            alert('Netzwerk: ' + (e.message || e));
+            showMini('Netzwerk: ' + (e.message || e), 'danger');
         } finally {
             if (btn) btn.disabled = false;
             input.focus();
         }
     }
-
-    // ─── Tickets-Panel (Liste der Claims) ───────────────────
-    let myClaims = [];
-    let panelOpen = false;
-
-    async function loadMyClaims() {
+    async function claim() {
+        if (!currentChannelId) return;
         const myId = getMyDiscordId();
-        if (!myId) return;
+        if (!myId) return showMini('Keine Discord-ID', 'danger');
         try {
-            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/my-claims?discordId=${encodeURIComponent(myId)}`, {
-                headers: { 'x-api-key': 'emden-super-secret-key-2026' },
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId: currentChannelId, discordId: myId }),
             });
-            if (!r.ok) return;
-            const d = await r.json();
-            myClaims = d.items || [];
-            renderClaimsBadge();
-            if (panelOpen) renderClaimsPanel();
-        } catch (e) {
-            console.warn('[Tickets] my-claims fetch failed:', e.message || e);
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) { showMini('Fehler: ' + (d.error || ('HTTP ' + r.status)), 'danger'); return; }
+            chatClaim = d.claim || chatClaim;
+            renderBanner();
+            renderActions();
+            showMini('Ticket geclaimt ✓', 'success');
+        } catch(e) {
+            showMini('Netzwerk: ' + (e.message || e), 'danger');
         }
     }
-
-    function renderClaimsBadge() {
-        const btn = $('tickets-trigger');
-        const badge = $('tickets-badge');
-        if (!btn || !badge) return;
-        const n = myClaims.length;
-        badge.textContent = n;
-        btn.classList.toggle('has-claims', n > 0);
-    }
-
-    function renderClaimsPanel() {
-        const list = $('tp-list');
-        if (!list) return;
-        if (myClaims.length === 0) {
-            list.innerHTML = '<div class="tp-empty">Keine aktiven Tickets — claime eins um es hier zu verwalten.</div>';
-            return;
-        }
-        list.innerHTML = myClaims.map(c => {
-            const since = c.claimedAt ? timeAgo(c.claimedAt) : '';
-            return `
-                <div class="tp-item">
-                    <div class="tp-item-name">#${escapeHtml(c.channelName || c.channelId)}</div>
-                    <div class="tp-item-meta">geclaimt ${escapeHtml(since)}</div>
-                    <div class="tp-item-actions">
-                        <button class="tp-action" onclick="Overlay.ticketOpenChat('${escapeHtml(c.channelId)}')">→ Chat</button>
-                        <button class="tp-action warn" onclick="Overlay.ticketRequestTransferFor('${escapeHtml(c.channelId)}')">↪️ Übergeben</button>
-                        <button class="tp-action danger" onclick="Overlay.ticketRequestCloseFor('${escapeHtml(c.channelId)}')">🔒 Schließen</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function timeAgo(ts) {
-        const s = Math.floor((Date.now() - ts) / 1000);
-        if (s < 60) return 'gerade eben';
-        if (s < 3600) return Math.floor(s / 60) + 'm';
-        if (s < 86400) return Math.floor(s / 3600) + 'h';
-        return Math.floor(s / 86400) + 'd';
-    }
-
-    function togglePanel() {
-        if (!isStaff()) return;
-        const panel = $('tickets-panel');
-        if (!panel) return;
-        panelOpen = !panel.classList.contains('open');
-        if (panelOpen) {
-            panel.classList.add('open');
-            loadMyClaims();
-            renderClaimsPanel();
-        } else {
-            panel.classList.remove('open');
+    async function transfer() {
+        if (!currentChannelId) return;
+        const myId = getMyDiscordId();
+        try {
+            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/transfer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
+                body: JSON.stringify({ channelId: currentChannelId, discordId: myId }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) { showMini('Fehler: ' + (d.error || ('HTTP ' + r.status)), 'danger'); return; }
+            chatClaim = null;
+            renderBanner();
+            renderActions();
+            showMini('Übernahme freigegeben', 'success');
+            back();
+        } catch(e) {
+            showMini('Netzwerk: ' + (e.message || e), 'danger');
         }
     }
-
-    // ─── Menü im Chat-Header (Übergeben / Schließen) ────────
-    function toggleMenu() {
-        const pop = $('tc-menu-pop');
-        if (!pop) return;
-        pop.classList.toggle('open');
+    function askClose() {
+        if (!currentChannelId) return;
+        pendingConfirm = { kind: 'close', channelId: currentChannelId };
+        const ov = $('ticket-overlay');
+        if (ov) ov.classList.add('confirm-active');
     }
-    function closeMenu() {
-        const pop = $('tc-menu-pop');
-        if (pop) pop.classList.remove('open');
+    function confirmCancel() {
+        pendingConfirm = null;
+        const ov = $('ticket-overlay');
+        if (ov) ov.classList.remove('confirm-active');
     }
-
-    async function requestCloseFor(channelId) {
-        if (!channelId) return;
-        if (!confirm('Ticket schließen? Channel wird in 30s gelöscht (cancel im Chat möglich).')) return;
+    async function confirmOk() {
+        if (!pendingConfirm || pendingConfirm.kind !== 'close') return confirmCancel();
+        const channelId = pendingConfirm.channelId;
+        confirmCancel();
         const myId = getMyDiscordId();
         try {
             const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/close`, {
@@ -3108,66 +3149,167 @@ const TicketCtrl = (() => {
                 body: JSON.stringify({ channelId, discordId: myId }),
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.ok) { alert('Fehler: ' + (d.error || ('HTTP ' + r.status))); return; }
-            closeMenu();
-            // Falls Chat dieses Channels offen ist → schließen
-            if (chatChannelId === channelId) closeChat();
-            // Aus my-claims entfernen
-            myClaims = myClaims.filter(c => c.channelId !== channelId);
-            renderClaimsBadge();
-            if (panelOpen) renderClaimsPanel();
+            if (!r.ok || !d.ok) { showMini('Fehler: ' + (d.error || ('HTTP ' + r.status)), 'danger'); return; }
+            showMini('Ticket schließt in 30s', 'success');
+            back();
         } catch(e) {
-            alert('Netzwerk: ' + (e.message || e));
+            showMini('Netzwerk: ' + (e.message || e), 'danger');
         }
     }
-    function requestClose() { if (chatChannelId) requestCloseFor(chatChannelId); }
 
-    async function requestTransferFor(channelId) {
-        if (!channelId) return;
-        if (!confirm('Ticket zur Übernahme freigeben? Andere Staff sehen wieder einen Toast.')) return;
+    // ─── MINI-NOTIF ───────────────────────────────────────
+    function showMini(text, kind) {
+        const root = $('ticket-mini-notif');
+        if (!root) return;
+        const el = document.createElement('div');
+        el.className = 'tk-mini ' + (kind || '');
+        const icon = kind === 'danger' ? '⚠' : kind === 'success' ? '✓' : 'ℹ';
+        el.innerHTML = `<span class="tk-mini-ico">${icon}</span><span>${esc(text)}</span>`;
+        root.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('show'));
+        setTimeout(() => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 400);
+        }, 3500);
+    }
+
+    // ─── ANNOUNCER (top-toast für neue/freie Tickets) ────
+    function showAnnounce(t, withSound) {
+        const stack = $('ticket-toast-stack');
+        if (!stack || !isStaff()) return;
+        // Nicht doppelt anzeigen
+        if (stack.querySelector(`[data-ann-channel="${t.channelId}"]`)) return;
+        const el = document.createElement('div');
+        el.className = 'ticket-toast show';
+        el.dataset.annChannel = t.channelId;
+        el.innerHTML = `
+            <div class="ticket-toast-icon">🎫</div>
+            <div class="ticket-toast-body">
+                <div class="ticket-toast-title">Neues Ticket</div>
+                <div class="ticket-toast-name">#${esc(t.channelName)}</div>
+                <div class="ticket-toast-meta">${esc(t.reason || 'Klicke um zu öffnen')}</div>
+            </div>
+            <button class="ticket-toast-btn" onclick="event.stopPropagation();Overlay.tkOpenAnn('${esc(t.channelId)}')">→ Öffnen</button>
+            <button class="ticket-toast-close" onclick="event.stopPropagation();this.parentElement.remove();">×</button>`;
+        stack.appendChild(el);
+        if (withSound) {
+            try { const a = new Audio('ticketsound.mp3'); a.volume = 0.4; a.play().catch(()=>{}); } catch(_) {}
+        }
+        setTimeout(() => { el.remove(); }, 25000);
+    }
+    function removeAnnounce(channelId) {
+        const stack = $('ticket-toast-stack');
+        if (!stack) return;
+        const el = stack.querySelector(`[data-ann-channel="${channelId}"]`);
+        if (el) el.remove();
+    }
+
+    // ─── SOCKET HANDLERS ──────────────────────────────────
+    function onNewTicket(data) {
+        if (!data?.channelId) return;
+        showAnnounce({
+            channelId: data.channelId,
+            channelName: data.channelName || data.ticketId || data.channelId,
+            reason: data.reason || ''
+        }, true);
+        loadAll();
+    }
+    function onClaimed(data) {
+        if (!data?.channelId) return;
         const myId = getMyDiscordId();
-        try {
-            const r = await fetch(`${OVL_CONFIG.API_URL}/api/ticket/transfer`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': 'emden-super-secret-key-2026' },
-                body: JSON.stringify({ channelId, discordId: myId }),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.ok) { alert('Fehler: ' + (d.error || ('HTTP ' + r.status))); return; }
-            closeMenu();
-            if (chatChannelId === channelId) closeChat();
-            myClaims = myClaims.filter(c => c.channelId !== channelId);
-            renderClaimsBadge();
-            if (panelOpen) renderClaimsPanel();
-        } catch(e) {
-            alert('Netzwerk: ' + (e.message || e));
+        // Update local state
+        const t = allTickets.find(x => x.channelId === data.channelId);
+        if (t) {
+            if (data.claimerDiscordId) {
+                t.claim = {
+                    claimerDiscordId: data.claimerDiscordId,
+                    claimerName: data.claimerName,
+                    claimerAvatar: data.claimerAvatar,
+                    claimedAt: data.claimedAt,
+                };
+            } else {
+                t.claim = null;
+            }
+        }
+        if (currentChannelId === data.channelId) {
+            chatClaim = t?.claim || null;
+            renderBanner();
+            renderActions();
+        }
+        if (view === 'list') renderList();
+        updateBadge();
+        // Announcement-Logik:
+        if (data.claimerDiscordId) {
+            removeAnnounce(data.channelId);
+            if (data.claimerDiscordId === myId) {
+                showMini('Du hast das Ticket übernommen', 'success');
+            }
+        } else {
+            // Transfer/Freigabe → wieder als Toast (mit Sound)
+            const tk = allTickets.find(x => x.channelId === data.channelId) || { channelId: data.channelId, channelName: data.channelName };
+            showAnnounce({
+                channelId: tk.channelId,
+                channelName: tk.channelName,
+                reason: 'Übernahme angefragt'
+            }, true);
         }
     }
-    function requestTransfer() { if (chatChannelId) requestTransferFor(chatChannelId); }
-
-    // Listener: ticket_closed → aus claims entfernen
+    function onMessage(payload) {
+        if (!payload?.channelId) return;
+        // Detail-View aktualisieren
+        if (currentChannelId === payload.channelId && view === 'detail') {
+            chatMessages.push(payload);
+            if (chatMessages.length > 200) chatMessages = chatMessages.slice(-200);
+            const feed = $('tk-feed');
+            const nearBottom = feed ? (feed.scrollHeight - feed.scrollTop - feed.clientHeight) < 100 : false;
+            appendMsg(payload, true);
+            if (nearBottom) scrollFeed();
+        }
+        // Update lastMessageAt für Sortierung
+        const t = allTickets.find(x => x.channelId === payload.channelId);
+        if (t) t.lastMessageAt = payload.ts || Date.now();
+    }
     function onClosed(data) {
         if (!data?.channelId) return;
-        myClaims = myClaims.filter(c => c.channelId !== data.channelId);
-        tickets.delete(data.channelId);
-        renderClaimsBadge();
-        renderToasts();
-        if (panelOpen) renderClaimsPanel();
-        if (chatChannelId === data.channelId) closeChat();
+        allTickets = allTickets.filter(x => x.channelId !== data.channelId);
+        removeAnnounce(data.channelId);
+        if (currentChannelId === data.channelId) back();
+        if (view === 'list') renderList();
+        updateBadge();
+        // Mini-Notif rechts unten für ALLE
+        showMini('Ticket #' + (data.channelName || data.channelId) + ' wurde geschlossen', '');
     }
 
-    // Wenn ein Ticket geclaimt/freigegeben wird → my-claims aktualisieren
-    const _origOnClaimed = onClaimed;
-    function onClaimedExt(data) {
-        _origOnClaimed(data);
-        // Nach kurzer Verzögerung neu laden (eigene Claims könnten sich geändert haben)
-        clearTimeout(window.__tk_reload);
-        window.__tk_reload = setTimeout(loadMyClaims, 300);
+    // ─── CURSOR-FOCUS-TRACKER ─────────────────────────────
+    let _focusGranted = false;
+    function trackCursor() {
+        document.addEventListener('mousemove', (e) => {
+            const ov = $('ticket-overlay');
+            const stack = $('ticket-toast-stack');
+            const trigger = $('tickets-trigger');
+            const mini = $('ticket-mini-notif');
+            let over = false;
+            const BUFFER = 30;
+            const checkRect = (el) => {
+                if (!el) return false;
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) return false;
+                return e.clientX >= r.left - BUFFER && e.clientX <= r.right + BUFFER &&
+                       e.clientY >= r.top - BUFFER && e.clientY <= r.bottom + BUFFER;
+            };
+            if (ov?.classList.contains('open')) { if (checkRect(ov)) over = true; }
+            stack?.querySelectorAll('.ticket-toast').forEach(t => { if (checkRect(t)) over = true; });
+            if (trigger && checkRect(trigger)) over = true;
+            mini?.querySelectorAll('.tk-mini').forEach(t => { if (checkRect(t)) over = true; });
+            if (over && !_focusGranted) { window.electronAPI?.requestOverlayFocus?.(true); _focusGranted = true; }
+            else if (!over && _focusGranted) { window.electronAPI?.requestOverlayFocus?.(false); _focusGranted = false; }
+        });
     }
 
+    // ─── INIT ─────────────────────────────────────────────
     function init() {
-        // Auto-resize Textarea
-        const input = $('tc-input');
+        loadSettings();
+        const input = $('tk-input');
         if (input) {
             input.addEventListener('input', () => {
                 input.style.height = 'auto';
@@ -3177,47 +3319,57 @@ const TicketCtrl = (() => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
             });
         }
-        trackToastCursor();
-        // Klick außerhalb des Menüs → schließen
-        document.addEventListener('click', (e) => {
-            const pop = $('tc-menu-pop');
-            const btn = $('tc-menu-btn');
-            if (!pop || !btn) return;
-            if (pop.contains(e.target) || btn.contains(e.target)) return;
-            pop.classList.remove('open');
-        });
-        // Initial my-claims laden, dann periodisch
-        setTimeout(loadMyClaims, 2500);
-        setInterval(loadMyClaims, 60000);
+        trackCursor();
+        // Beim Start einmal laden (falls Staff)
+        setTimeout(() => { if (isStaff()) loadAll(); }, 2500);
+        setInterval(() => { if (isStaff()) loadAll(); }, 60000);
     }
-
     window.addEventListener('DOMContentLoaded', init);
 
     return {
-        onNewTicket, onClaimed: onClaimedExt, onMessage, onClosed,
-        claim, dismiss, openChat, closeChat, send,
-        togglePanel, toggleMenu,
-        requestClose, requestCloseFor,
-        requestTransfer, requestTransferFor,
-        loadMyClaims,
+        // Public API
+        open, close, toggle, back, openSettings,
+        loadAll,
+        openDetail, send, claim, transfer,
+        askClose, confirmCancel, confirmOk,
+        setSide, setTop, setBottom, setWidth, setAlpha, resetSettings,
+        // Socket-Events
+        onNewTicket, onClaimed, onMessage, onClosed,
     };
 })();
 window.TicketCtrl = TicketCtrl;
 
-// Overlay-API (fuer onclick handlers im HTML)
 Object.assign(Overlay, {
-    ticketClaim: (channelId, btnEl) => TicketCtrl.claim(channelId, btnEl),
-    ticketDismiss: (channelId) => TicketCtrl.dismiss(channelId),
-    ticketOpenChat: (channelId) => TicketCtrl.openChat(channelId),
-    ticketCloseChat: () => TicketCtrl.closeChat(),
-    ticketSend: () => TicketCtrl.send(),
-    toggleTicketsPanel: () => TicketCtrl.togglePanel(),
-    ticketToggleMenu: () => TicketCtrl.toggleMenu(),
-    ticketRequestClose: () => TicketCtrl.requestClose(),
-    ticketRequestTransfer: () => TicketCtrl.requestTransfer(),
-    ticketRequestCloseFor: (id) => TicketCtrl.requestCloseFor(id),
-    ticketRequestTransferFor: (id) => TicketCtrl.requestTransferFor(id),
+    toggleTickets:  () => TicketCtrl.toggle(),
+    tkClose:        () => TicketCtrl.close(),
+    tkBack:         () => TicketCtrl.back(),
+    tkOpenSettings: () => TicketCtrl.openSettings(),
+    tkOpenDetail:   (id) => TicketCtrl.openDetail(id),
+    tkOpenAnn:      (id) => { TicketCtrl.open(); setTimeout(() => TicketCtrl.openDetail(id), 50); },
+    tkSend:         () => TicketCtrl.send(),
+    tkClaim:        () => TicketCtrl.claim(),
+    tkTransfer:     () => TicketCtrl.transfer(),
+    tkAskClose:     () => TicketCtrl.askClose(),
+    tkConfirmCancel:() => TicketCtrl.confirmCancel(),
+    tkConfirmOk:    () => TicketCtrl.confirmOk(),
+    tkSetSide:      (s) => TicketCtrl.setSide(s),
+    tkSetTop:       (v) => TicketCtrl.setTop(v),
+    tkSetBottom:    (v) => TicketCtrl.setBottom(v),
+    tkSetWidth:     (v) => TicketCtrl.setWidth(v),
+    tkSetAlpha:     (v) => TicketCtrl.setAlpha(v),
+    tkResetSettings:() => TicketCtrl.resetSettings(),
 });
+
+// ════════════════════════════════════════════════════════════════
+// LEGACY TICKET STUBS (für bestehende onclick-Handler — leer/no-op)
+// ════════════════════════════════════════════════════════════════
+const _LegacyTicket = {
+    onNewTicket: (d) => TicketCtrl.onNewTicket(d),
+    onClaimed:   (d) => TicketCtrl.onClaimed(d),
+    onMessage:   (d) => TicketCtrl.onMessage(d),
+    onClosed:    (d) => TicketCtrl.onClosed(d),
+};
+window._LegacyTicket = _LegacyTicket;
 
 window.addEventListener('DOMContentLoaded', () => {
     Overlay.init();
