@@ -60,6 +60,10 @@ const robloxStates = new Map();
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 
+// === Premium-Spende-System (Discord-Activity Monetization) ===
+const PREMIUM_SKU_ID = process.env.PREMIUM_SKU_ID || '1498325834338144297';
+const PREMIUM_ROLE_ID = process.env.PREMIUM_ROLE_ID || '1498325487636840529';
+
 // === Overlay & Roblox Link Tracking ===
 const ON_DUTY_ROLE_ID = "1367160344992284803";
 const LINKS_FILE = path.join(path.resolve(), "data", "robloxLinks.json");
@@ -1951,6 +1955,93 @@ const apiServer = http.createServer(async (req, res) => {
         } catch(e) {
             res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
         }
+        return;
+    }
+
+    // ─── PREMIUM (Discord Activity Monetization) ────────────────────
+    // GET /api/premium/status?discordId=...
+    // Pruefe ob User die Premium-SKU als aktive Entitlement hat,
+    // synchronisiere die Premium-Rolle im Server und gib Status zurueck.
+    if (req.method === "GET" && url.pathname === "/api/premium/status") {
+        try {
+            const discordId = url.searchParams.get('discordId');
+            if (!discordId) { res.writeHead(400); return res.end(JSON.stringify({ error: 'discordId required' })); }
+            if (!DISCORD_CLIENT_ID || !PREMIUM_SKU_ID) {
+                res.writeHead(503);
+                return res.end(JSON.stringify({ error: 'Premium nicht konfiguriert' }));
+            }
+            const r = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements?user_id=${encodeURIComponent(discordId)}&sku_ids=${PREMIUM_SKU_ID}&exclude_ended=true`, {
+                headers: { Authorization: `Bot ${process.env.TOKEN}` },
+            });
+            const list = await r.json().catch(() => []);
+            if (!Array.isArray(list)) {
+                res.writeHead(502);
+                return res.end(JSON.stringify({ error: 'Discord API error', detail: list }));
+            }
+            const now = Date.now();
+            const active = list.find(e =>
+                String(e.sku_id) === String(PREMIUM_SKU_ID)
+                && (!e.ends_at || new Date(e.ends_at).getTime() > now)
+                && (!e.deleted)
+            );
+            const isActive = !!active;
+            const endsAt = active?.ends_at ? new Date(active.ends_at).getTime() : null;
+
+            // Rolle synchronisieren (best-effort)
+            try {
+                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+                if (guild) {
+                    const member = await guild.members.fetch(discordId).catch(() => null);
+                    if (member) {
+                        const has = member.roles.cache.has(PREMIUM_ROLE_ID);
+                        if (isActive && !has) await member.roles.add(PREMIUM_ROLE_ID).catch(() => {});
+                        else if (!isActive && has) await member.roles.remove(PREMIUM_ROLE_ID).catch(() => {});
+                    }
+                }
+            } catch(e) { console.warn('[Premium] role sync fail:', e?.message); }
+
+            res.writeHead(200);
+            return res.end(JSON.stringify({
+                active: isActive,
+                endsAt,
+                skuId: PREMIUM_SKU_ID,
+                entitlementId: active?.id || null,
+            }));
+        } catch(e) {
+            res.writeHead(500);
+            return res.end(JSON.stringify({ error: e.message }));
+        }
+    }
+
+    // POST /api/premium/webhook — Discord Outgoing Webhook bei Entitlement-Events
+    // Stelle in Dev-Portal "Webhooks" auf https://<vercel>/api/premium/webhook
+    // (vorerst ohne Signatur-Verifikation — siehe TODO).
+    if (req.method === "POST" && url.pathname === "/api/premium/webhook") {
+        let body = ""; req.on("data", c => (body += c)); req.on("end", async () => {
+            try {
+                const evt = JSON.parse(body || "{}");
+                const t = evt.type || evt.t || '';
+                const data = evt.data || evt.d || {};
+                if (String(data.sku_id) !== String(PREMIUM_SKU_ID)) {
+                    res.writeHead(200); return res.end('{}');
+                }
+                const did = data.user_id;
+                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+                if (guild && did) {
+                    const member = await guild.members.fetch(did).catch(() => null);
+                    if (member) {
+                        if (t.includes('CREATE') || t.includes('UPDATE')) {
+                            await member.roles.add(PREMIUM_ROLE_ID).catch(() => {});
+                        } else if (t.includes('DELETE')) {
+                            await member.roles.remove(PREMIUM_ROLE_ID).catch(() => {});
+                        }
+                    }
+                }
+                res.writeHead(200); return res.end('{}');
+            } catch(e) {
+                res.writeHead(500); return res.end(JSON.stringify({ error: e.message }));
+            }
+        });
         return;
     }
 

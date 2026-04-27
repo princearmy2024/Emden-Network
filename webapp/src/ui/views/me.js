@@ -4,6 +4,7 @@
 import { api, escapeHtml, fmtDuration, refreshIcons, toast, imgUrl } from './api.js';
 import * as sound from '../../sounds.js';
 import * as device from '../../device.js';
+import * as premium from '../../premium.js';
 
 let currentRoot = null;
 let currentSession = null;
@@ -25,7 +26,8 @@ async function load() {
     api(`/shifts?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
     api(`/streaks?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
     api(`/roblox/profile?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
-  ]).then(([shiftsData, streaksData, robloxData]) => {
+    premium.getStatus(currentSession.discordId).catch(() => null),
+  ]).then(([shiftsData, streaksData, robloxData, premiumData]) => {
     if (shiftsData) {
       myShift = shiftsData.shifts?.[currentSession.discordId] || { state: 'off', savedMs: 0, breakMs: 0, startedAt: null, breakStartedAt: null };
       serverNow = shiftsData.serverNow || Date.now();
@@ -34,6 +36,7 @@ async function load() {
     }
     if (streaksData) renderStreakCard(streaksData);
     renderRobloxCard(robloxData);
+    renderPremiumCard(premiumData);
   });
 }
 
@@ -61,6 +64,11 @@ function renderShell() {
     <div class="card" id="me-streak">
       <div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
       <div class="empty"><span>—</span></div>
+    </div>
+
+    <div class="card premium-card" id="me-premium">
+      <div class="card-title"><i data-lucide="gem"></i><span>Spender / Premium</span></div>
+      <div class="loading"><div class="spinner"></div></div>
     </div>
 
     <div class="card" id="me-roblox">
@@ -253,6 +261,71 @@ function renderStreakCard(d) {
     </div>
     ${my.completed ? `<div class="banner success" style="margin-top:10px;"><i data-lucide="check"></i><span>Heute erfüllt!</span></div>` : ''}`;
   refreshIcons();
+}
+
+function renderPremiumCard(d) {
+  const card = document.getElementById('me-premium');
+  if (!card) return;
+  const active = !!d?.active;
+  const endsAt = d?.endsAt ? new Date(d.endsAt) : null;
+  const endsStr = endsAt ? endsAt.toLocaleDateString('de-DE') : '';
+
+  if (active) {
+    card.classList.add('premium-active');
+    card.innerHTML = `
+      <div class="card-title"><i data-lucide="gem"></i><span>Spender / Premium</span><span class="card-tag premium-tag">AKTIV</span></div>
+      <div class="premium-row">
+        <div class="premium-icon"><i data-lucide="sparkles"></i></div>
+        <div class="premium-body">
+          <div class="premium-title">Du bist Spender 💎</div>
+          <div class="premium-sub">${endsStr ? `Verlängert sich automatisch · nächste Abbuchung: ${endsStr}` : 'Vielen Dank für deinen Support!'}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.55;">
+        Deine Premium-Rolle wird automatisch synchronisiert. Du kannst dein Abo jederzeit über
+        Discord-Einstellungen → Abos kündigen.
+      </div>`;
+  } else {
+    card.classList.remove('premium-active');
+    card.innerHTML = `
+      <div class="card-title"><i data-lucide="gem"></i><span>Spender / Premium</span></div>
+      <div class="premium-row">
+        <div class="premium-icon idle"><i data-lucide="heart"></i></div>
+        <div class="premium-body">
+          <div class="premium-title">Werde Spender</div>
+          <div class="premium-sub">2,99 €/Monat — unterstütze Emden Network</div>
+        </div>
+      </div>
+      <ul class="premium-perks">
+        <li><i data-lucide="check"></i><span>Exklusive 💎 Spender-Rolle in Discord</span></li>
+        <li><i data-lucide="check"></i><span>Farbiger Name im Chat</span></li>
+        <li><i data-lucide="check"></i><span>VIP-Support</span></li>
+      </ul>
+      <button class="btn primary full lg" id="premium-buy-btn">
+        <i data-lucide="gem"></i><span>Jetzt Spender werden</span>
+      </button>`;
+  }
+  refreshIcons();
+  const btn = document.getElementById('premium-buy-btn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await premium.startPurchase();
+        toast('Vielen Dank! Status aktualisiert sich gleich…', 'success');
+        // Discord schliesst Modal nach erfolgreichem Kauf — Status nach kurzem
+        // Delay neu laden (Webhook braucht 1-2s)
+        setTimeout(async () => {
+          premium.clearCache();
+          const fresh = await premium.getStatus(currentSession.discordId, { force: true });
+          renderPremiumCard(fresh);
+        }, 2500);
+      } catch(e) {
+        toast(e.message, 'danger');
+        btn.disabled = false;
+      }
+    });
+  }
 }
 
 function renderRobloxCard(d) {
