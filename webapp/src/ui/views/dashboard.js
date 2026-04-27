@@ -256,6 +256,9 @@ async function loadMonthTop() {
 }
 
 // ─── Live Feed ──────────────────────────────────────
+// Client-side Roblox-Avatar-Cache (Fallback wenn Bot keine targetAvatar liefert)
+const _avaCache = new Map(); // userId -> url
+
 function hookFeed() {
   unsubs.push(live.on('ticket:new', (t) => {
     pushFeed({ type: 'ticket', icon: 'ticket', tone: 'success', title: `Ticket: #${t.channelName || ''}`, sub: t.category || '', ts: Date.now() });
@@ -274,6 +277,7 @@ function hookFeed() {
         firstPass = false;
         log.forEach(e => lastModIds.add(modKey(e)));
       } else {
+        let added = false;
         for (const e of log) {
           const k = modKey(e);
           if (!lastModIds.has(k)) {
@@ -284,12 +288,15 @@ function hookFeed() {
               tone: e.action === 'Ban' || e.action === 'One Day Ban' ? 'danger' : 'warn',
               title: `${e.action}: ${e.displayName || e.username || '?'}`,
               sub: `von ${e.moderator || '?'}`,
-              avatar: e.targetAvatar || '',
+              avatar: e.targetAvatar || _avaCache.get(String(e.userId || '')) || '',
               modAvatar: e.moderatorAvatar || '',
+              userId: e.userId || '',
               ts: e.date ? new Date(e.date).getTime() : Date.now(),
             });
+            added = true;
           }
         }
+        if (added) enrichRobloxAvatars();
       }
     } catch(_) {}
   };
@@ -315,14 +322,48 @@ async function backfillFeed() {
         sub: `von ${e.moderator || '?'}`,
         avatar: e.targetAvatar || '',
         modAvatar: e.moderatorAvatar || '',
+        userId: e.userId || '',
         ts: e.date ? new Date(e.date).getTime() : Date.now(),
       });
     });
     feedItems.sort((a, b) => b.ts - a.ts);
     renderFeed();
+    enrichRobloxAvatars();
   } catch(_) {
     renderFeed();
   }
+}
+
+// Client-side Fallback: falls der Bot keine targetAvatar liefert, holen wir
+// die Roblox-Avatare ueber /api/roblox/avatars batchweise nach.
+async function enrichRobloxAvatars() {
+  const need = [];
+  for (const it of feedItems) {
+    if (it.avatar) continue;
+    const uid = String(it.userId || '');
+    if (!/^\d+$/.test(uid)) continue;
+    if (_avaCache.has(uid)) {
+      it.avatar = _avaCache.get(uid);
+      continue;
+    }
+    need.push(uid);
+  }
+  // Schon vorhandene aus Cache rendern
+  renderFeed();
+  if (need.length === 0) return;
+  try {
+    const ids = [...new Set(need)].slice(0, 50);
+    const d = await api(`/roblox/avatars?ids=${ids.join(',')}`);
+    const map = d.avatars || {};
+    for (const [id, url] of Object.entries(map)) {
+      _avaCache.set(String(id), url);
+    }
+    for (const it of feedItems) {
+      const uid = String(it.userId || '');
+      if (!it.avatar && _avaCache.has(uid)) it.avatar = _avaCache.get(uid);
+    }
+    renderFeed();
+  } catch(_) {}
 }
 
 function pushFeed(item) {
