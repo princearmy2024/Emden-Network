@@ -382,7 +382,7 @@ function renderFeed() {
   }
   list.innerHTML = feedItems.map(i => {
     const avaCell = i.avatar
-      ? `<img class="feed-ava" src="${escapeHtml(imgUrl(i.avatar))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'feed-icon',innerHTML:'<i data-lucide=\\'${i.icon}\\'></i>'}))">`
+      ? `<img class="feed-ava" src="${escapeHtml(imgUrl(i.avatar))}" alt="" data-fallback-icon="${i.icon}">`
       : `<div class="feed-icon"><i data-lucide="${i.icon}"></i></div>`;
     const modAva = i.modAvatar
       ? `<img class="feed-mod" src="${escapeHtml(imgUrl(i.modAvatar))}" alt="">`
@@ -397,6 +397,17 @@ function renderFeed() {
     </div>`;
   }).join('');
   refreshIcons();
+  // Fallback fuer kaputte Avatar-URLs ohne CSP-blockiertes inline-onerror
+  list.querySelectorAll('img.feed-ava[data-fallback-icon]').forEach(img => {
+    img.addEventListener('error', () => {
+      const ic = img.dataset.fallbackIcon || 'shield';
+      const div = document.createElement('div');
+      div.className = 'feed-icon';
+      div.innerHTML = `<i data-lucide="${ic}"></i>`;
+      img.replaceWith(div);
+      refreshIcons();
+    }, { once: true });
+  });
 }
 
 function timeAgoShort(ts) {

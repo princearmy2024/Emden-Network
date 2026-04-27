@@ -12,6 +12,10 @@ import { renderShell } from './ui/shell.js';
 import { renderAccessDenied } from './ui/access-denied.js';
 import { applyMode, watchResize } from './device.js';
 import { unlockOnFirstGesture } from './sounds.js';
+import { createIcons, icons } from 'lucide';
+
+// Lucide global verfuegbar machen (statt CDN — Discord-CSP blockt unpkg)
+window.lucide = { createIcons: (opts = {}) => createIcons({ icons, ...opts }) };
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,16 +26,8 @@ function setBootStatus(text, isError = false) {
   if (boot) boot.classList.toggle('error', isError);
 }
 
-// Wait for Lucide CDN to be ready before any rendering
-function waitForLucide() {
-  return new Promise(resolve => {
-    if (window.lucide?.createIcons) return resolve();
-    const t = setInterval(() => {
-      if (window.lucide?.createIcons) { clearInterval(t); resolve(); }
-    }, 50);
-    setTimeout(() => { clearInterval(t); resolve(); }, 3000);
-  });
-}
+// Lucide ist gebundled, sofort verfuegbar.
+function waitForLucide() { return Promise.resolve(); }
 
 async function main() {
   try {
