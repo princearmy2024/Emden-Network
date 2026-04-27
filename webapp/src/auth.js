@@ -70,13 +70,27 @@ export async function initAuth() {
   session = {
     discordId: auth.user.id,
     username: auth.user.global_name || auth.user.username,
-    avatar: auth.user.avatar
-      ? `https://cdn.discordapp.com/avatars/${auth.user.id}/${auth.user.avatar}.png`
-      : null,
+    avatar: buildAvatarUrl(auth.user),
     accessToken: access_token,
     mode: 'discord',
   };
   return session;
+}
+
+function buildAvatarUrl(user) {
+  if (!user) return null;
+  if (user.avatar) {
+    // Custom avatar (animated falls hash mit "a_" beginnt)
+    const ext = user.avatar.startsWith('a_') ? 'gif' : 'png';
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=128`;
+  }
+  // Default avatar — Discord hat 6 Default-Variants
+  try {
+    const idx = Number((BigInt(user.id) >> 22n) % 6n);
+    return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+  } catch(_) {
+    return `https://cdn.discordapp.com/embed/avatars/0.png`;
+  }
 }
 
 export function getSession() { return session; }

@@ -539,6 +539,55 @@ html, body {
 .toast.success { border-left: 3px solid var(--success); }
 .toast.danger { border-left: 3px solid var(--danger); }
 
+/* ════ RESPONSIVE: ab 720px Breite zwei Spalten im Mod-Eintragen + GSG9 ════ */
+@media (min-width: 720px) {
+  .app-main {
+    padding: 18px;
+  }
+  /* Mod-Create: Form links, History rechts */
+  #mc-history {
+    /* sticky position auf Desktop */
+  }
+  .detail-view:has(#mc-action-card) {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 14px;
+    align-items: start;
+  }
+  .detail-view:has(#mc-action-card) > .card:nth-child(-n+2) {
+    grid-column: 1;
+  }
+  .detail-view:has(#mc-action-card) > #mc-history {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+  /* List items größer */
+  .list-item { padding: 12px 14px; }
+  .li-avatar { width: 40px; height: 40px; }
+}
+@media (min-width: 1000px) {
+  .app-main {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  /* Tabs zentrieren */
+  .app-tabs {
+    justify-content: center;
+  }
+  .app-tab {
+    min-width: 90px;
+    padding: 12px 18px;
+  }
+  /* Stat Grid mit 4 Spalten */
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* ════ MODAL (Confirm) ════ */
 .modal-overlay {
   position: fixed; inset: 0;

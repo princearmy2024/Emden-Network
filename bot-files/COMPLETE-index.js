@@ -4400,6 +4400,41 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 });
 
 let lastSupporterCount = -1;
+// Roblox-Username-Cache (TTL 1h) fuer GSG9 etc.
+const robloxUsernameCache = new Map(); // robloxId -> { username, displayName, ts }
+const ROBLOX_USERNAME_TTL = 60 * 60 * 1000; // 1h
+async function getRobloxUsernames(robloxIds) {
+    const now = Date.now();
+    const result = new Map();
+    const need = [];
+    for (const id of robloxIds) {
+        if (!id) continue;
+        const cached = robloxUsernameCache.get(String(id));
+        if (cached && (now - cached.ts < ROBLOX_USERNAME_TTL)) {
+            result.set(String(id), { username: cached.username, displayName: cached.displayName });
+        } else {
+            need.push(String(id));
+        }
+    }
+    if (need.length > 0) {
+        try {
+            // Roblox-Bulk-Endpoint: POST /v1/users
+            const r = await fetch('https://users.roblox.com/v1/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userIds: need.map(x => Number(x)).filter(x => !isNaN(x)), excludeBannedUsers: false }),
+            });
+            const d = await r.json().catch(() => ({}));
+            for (const u of (d.data || [])) {
+                const entry = { username: u.name, displayName: u.displayName || u.name, ts: now };
+                robloxUsernameCache.set(String(u.id), entry);
+                result.set(String(u.id), entry);
+            }
+        } catch(_) {}
+    }
+    return result;
+}
+
 // GSG9 Cache Refresh (alle 30s)
 async function refreshGSG9Cache() {
     try {
@@ -4415,20 +4450,38 @@ async function refreshGSG9Cache() {
         ];
         const GSG9_ON_DUTY_ROLE = '1419050043822047375';
 
+        // Sammle alle Roblox-IDs
+        const allRobloxIds = [];
+        for (const r of GSG9_ROLES) {
+            const role = guild.roles.cache.get(r.id);
+            if (!role) continue;
+            for (const m of role.members.values()) {
+                const rId = robloxLinks.get(m.id);
+                if (rId) allRobloxIds.push(rId);
+            }
+        }
+        const usernameMap = await getRobloxUsernames([...new Set(allRobloxIds)]);
+
         cachedGSG9Teams = GSG9_ROLES.map(r => {
             const role = guild.roles.cache.get(r.id);
             if (!role) return { name: r.name, color: '#5B9AFF', members: [] };
             return {
                 name: role.name || r.name,
                 color: role.hexColor !== '#000000' ? role.hexColor : '#5B9AFF',
-                members: role.members.map(m => ({
-                    discordId: m.id,
-                    username: m.displayName || m.user.username,
-                    avatar: m.user.displayAvatarURL({ size: 64 }),
-                    status: m.presence?.status || 'offline',
-                    onDuty: m.roles.cache.has(GSG9_ON_DUTY_ROLE),
-                    robloxId: robloxLinks.get(m.id) || null,
-                }))
+                members: role.members.map(m => {
+                    const rId = robloxLinks.get(m.id) || null;
+                    const robloxInfo = rId ? usernameMap.get(String(rId)) : null;
+                    return {
+                        discordId: m.id,
+                        username: m.displayName || m.user.username,
+                        avatar: m.user.displayAvatarURL({ size: 64 }),
+                        status: m.presence?.status || 'offline',
+                        onDuty: m.roles.cache.has(GSG9_ON_DUTY_ROLE),
+                        robloxId: rId,
+                        robloxUsername: robloxInfo?.username || null,
+                        robloxDisplayName: robloxInfo?.displayName || null,
+                    };
+                })
             };
         });
     } catch(e) {}
