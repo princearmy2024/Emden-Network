@@ -4062,13 +4062,22 @@ async function countPremiumSubscribers() {
 }
 
 async function buildPremiumPanelContainer() {
-    const subs = await countPremiumSubscribers();
+    let subs = 0;
+    try { subs = await countPremiumSubscribers(); } catch(_) {}
     const { ButtonBuilder, ButtonStyle } = await import('discord.js');
-    // Premium-Button (Style 6) — Discord rendert automatisch das Abo-Symbol +
-    // den SKU-Namen + Preis + Klick oeffnet die native Bezahl-Box.
-    const premiumBtn = new ButtonBuilder()
-        .setSKUId(PREMIUM_SKU_ID)
-        .setStyle(ButtonStyle.Premium);
+
+    const actionRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('premium_info')
+            .setLabel('Jetzt Spender werden')
+            .setEmoji('💎')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId('premium_status')
+            .setLabel('Mein Status')
+            .setEmoji('📋')
+            .setStyle(ButtonStyle.Secondary),
+    );
 
     const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
@@ -4091,7 +4100,7 @@ async function buildPremiumPanelContainer() {
             `📊  **Aktive Spender:** \`${subs}\``
         ))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-        .addActionRowComponents(new ActionRowBuilder().addComponents(premiumBtn))
+        .addActionRowComponents(actionRow)
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `-# Vielen Dank an alle Spender — ihr macht Emden Network moeglich. ❤️`
