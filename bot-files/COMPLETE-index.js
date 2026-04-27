@@ -55,6 +55,11 @@ const ROBLOX_CLIENT_SECRET = process.env.ROBLOX_CLIENT_SECRET || '';
 const ROBLOX_REDIRECT_URI = process.env.ROBLOX_REDIRECT_URI || 'http://localhost:7329/roblox-callback';
 const robloxStates = new Map();
 
+// === Discord OAuth2 (fuer Embedded Activity Token Exchange) ===
+// Client-Secret darf NIE im Frontend liegen — daher serverseitig hier
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || process.env.CLIENT_ID || '';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+
 // === Overlay & Roblox Link Tracking ===
 const ON_DUTY_ROLE_ID = "1367160344992284803";
 const LINKS_FILE = path.join(path.resolve(), "data", "robloxLinks.json");
@@ -1869,6 +1874,47 @@ const apiServer = http.createServer(async (req, res) => {
             } catch (e) {
                 console.error('[Ticket] /reply:', e);
                 res.writeHead(500); res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+        });
+        return;
+    }
+
+    // ─── DISCORD ACTIVITY: Token Exchange (Embedded App SDK) ────────
+    // POST /api/discord-token-exchange — body: { code }
+    // Tauscht den Authorization Code von authorize() gegen einen Access Token.
+    // Client-Secret bleibt serverseitig (DARF nie im Frontend liegen).
+    if (req.method === "POST" && url.pathname === "/api/discord-token-exchange") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", async () => {
+            try {
+                if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+                    res.writeHead(503);
+                    return res.end(JSON.stringify({ error: "Discord OAuth nicht konfiguriert (CLIENT_ID/SECRET in .env)" }));
+                }
+                const { code } = JSON.parse(body || "{}");
+                if (!code) { res.writeHead(400); return res.end(JSON.stringify({ error: "code required" })); }
+                const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({
+                        client_id: DISCORD_CLIENT_ID,
+                        client_secret: DISCORD_CLIENT_SECRET,
+                        grant_type: "authorization_code",
+                        code,
+                    }),
+                });
+                const data = await tokenRes.json();
+                if (!tokenRes.ok || !data.access_token) {
+                    console.error("[ActivityAuth] Token exchange fehlgeschlagen:", data);
+                    res.writeHead(400);
+                    return res.end(JSON.stringify({ error: data.error_description || data.error || "token_exchange_failed" }));
+                }
+                res.writeHead(200);
+                res.end(JSON.stringify({ access_token: data.access_token }));
+            } catch (e) {
+                console.error('[ActivityAuth] /token-exchange:', e);
+                res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
             }
         });
         return;
