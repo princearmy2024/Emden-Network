@@ -1879,6 +1879,81 @@ const apiServer = http.createServer(async (req, res) => {
         return;
     }
 
+    // ─── ROBLOX SEARCH (fuer Mod-Eintrag-Autocomplete) ──────────────
+    // GET /api/roblox/search?q=<username|displayname>
+    if (req.method === "GET" && url.pathname === "/api/roblox/search") {
+        try {
+            const q = (url.searchParams.get("q") || "").trim();
+            if (!q || q.length < 2) {
+                res.writeHead(200);
+                return res.end(JSON.stringify({ users: [] }));
+            }
+            // Roblox-Username-API (Batch-Endpoint, sucht exakte Matches)
+            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: [q], excludeBannedUsers: false }),
+            });
+            const searchData = await searchRes.json().catch(() => ({}));
+            let candidates = searchData.data || [];
+
+            // Wenn nichts exakt gefunden, versuche Search-API (fuzzy)
+            if (candidates.length === 0) {
+                try {
+                    const fuzzyRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(q)}&limit=10`);
+                    const fuzzyData = await fuzzyRes.json().catch(() => ({}));
+                    candidates = (fuzzyData.data || []).slice(0, 8);
+                } catch(_) {}
+            }
+
+            if (candidates.length === 0) {
+                res.writeHead(200);
+                return res.end(JSON.stringify({ users: [] }));
+            }
+
+            // Avatars batch laden
+            const ids = candidates.map(c => c.id).join(',');
+            let avatarMap = {};
+            try {
+                const avRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids}&size=150x150&format=Png`);
+                const avData = await avRes.json().catch(() => ({}));
+                for (const a of (avData.data || [])) {
+                    avatarMap[a.targetId] = a.imageUrl;
+                }
+            } catch(_) {}
+
+            const users = candidates.slice(0, 8).map(u => ({
+                userId: String(u.id),
+                username: u.name,
+                displayName: u.displayName || u.name,
+                avatar: avatarMap[u.id] || null,
+            }));
+            res.writeHead(200);
+            return res.end(JSON.stringify({ users }));
+        } catch(e) {
+            console.error('[Roblox Search]', e);
+            res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+    }
+
+    // GET /api/roblox/avatars?ids=1,2,3 — batch avatar fetch
+    if (req.method === "GET" && url.pathname === "/api/roblox/avatars") {
+        try {
+            const ids = (url.searchParams.get("ids") || "").split(',').filter(x => /^\d+$/.test(x.trim())).slice(0, 50);
+            if (ids.length === 0) { res.writeHead(200); return res.end(JSON.stringify({ avatars: {} })); }
+            const r = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids.join(',')}&size=150x150&format=Png`);
+            const d = await r.json().catch(() => ({}));
+            const avatars = {};
+            for (const a of (d.data || [])) avatars[a.targetId] = a.imageUrl;
+            res.writeHead(200);
+            return res.end(JSON.stringify({ avatars }));
+        } catch(e) {
+            res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+    }
+
     // ─── DISCORD ACTIVITY: Token Exchange (Embedded App SDK) ────────
     // POST /api/discord-token-exchange — body: { code }
     // Tauscht den Authorization Code von authorize() gegen einen Access Token.
@@ -2868,7 +2943,29 @@ const apiServer = http.createServer(async (req, res) => {
         allEntries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         const limited = allEntries.slice(0, limit);
 
-        // Moderator-Avatare anreichern
+        // Roblox-Target-Avatars batchweise laden (Cache-basiert, 5-min TTL)
+        if (!global._robloxAvatarCache) global._robloxAvatarCache = new Map();
+        const cache = global._robloxAvatarCache;
+        const NOW = Date.now();
+        const TTL = 5 * 60 * 1000;
+        const needFetch = [];
+        for (const e of limited) {
+            const cached = cache.get(String(e.userId));
+            if (!cached || (NOW - cached.ts > TTL)) needFetch.push(String(e.userId));
+        }
+        if (needFetch.length > 0) {
+            try {
+                // Roblox erlaubt bis zu 100 IDs pro Request
+                const batch = needFetch.slice(0, 100);
+                const r = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${batch.join(',')}&size=150x150&format=Png`);
+                const d = await r.json().catch(() => ({}));
+                for (const a of (d.data || [])) {
+                    cache.set(String(a.targetId), { url: a.imageUrl, ts: NOW });
+                }
+            } catch(_) {}
+        }
+
+        // Moderator-Avatare + Target-Avatare anreichern
         const enriched = limited.map(e => {
             let moderatorAvatar = e.modAvatar || null;
             if (e.moderator) {
@@ -2879,7 +2976,9 @@ const apiServer = http.createServer(async (req, res) => {
                     }
                 }
             }
-            return { ...e, moderatorAvatar };
+            const targetCache = cache.get(String(e.userId));
+            const targetAvatar = targetCache?.url || null;
+            return { ...e, moderatorAvatar, targetAvatar };
         });
 
         res.writeHead(200);

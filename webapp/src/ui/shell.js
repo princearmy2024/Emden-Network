@@ -4,7 +4,9 @@ import { renderCases } from './views/cases.js';
 import { renderLeaderboard } from './views/leaderboard.js';
 import { renderMe } from './views/me.js';
 import { renderModCreate } from './views/modcreate.js';
-import { refreshIcons } from './views/api.js';
+import { renderGsg9 } from './views/gsg9.js';
+import { refreshIcons, toast } from './views/api.js';
+import * as live from '../live.js';
 
 const TABS = [
   { id: 'tickets',     icon: 'ticket',          label: 'Tickets',     render: renderTickets },
@@ -12,6 +14,7 @@ const TABS = [
   { id: 'modlog',      icon: 'shield',          label: 'Mod-Log',     render: renderModLog },
   { id: 'modcreate',   icon: 'shield-plus',     label: 'Eintragen',   render: renderModCreate },
   { id: 'leaderboard', icon: 'trophy',          label: 'Top',         render: renderLeaderboard },
+  { id: 'gsg9',        icon: 'shield-half',     label: 'GSG9',        render: renderGsg9 },
   { id: 'me',          icon: 'user-round',      label: 'Profil',      render: renderMe },
 ];
 
@@ -30,7 +33,7 @@ export function renderShell(root, session) {
           : `<div class="avatar-fallback">${esc((session.username || '?').charAt(0).toUpperCase())}</div>`}
         <div class="app-header-info">
           <div class="app-header-name">${esc(session.username || 'Unbekannt')}</div>
-          <div class="app-header-sub">Emden Network · ${role.toUpperCase()}</div>
+          <div class="app-header-sub">Emden Network</div>
         </div>
         <div class="role-badge ${role}"><i data-lucide="${roleIcon}"></i><span>${role}</span></div>
       </header>
@@ -52,6 +55,16 @@ export function renderShell(root, session) {
   document.getElementById('tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.app-tab');
     if (btn) switchTab(btn.dataset.tab);
+  });
+
+  // Live-Updates starten
+  live.start(session);
+  // Live-Notifications: bei neuen Tickets/Cases Toast (egal welcher Tab gerade aktiv)
+  live.on('ticket:new', (t) => {
+    toast(`Neues Ticket: #${t.channelName}`, 'success');
+  });
+  live.on('case:new', (c) => {
+    toast(`Neuer Support-Case: ${c.username}`, 'success');
   });
 
   switchTab(currentTab);

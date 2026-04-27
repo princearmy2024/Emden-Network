@@ -4,6 +4,9 @@
  * State: 'list' oder 'detail'. Wechselt im selben root, kein Page-Reload.
  */
 import { api, escapeHtml, timeAgo, refreshIcons, setLoading, setEmpty, setError, toast, confirmModal } from './api.js';
+import * as live from '../../live.js';
+
+let liveUnsub = null;
 
 let currentRoot = null;
 let currentSession = null;
@@ -17,19 +20,18 @@ export async function renderTickets(root, session) {
   currentRoot = root;
   currentSession = session;
   view = 'list';
+  // Bei Live-Update der Liste neu rendern (nur wenn list-view aktiv)
+  if (liveUnsub) liveUnsub();
+  liveUnsub = live.on('ticket:list', (items) => {
+    if (view === 'list' && currentRoot && currentRoot.isConnected) {
+      allTickets = items;
+      renderListContent();
+    }
+  });
   await renderListView();
 }
 
-async function renderListView() {
-  view = 'list';
-  setLoading(currentRoot, 'Lade Tickets...');
-  try {
-    const d = await api(`/tickets/all?discordId=${encodeURIComponent(currentSession.discordId)}`);
-    allTickets = d.items || [];
-  } catch (e) {
-    setError(currentRoot, e.message || 'Fehler beim Laden');
-    return;
-  }
+function renderListContent() {
   if (allTickets.length === 0) {
     setEmpty(currentRoot, 'inbox', 'Keine offenen Tickets');
     return;
@@ -37,15 +39,12 @@ async function renderListView() {
   const myId = currentSession.discordId;
   const mine = allTickets.filter(t => t.claim?.claimerDiscordId === myId);
   const others = allTickets.filter(t => t.claim?.claimerDiscordId !== myId);
-
-  // Gruppiere others nach Kategorie
   const byCat = new Map();
   for (const t of others) {
     const cat = t.category || 'Allgemein';
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(t);
   }
-
   let html = '';
   if (mine.length > 0) {
     html += `<div class="card">
@@ -61,11 +60,22 @@ async function renderListView() {
   }
   currentRoot.innerHTML = html;
   refreshIcons();
-
-  // Click Listener
   currentRoot.querySelectorAll('[data-channel-id]').forEach(el => {
     el.addEventListener('click', () => openDetail(el.dataset.channelId));
   });
+}
+
+async function renderListView() {
+  view = 'list';
+  setLoading(currentRoot, 'Lade Tickets...');
+  try {
+    const d = await api(`/tickets/all?discordId=${encodeURIComponent(currentSession.discordId)}`);
+    allTickets = d.items || [];
+  } catch (e) {
+    setError(currentRoot, e.message || 'Fehler beim Laden');
+    return;
+  }
+  renderListContent();
 }
 
 function itemHtml(t, isMine) {

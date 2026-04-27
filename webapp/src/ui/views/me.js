@@ -1,7 +1,7 @@
 /**
- * Profil + Shift-Controls + Stats
+ * Profil: User-Info + Shift-Controls + Streak + Roblox-Verknüpfung
  */
-import { api, escapeHtml, fmtDuration, refreshIcons, setError, toast } from './api.js';
+import { api, escapeHtml, fmtDuration, refreshIcons, toast } from './api.js';
 
 let currentRoot = null;
 let currentSession = null;
@@ -12,41 +12,42 @@ let tickInterval = null;
 export async function renderMe(root, session) {
   currentRoot = root;
   currentSession = session;
+  if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
   await load();
 }
 
 async function load() {
-  // Header rendern, dann Shift live updaten
   renderShell();
-  try {
-    const d = await api(`/shifts?discordId=${encodeURIComponent(currentSession.discordId)}`);
-    myShift = d.shifts?.[currentSession.discordId] || { state: 'off', savedMs: 0, breakMs: 0, startedAt: null, breakStartedAt: null };
-    serverNow = d.serverNow || Date.now();
-    renderShiftCard();
-    renderStreakCard();
-    startTick();
-  } catch (e) {
-    const sc = document.getElementById('me-shift');
-    if (sc) sc.innerHTML = `<div class="empty"><i data-lucide="alert-circle" style="color:var(--danger);"></i><span>${escapeHtml(e.message)}</span></div>`;
-    refreshIcons();
-  }
+  // Parallel laden
+  Promise.all([
+    api(`/shifts?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
+    api(`/streaks?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
+    api(`/roblox/profile?discordId=${encodeURIComponent(currentSession.discordId)}`).catch(() => null),
+  ]).then(([shiftsData, streaksData, robloxData]) => {
+    if (shiftsData) {
+      myShift = shiftsData.shifts?.[currentSession.discordId] || { state: 'off', savedMs: 0, breakMs: 0, startedAt: null, breakStartedAt: null };
+      serverNow = shiftsData.serverNow || Date.now();
+      renderShiftCard();
+      startTick();
+    }
+    if (streaksData) renderStreakCard(streaksData);
+    renderRobloxCard(robloxData);
+  });
 }
 
 function renderShell() {
+  const role = currentSession.isAdmin ? 'Administrator' : currentSession.isStaff ? 'Staff (EN-Team)' : 'User';
+  const roleClass = currentSession.isAdmin ? 'danger' : currentSession.isStaff ? '' : '';
   currentRoot.innerHTML = `
     <div class="card">
-      <div class="card-title"><i data-lucide="user"></i><span>Profil</span></div>
-      <div class="list-item no-hover">
+      <div class="list-item no-hover" style="padding:6px;">
         ${currentSession.avatar
-          ? `<img class="li-avatar" src="${escapeHtml(currentSession.avatar)}" alt="">`
-          : `<div class="li-avatar">${escapeHtml((currentSession.username || '?').charAt(0).toUpperCase())}</div>`}
+          ? `<img class="li-avatar" style="width:54px;height:54px;" src="${escapeHtml(currentSession.avatar)}" alt="">`
+          : `<div class="li-avatar" style="width:54px;height:54px;font-size:20px;">${escapeHtml((currentSession.username || '?').charAt(0).toUpperCase())}</div>`}
         <div class="li-body">
-          <div class="li-title">${escapeHtml(currentSession.username || 'Unbekannt')}</div>
-          <div class="li-meta">Discord-ID: ${escapeHtml(currentSession.discordId)}</div>
+          <div class="li-title" style="font-size:15px;">${escapeHtml(currentSession.username || 'Unbekannt')}</div>
+          <div class="li-meta">${escapeHtml(role)}</div>
         </div>
-        ${currentSession.isAdmin
-          ? `<span class="li-tag danger">Admin</span>`
-          : currentSession.isStaff ? `<span class="li-tag">Staff</span>` : `<span class="li-tag">User</span>`}
       </div>
     </div>
 
@@ -58,6 +59,11 @@ function renderShell() {
     <div class="card" id="me-streak">
       <div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
       <div class="empty"><span>—</span></div>
+    </div>
+
+    <div class="card" id="me-roblox">
+      <div class="card-title"><i data-lucide="gamepad-2"></i><span>Roblox-Verknüpfung</span></div>
+      <div class="loading"><div class="spinner"></div></div>
     </div>`;
   refreshIcons();
 }
@@ -69,11 +75,11 @@ function renderShiftCard() {
   const stateLabel = state === 'active' ? 'Im Dienst' : state === 'break' ? 'Pause' : 'Offline';
   card.innerHTML = `
     <div class="card-title"><i data-lucide="clock"></i><span>Mein Shift</span></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div class="shift-state ${state}">
         <span class="dot"></span><span>${stateLabel}</span>
       </div>
-      <div style="font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;" id="shift-time">${fmtDuration(getCurrentTotal())}</div>
+      <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;" id="shift-time">${fmtDuration(getCurrentTotal())}</div>
     </div>
     <div class="stat-grid" style="margin-bottom:12px;">
       <div class="stat">
@@ -128,10 +134,7 @@ function startTick() {
 async function doAction(action) {
   const path = action === 'start' ? '/shift/start' : action === 'pause' ? '/shift/pause' : '/shift/end';
   try {
-    const d = await api(path, {
-      method: 'POST',
-      body: { discordId: currentSession.discordId },
-    });
+    const d = await api(path, { method: 'POST', body: { discordId: currentSession.discordId } });
     myShift = d.shift || myShift;
     renderShiftCard();
     toast(action === 'start' ? 'Shift gestartet' : action === 'pause' ? 'Pause' : 'Shift beendet', 'success');
@@ -140,39 +143,68 @@ async function doAction(action) {
   }
 }
 
-function renderStreakCard() {
+function renderStreakCard(d) {
   const card = document.getElementById('me-streak');
   if (!card) return;
-  // Lade Streaks (alle, dann meine ausfiltern)
-  api(`/streaks?discordId=${encodeURIComponent(currentSession.discordId)}`).then(d => {
-    const my = d.streaks?.[currentSession.discordId];
-    if (!my) {
-      card.innerHTML = `<div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
-        <div class="empty"><span>Noch keine Streak-Daten</span></div>`;
-      refreshIcons();
-      return;
-    }
-    const reqs = d.requirements || {};
-    card.innerHTML = `
-      <div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
-        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#000;">${my.streak || 0}</div>
-        <div>
-          <div style="font-size:16px;font-weight:800;">${my.streak || 0} Tage</div>
-          <div style="font-size:11px;color:var(--text-dim);">Best: ${my.bestStreak || 0} ${my.protected ? '· geschützt' : ''}</div>
-        </div>
-      </div>
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-label">Heute Zeit</div>
-          <div class="stat-value small">${fmtDuration(my.todayMs || 0)} / ${fmtDuration(reqs.minMs || 0)}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Heute Einträge</div>
-          <div class="stat-value small">${my.todayEntries || 0} / ${reqs.minEntries || 0}</div>
-        </div>
-      </div>
-      ${my.completed ? `<div class="banner success" style="margin-top:10px;"><i data-lucide="check"></i><span>Heute erfüllt!</span></div>` : ''}`;
+  const my = d?.streaks?.[currentSession.discordId];
+  if (!my) {
+    card.innerHTML = `<div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
+      <div class="empty"><span>Noch keine Streak-Daten</span></div>`;
     refreshIcons();
-  }).catch(() => {});
+    return;
+  }
+  const reqs = d.requirements || {};
+  card.innerHTML = `
+    <div class="card-title"><i data-lucide="flame"></i><span>Streak</span></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+      <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#000;box-shadow:0 4px 16px rgba(251,191,36,0.3);">${my.streak || 0}</div>
+      <div>
+        <div style="font-size:18px;font-weight:800;">${my.streak || 0} Tage</div>
+        <div style="font-size:11px;color:var(--text-dim);">Best: ${my.bestStreak || 0}${my.protected ? ' · 🛡 geschützt' : ''}</div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Heute Zeit</div>
+        <div class="stat-value small">${fmtDuration(my.todayMs || 0)}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Min. ${fmtDuration(reqs.minMs || 0)}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Heute Einträge</div>
+        <div class="stat-value small">${my.todayEntries || 0}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Min. ${reqs.minEntries || 0}</div>
+      </div>
+    </div>
+    ${my.completed ? `<div class="banner success" style="margin-top:10px;"><i data-lucide="check"></i><span>Heute erfüllt!</span></div>` : ''}`;
+  refreshIcons();
+}
+
+function renderRobloxCard(d) {
+  const card = document.getElementById('me-roblox');
+  if (!card) return;
+  if (!d || !d.profile) {
+    card.innerHTML = `
+      <div class="card-title"><i data-lucide="gamepad-2"></i><span>Roblox-Verknüpfung</span></div>
+      <div class="empty">
+        <i data-lucide="link-2-off"></i>
+        <span>Noch nicht verknüpft</span>
+        <span style="font-size:10px;">Verknüpfung läuft über Dashboard / Mobile-App</span>
+      </div>`;
+    refreshIcons();
+    return;
+  }
+  const p = d.profile;
+  card.innerHTML = `
+    <div class="card-title"><i data-lucide="gamepad-2"></i><span>Roblox-Verknüpfung</span></div>
+    <div class="list-item no-hover">
+      ${p.avatar
+        ? `<img class="li-avatar" src="${escapeHtml(p.avatar)}" alt="">`
+        : `<div class="li-avatar"><i data-lucide="user"></i></div>`}
+      <div class="li-body">
+        <div class="li-title">${escapeHtml(p.displayName || p.username)}</div>
+        <div class="li-meta">@${escapeHtml(p.username)} · ID ${escapeHtml(p.userId)}</div>
+      </div>
+      <span class="li-tag success">Verknüpft</span>
+    </div>`;
+  refreshIcons();
 }

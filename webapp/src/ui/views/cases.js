@@ -2,26 +2,25 @@
  * Support-Cases View — offene Cases listen + übernehmen
  */
 import { api, escapeHtml, timeAgo, refreshIcons, setLoading, setEmpty, setError, toast, confirmModal } from './api.js';
+import * as live from '../../live.js';
 
 let currentRoot = null;
 let currentSession = null;
+let liveUnsub = null;
 
 export async function renderCases(root, session) {
   currentRoot = root;
   currentSession = session;
+  if (liveUnsub) liveUnsub();
+  liveUnsub = live.on('case:list', (cases) => {
+    if (currentRoot && currentRoot.isConnected) {
+      renderList(cases);
+    }
+  });
   await loadAndRender();
 }
 
-async function loadAndRender() {
-  setLoading(currentRoot, 'Lade Cases...');
-  let cases = [];
-  try {
-    const d = await api(`/support-cases/open?discordId=${encodeURIComponent(currentSession.discordId)}`);
-    cases = d.cases || [];
-  } catch (e) {
-    setError(currentRoot, e.message);
-    return;
-  }
+function renderList(cases) {
   if (cases.length === 0) {
     setEmpty(currentRoot, 'check-circle-2', 'Keine offenen Support-Cases');
     return;
@@ -31,18 +30,22 @@ async function loadAndRender() {
     ${cases.map(itemHtml).join('')}
   </div>`;
   refreshIcons();
-  currentRoot.querySelectorAll('[data-case-id]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-act]')) return;
-      // Click auf Item ohne Action — nichts (oder Detail später)
-    });
-  });
   currentRoot.querySelectorAll('button[data-act="take"]').forEach(b => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       doTakeOver(b.dataset.caseId);
     });
   });
+}
+
+async function loadAndRender() {
+  setLoading(currentRoot, 'Lade Cases...');
+  try {
+    const d = await api(`/support-cases/open?discordId=${encodeURIComponent(currentSession.discordId)}`);
+    renderList(d.cases || []);
+  } catch (e) {
+    setError(currentRoot, e.message);
+  }
 }
 
 function itemHtml(c) {
