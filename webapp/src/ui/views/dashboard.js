@@ -284,6 +284,8 @@ function hookFeed() {
               tone: e.action === 'Ban' || e.action === 'One Day Ban' ? 'danger' : 'warn',
               title: `${e.action}: ${e.displayName || e.username || '?'}`,
               sub: `von ${e.moderator || '?'}`,
+              avatar: e.targetAvatar || '',
+              modAvatar: e.moderatorAvatar || '',
               ts: e.date ? new Date(e.date).getTime() : Date.now(),
             });
           }
@@ -311,6 +313,8 @@ async function backfillFeed() {
         tone: e.action === 'Ban' || e.action === 'One Day Ban' ? 'danger' : 'warn',
         title: `${e.action}: ${e.displayName || e.username || '?'}`,
         sub: `von ${e.moderator || '?'}`,
+        avatar: e.targetAvatar || '',
+        modAvatar: e.moderatorAvatar || '',
         ts: e.date ? new Date(e.date).getTime() : Date.now(),
       });
     });
@@ -335,15 +339,22 @@ function renderFeed() {
     refreshIcons();
     return;
   }
-  list.innerHTML = feedItems.map(i => `
-    <div class="feed-item ${i.tone}">
-      <div class="feed-icon"><i data-lucide="${i.icon}"></i></div>
+  list.innerHTML = feedItems.map(i => {
+    const avaCell = i.avatar
+      ? `<img class="feed-ava" src="${escapeHtml(i.avatar)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'feed-icon',innerHTML:'<i data-lucide=\\'${i.icon}\\'></i>'}))">`
+      : `<div class="feed-icon"><i data-lucide="${i.icon}"></i></div>`;
+    const modAva = i.modAvatar
+      ? `<img class="feed-mod" src="${escapeHtml(i.modAvatar)}" alt="">`
+      : '';
+    return `<div class="feed-item ${i.tone}">
+      ${avaCell}
       <div class="feed-body">
         <div class="feed-title">${escapeHtml(i.title)}</div>
-        ${i.sub ? `<div class="feed-sub">${escapeHtml(i.sub)}</div>` : ''}
+        ${i.sub ? `<div class="feed-sub">${modAva}<span>${escapeHtml(i.sub)}</span></div>` : ''}
       </div>
       <div class="feed-ts">${timeAgoShort(i.ts)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   refreshIcons();
 }
 

@@ -808,6 +808,30 @@ html, body {
 .feed-item.warn    .feed-icon { background: rgba(251,191,36,.12); color: var(--warn); }
 .feed-item.danger  .feed-icon { background: rgba(239,68,68,.12);  color: #fca5a5; }
 .feed-icon [data-lucide] { width: 14px; height: 14px; }
+.feed-ava {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-3);
+}
+.feed-mod {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+  object-fit: cover;
+}
+.feed-sub {
+  display: flex; align-items: center; gap: 2px;
+  min-width: 0;
+}
+.feed-sub > span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
 .feed-body { flex: 1; min-width: 0; }
 .feed-title {
   font-size: 12px; font-weight: 700;
