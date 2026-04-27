@@ -1,51 +1,65 @@
 /**
  * Vercel Serverless Proxy → Bot auf Cybrancee
  *
- * Discord-Activity kann nicht direkt zu HTTP-Backends, also routen wir alles
- * von /api/* durch eine Vercel-Funktion zum Bot weiter (Vercel kann HTTP).
- *
- * Edge runtime: schnell, billig, weltweit verteilt.
+ * Discord-Activity kann nicht direkt zu HTTP-Backends. Edge-Runtime erlaubt
+ * keine direkten IPs (siehe DOMAIN_RESTRICTION error). Daher Node-Runtime.
  */
 export const config = {
-  runtime: 'edge',
+  api: { bodyParser: false }, // wir streamen den Body durch
 };
 
-const BOT_URL = 'http://91.98.124.212:5009';
+const BOT_HOST = '91.98.124.212';
+const BOT_PORT = 5009;
 
-export default async function handler(req) {
-  const incoming = new URL(req.url);
-  const target = BOT_URL + incoming.pathname + incoming.search;
+import http from 'node:http';
 
-  // Headers durchreichen, problematische Hosts/Connection rauswerfen
-  const headers = new Headers();
-  for (const [k, v] of req.headers.entries()) {
-    const lk = k.toLowerCase();
-    if (lk === 'host' || lk === 'connection' || lk === 'content-length') continue;
-    headers.set(k, v);
-  }
+export default async function handler(req, res) {
+  const path = req.url; // bereits inkl. /api/...
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers['x-forwarded-host'];
+  delete headers['x-forwarded-proto'];
+  delete headers['x-forwarded-for'];
+  delete headers['x-real-ip'];
+  delete headers['x-vercel-deployment-url'];
+  delete headers['x-vercel-id'];
+  delete headers['x-vercel-forwarded-for'];
 
-  const init = {
-    method: req.method,
-    headers,
-  };
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    init.body = await req.arrayBuffer();
-  }
+  const upstream = http.request(
+    {
+      host: BOT_HOST,
+      port: BOT_PORT,
+      method: req.method,
+      path,
+      headers,
+      timeout: 15000,
+    },
+    (botRes) => {
+      // Status + Headers durchreichen
+      const respHeaders = { ...botRes.headers };
+      delete respHeaders['transfer-encoding'];
+      delete respHeaders['content-encoding']; // Vercel re-encoded selber
+      res.writeHead(botRes.statusCode || 502, respHeaders);
+      botRes.pipe(res);
+    }
+  );
 
-  try {
-    const r = await fetch(target, init);
-    // Response-Headers durchreichen (CORS etc kommt vom Bot)
-    const respHeaders = new Headers();
-    r.headers.forEach((v, k) => {
-      const lk = k.toLowerCase();
-      if (lk === 'content-encoding' || lk === 'transfer-encoding') return;
-      respHeaders.set(k, v);
-    });
-    return new Response(r.body, { status: r.status, headers: respHeaders });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: 'Bot proxy failed: ' + (err?.message || err) }), {
-      status: 502,
-      headers: { 'content-type': 'application/json' },
-    });
-  }
+  upstream.on('error', (err) => {
+    console.error('[Proxy] Bot unreachable:', err.message);
+    if (!res.headersSent) {
+      res.writeHead(502, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Bot proxy failed: ' + err.message }));
+    }
+  });
+
+  upstream.on('timeout', () => {
+    upstream.destroy();
+    if (!res.headersSent) {
+      res.writeHead(504, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Bot proxy timeout' }));
+    }
+  });
+
+  // Request-Body streamen
+  req.pipe(upstream);
 }
