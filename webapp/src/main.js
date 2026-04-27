@@ -10,6 +10,8 @@
 import { initAuth, getSession } from './auth.js';
 import { renderShell } from './ui/shell.js';
 import { renderAccessDenied } from './ui/access-denied.js';
+import { applyMode, watchResize } from './device.js';
+import { unlockOnFirstGesture } from './sounds.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,6 +35,9 @@ function waitForLucide() {
 
 async function main() {
   try {
+    applyMode();
+    watchResize();
+    unlockOnFirstGesture();
     await waitForLucide();
     setBootStatus('Verbinde mit Discord...');
     const session = await initAuth();

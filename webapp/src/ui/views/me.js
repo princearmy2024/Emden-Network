@@ -2,6 +2,8 @@
  * Profil: User-Info + Shift-Controls + Streak + Roblox-Verknüpfung
  */
 import { api, escapeHtml, fmtDuration, refreshIcons, toast } from './api.js';
+import * as sound from '../../sounds.js';
+import * as device from '../../device.js';
 
 let currentRoot = null;
 let currentSession = null;
@@ -64,8 +66,82 @@ function renderShell() {
     <div class="card" id="me-roblox">
       <div class="card-title"><i data-lucide="gamepad-2"></i><span>Roblox-Verknüpfung</span></div>
       <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card" id="me-settings">
+      <div class="card-title"><i data-lucide="settings"></i><span>Einstellungen</span></div>
+      <div class="setting-row">
+        <div class="setting-label"><i data-lucide="smartphone"></i><span>Anzeige-Modus</span></div>
+        <div class="seg" id="mode-seg">
+          <button data-mode="auto">Auto</button>
+          <button data-mode="phone">Handy</button>
+          <button data-mode="pc">PC</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><i data-lucide="bell"></i><span>Benachrichtigungs-Sound</span></div>
+        <button class="btn ${sound.isMuted() ? '' : 'primary'}" id="sound-mute-btn">
+          <i data-lucide="${sound.isMuted() ? 'volume-x' : 'volume-2'}"></i>
+          <span>${sound.isMuted() ? 'Aus' : 'An'}</span>
+        </button>
+      </div>
+      <div class="setting-row" id="vol-row" style="${sound.isMuted() ? 'opacity:0.4;pointer-events:none;' : ''}">
+        <div class="setting-label"><i data-lucide="volume-1"></i><span>Lautstärke</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex:1;">
+          <input type="range" id="vol-slider" min="0" max="100" value="${Math.round(sound.getVolume() * 100)}" style="flex:1;">
+          <button class="btn icon-only sm" id="vol-test" title="Testen"><i data-lucide="play"></i></button>
+        </div>
+      </div>
     </div>`;
   refreshIcons();
+  bindSettings();
+}
+
+function bindSettings() {
+  // Device-Mode Segmented Control
+  const seg = document.getElementById('mode-seg');
+  if (seg) {
+    const cur = device.getMode();
+    seg.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === cur);
+      b.addEventListener('click', () => {
+        device.setMode(b.dataset.mode);
+        seg.querySelectorAll('button').forEach(x => x.classList.toggle('active', x.dataset.mode === b.dataset.mode));
+        toast('Modus: ' + b.dataset.mode, 'success');
+        // Mode-Change Event triggern damit Shell neu rendert
+        window.dispatchEvent(new CustomEvent('en:modechange'));
+      });
+    });
+  }
+
+  // Sound Mute Toggle
+  const muteBtn = document.getElementById('sound-mute-btn');
+  if (muteBtn) {
+    muteBtn.addEventListener('click', () => {
+      sound.setMuted(!sound.isMuted());
+      const muted = sound.isMuted();
+      muteBtn.classList.toggle('primary', !muted);
+      muteBtn.innerHTML = `<i data-lucide="${muted ? 'volume-x' : 'volume-2'}"></i><span>${muted ? 'Aus' : 'An'}</span>`;
+      const volRow = document.getElementById('vol-row');
+      if (volRow) {
+        volRow.style.opacity = muted ? '0.4' : '';
+        volRow.style.pointerEvents = muted ? 'none' : '';
+      }
+      // Header-Icon synchronisieren
+      const ic = document.querySelector('#sound-toggle [data-lucide]');
+      if (ic) ic.setAttribute('data-lucide', muted ? 'volume-x' : 'volume-2');
+      refreshIcons();
+      if (!muted) sound.play();
+    });
+  }
+
+  // Volume Slider
+  const vol = document.getElementById('vol-slider');
+  if (vol) {
+    vol.addEventListener('input', () => sound.setVolume(vol.value / 100));
+  }
+  const test = document.getElementById('vol-test');
+  if (test) test.addEventListener('click', () => sound.play());
 }
 
 function renderShiftCard() {

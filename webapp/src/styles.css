@@ -539,15 +539,13 @@ html, body {
 .toast.success { border-left: 3px solid var(--success); }
 .toast.danger { border-left: 3px solid var(--danger); }
 
-/* ════ RESPONSIVE: ab 720px Breite zwei Spalten im Mod-Eintragen + GSG9 ════ */
+/* ════ RESPONSIVE — Dashboard-Layout fuer breite Screens ════ */
 @media (min-width: 720px) {
-  .app-main {
-    padding: 18px;
-  }
-  /* Mod-Create: Form links, History rechts */
-  #mc-history {
-    /* sticky position auf Desktop */
-  }
+  .app-main { padding: 18px 22px; }
+  .list-item { padding: 12px 14px; }
+  .li-avatar { width: 40px; height: 40px; }
+
+  /* Mod-Create: Form links, History rechts (sticky) */
   .detail-view:has(#mc-action-card) {
     display: grid;
     grid-template-columns: 1fr 320px;
@@ -562,29 +560,82 @@ html, body {
     grid-row: 1 / 3;
     position: sticky;
     top: 0;
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 220px);
     overflow-y: auto;
   }
-  /* List items größer */
-  .list-item { padding: 12px 14px; }
-  .li-avatar { width: 40px; height: 40px; }
 }
-@media (min-width: 1000px) {
-  .app-main {
-    max-width: 1100px;
-    margin: 0 auto;
+
+/* ── Echte Dashboard-Form mit Sidebar-Nav ab 980px ── */
+@media (min-width: 980px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "header header"
+      "sidebar main";
+    height: 100vh;
   }
-  /* Tabs zentrieren */
+  .app-header { grid-area: header; }
   .app-tabs {
-    justify-content: center;
+    grid-area: sidebar;
+    flex-direction: column;
+    align-items: stretch;
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    padding: 16px 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: rgba(0, 0, 0, 0.18);
   }
   .app-tab {
-    min-width: 90px;
-    padding: 12px 18px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border-bottom: none;
+    border-radius: 10px;
+    margin-bottom: 3px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 13px;
+    min-width: 0;
+    width: 100%;
+    text-align: left;
   }
-  /* Stat Grid mit 4 Spalten */
-  .stat-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .app-tab [data-lucide] { width: 18px; height: 18px; }
+  .app-tab.active {
+    background: rgba(91, 154, 255, 0.12);
+    color: var(--accent);
+    border-bottom-color: transparent;
+  }
+  .app-tab.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 8px; bottom: 8px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+  }
+  .app-tab { position: relative; }
+  .app-main {
+    grid-area: main;
+    padding: 22px 28px;
+  }
+  /* Stat Grid — 4 Spalten breit */
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  /* Mehrspaltige Cards in Mod-Log + Tickets-Listen */
+  .app-main > .card[id="mc-history"] { /* schon gehandelt */ }
+}
+
+/* Ultra-wide (Desktop-Discord auf grossem Monitor) */
+@media (min-width: 1400px) {
+  .app-shell {
+    grid-template-columns: 240px 1fr;
+  }
+  .app-main {
+    padding: 26px 36px;
   }
 }
 
@@ -624,3 +675,272 @@ html, body {
 .modal h3 { text-align: center; font-size: 16px; font-weight: 800; margin-bottom: 6px; }
 .modal p { text-align: center; font-size: 13px; color: var(--text-dim); margin-bottom: 18px; line-height: 1.5; }
 .modal .action-row { display: flex; gap: 8px; }
+
+/* ════ HEADER-BTN (Sound-Toggle etc.) ════ */
+.header-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.header-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.header-btn [data-lucide] { width: 16px; height: 16px; }
+
+/* ════ CARD-TAG (count / LIVE badge) ════ */
+.card-tag {
+  margin-left: auto;
+  font-size: 9px; font-weight: 800;
+  padding: 3px 8px; border-radius: 100px;
+  background: var(--bg-3);
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+.card-tag.live {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  animation: livePulse 1.6s infinite;
+}
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ════ DASHBOARD-GRID ════ */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.dash-col { display: flex; flex-direction: column; min-width: 0; }
+.dash-col > .card { margin-bottom: 10px; }
+.dash-col > .card:last-child { margin-bottom: 0; }
+.dash-feed { flex: 1; display: flex; flex-direction: column; }
+
+/* Shift-Card-Row */
+.shift-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.shift-time {
+  font-size: 22px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* Active-Staff-Liste */
+.active-staff-list {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.active-staff-item {
+  position: relative;
+  width: 36px; height: 36px;
+}
+.active-staff-item img,
+.active-staff-item .ava-fallback {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  object-fit: cover;
+  background: var(--bg-3);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; color: var(--text-dim);
+  font-size: 13px;
+}
+.active-staff-item .ind {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-2);
+}
+.active-staff-item .ind.active { background: var(--success); }
+.active-staff-item .ind.break  { background: var(--warn); }
+.active-staff-more {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  color: var(--text-dim);
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border-strong);
+}
+
+/* Feed */
+.feed-list {
+  display: flex; flex-direction: column; gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 480px;
+}
+.feed-list::-webkit-scrollbar { width: 4px; }
+.feed-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.feed-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.feed-item.success { border-left: 3px solid var(--success); }
+.feed-item.warn    { border-left: 3px solid var(--warn); }
+.feed-item.danger  { border-left: 3px solid var(--danger); }
+.feed-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: rgba(91, 154, 255, 0.12);
+  color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.feed-item.success .feed-icon { background: rgba(74,222,128,.12); color: var(--success); }
+.feed-item.warn    .feed-icon { background: rgba(251,191,36,.12); color: var(--warn); }
+.feed-item.danger  .feed-icon { background: rgba(239,68,68,.12);  color: #fca5a5; }
+.feed-icon [data-lucide] { width: 14px; height: 14px; }
+.feed-body { flex: 1; min-width: 0; }
+.feed-title {
+  font-size: 12px; font-weight: 700;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.feed-sub {
+  font-size: 10px; color: var(--text-dim);
+  margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.feed-ts {
+  font-size: 10px; color: var(--text-muted);
+  flex-shrink: 0; font-weight: 600;
+}
+
+/* ════ SETTINGS (Profil-Tab) ════ */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.setting-label [data-lucide] { width: 14px; height: 14px; color: var(--text-dim); }
+
+/* Segmented Control */
+.seg {
+  display: inline-flex;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+}
+.seg button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px; font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.seg button:hover { color: var(--text); }
+.seg button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Btn icon-only sm */
+.btn.icon-only {
+  width: 32px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn.icon-only.sm { width: 28px; height: 28px; }
+.btn.icon-only.sm [data-lucide] { width: 14px; height: 14px; }
+
+/* Volume Slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--bg-3);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* ════ DASH 3-COL nur auf PC-Mode ════ */
+body.mode-pc .dash-grid {
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  height: calc(100vh - 110px);
+}
+body.mode-pc .dash-col { overflow-y: auto; padding-right: 4px; }
+body.mode-pc .dash-col::-webkit-scrollbar { width: 4px; }
+body.mode-pc .dash-col::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+body.mode-pc .dash-feed .feed-list { max-height: none; }
+
+/* Innerhalb des Dashboards die 2-Spalten-Modcreate-Variante deaktivieren —
+   der Dashboard hat schon eine eigene Live-Feed-Spalte rechts. */
+.dash-mid .detail-view { grid-template-columns: 1fr !important; display: block !important; }
+.dash-mid .detail-view > #mc-history { position: static !important; max-height: 360px; }
+body.mode-pc .dash-mid .detail-view > #mc-history { display: none; }
+
+/* Wenn user "PC" forced aber viewport schmal — horizontal scroll erlauben */
+@media (max-width: 1100px) {
+  body.mode-pc.mode-forced .dash-grid {
+    grid-template-columns: 280px minmax(440px, 1fr) 280px;
+    overflow-x: auto;
+  }
+}
+
+/* Wenn user "Handy" forced — Sidebar-Layout deaktivieren */
+body.mode-phone.mode-forced .app-shell {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
+  grid-template-areas: none !important;
+}
+body.mode-phone.mode-forced .app-tabs {
+  flex-direction: row !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 0 !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+body.mode-phone.mode-forced .app-tab {
+  flex-direction: column !important;
+  border-radius: 0 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 0 !important;
+  padding: 10px 14px !important;
+  font-size: 10px !important;
+}
+body.mode-phone.mode-forced .app-tab.active::before { display: none; }
