@@ -4064,6 +4064,12 @@ async function countPremiumSubscribers() {
 async function buildPremiumPanelContainer() {
     const subs = await countPremiumSubscribers();
     const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    // Premium-Button (Style 6) — Discord rendert automatisch das Abo-Symbol +
+    // den SKU-Namen + Preis + Klick oeffnet die native Bezahl-Box.
+    const premiumBtn = new ButtonBuilder()
+        .setSKUId(PREMIUM_SKU_ID)
+        .setStyle(ButtonStyle.Premium);
+
     const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `# 💎  Emden Network · Spender-Programm\n` +
@@ -4073,8 +4079,8 @@ async function buildPremiumPanelContainer() {
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `## ✨ Was bekommst du?\n` +
             `<:Administration:1489312566030110721>  Exklusive **<@&${PREMIUM_ROLE_ID}>**-Rolle\n` +
-            `🎨  Farbiger Name im Chat — heb dich vom Rest ab\n` +
-            `🚀  VIP-Support — schnellere Antworten\n` +
+            `🎨  Farbiger Name im Chat\n` +
+            `🚀  VIP-Support\n` +
             `💎  Spender-Badge auf deinem Profil im Dashboard\n` +
             `🎮  *(geplant)* In-Game Vorteile im Roblox-Server`
         ))
@@ -4085,29 +4091,7 @@ async function buildPremiumPanelContainer() {
             `📊  **Aktive Spender:** \`${subs}\``
         ))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-            `## 🚀 So gehts\n` +
-            `1. Klick **"Spender werden"** unten\n` +
-            `2. Du bekommst Anweisungen wie's geht\n` +
-            `3. Discord wickelt die Zahlung sicher ab\n` +
-            `4. Deine Rolle erscheint **automatisch** innerhalb von 30 Sekunden\n\n` +
-            `-# Du bist schon Spender? Klick **"Mein Status"** um's zu sehen.`
-        ))
-        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
-        .addActionRowComponents(
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('premium_info')
-                    .setLabel('Spender werden')
-                    .setEmoji('💎')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('premium_status')
-                    .setLabel('Mein Status')
-                    .setEmoji('📋')
-                    .setStyle(ButtonStyle.Secondary),
-            )
-        )
+        .addActionRowComponents(new ActionRowBuilder().addComponents(premiumBtn))
         .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
             `-# Vielen Dank an alle Spender — ihr macht Emden Network moeglich. ❤️`
