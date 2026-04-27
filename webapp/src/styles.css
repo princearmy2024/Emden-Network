@@ -543,6 +543,38 @@ html, body {
 .toast.success { border-left: 3px solid var(--success); }
 .toast.danger { border-left: 3px solid var(--danger); }
 
+/* ── Tablet-Fix: Tab-Nav nicht abschneiden, Scroll-Hinweis sichtbar ── */
+.app-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  position: relative;
+}
+.app-tabs::-webkit-scrollbar { display: block; height: 2px; }
+.app-tabs::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+/* Fade-Hinweis am rechten Rand der Tab-Leiste — zeigt: hier kann man scrollen */
+.app-shell::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Tablet-Spezifisch (480-979px) — kompaktere Tabs, mehr Platz fuer Content */
+@media (min-width: 480px) and (max-width: 979px) {
+  .app-tab {
+    min-width: 56px;
+    padding: 9px 12px;
+    font-size: 9px;
+  }
+  .app-tab [data-lucide] { width: 16px; height: 16px; }
+  .app-header { padding: 10px 14px; }
+  .app-header img,
+  .app-header .avatar-fallback { width: 30px; height: 30px; }
+  .app-header-name { font-size: 13px; }
+  .app-header-sub { font-size: 10px; }
+  .role-badge { padding: 3px 8px; font-size: 8px; }
+}
+
 /* ════ RESPONSIVE — Dashboard-Layout fuer breite Screens ════ */
 @media (min-width: 720px) {
   .app-main { padding: 18px 22px; }
