@@ -20,8 +20,20 @@ function setBootStatus(text, isError = false) {
   if (boot) boot.classList.toggle('error', isError);
 }
 
+// Wait for Lucide CDN to be ready before any rendering
+function waitForLucide() {
+  return new Promise(resolve => {
+    if (window.lucide?.createIcons) return resolve();
+    const t = setInterval(() => {
+      if (window.lucide?.createIcons) { clearInterval(t); resolve(); }
+    }, 50);
+    setTimeout(() => { clearInterval(t); resolve(); }, 3000);
+  });
+}
+
 async function main() {
   try {
+    await waitForLucide();
     setBootStatus('Verbinde mit Discord...');
     const session = await initAuth();
 

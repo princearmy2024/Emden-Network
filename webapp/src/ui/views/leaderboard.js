@@ -1,16 +1,10 @@
-import { api, escapeHtml } from './api.js';
-
-function fmtMs(ms) {
-  if (!ms || ms < 0) return '0s';
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return Math.floor((ms % 60000) / 1000) + 's';
-}
+/**
+ * Leaderboard View — Top 25 Staff nach Shift-Zeit
+ */
+import { api, escapeHtml, fmtDuration, refreshIcons, setLoading, setEmpty, setError } from './api.js';
 
 export async function renderLeaderboard(root, session) {
-  root.innerHTML = '<div class="loading">Lade Leaderboard...</div>';
+  setLoading(root, 'Lade Leaderboard...');
   try {
     const d = await api(`/shifts?discordId=${encodeURIComponent(session.discordId)}`);
     const shifts = d.shifts || {};
@@ -27,23 +21,36 @@ export async function renderLeaderboard(root, session) {
       .slice(0, 25);
 
     if (rows.length === 0) {
-      root.innerHTML = '<div class="empty">Keine Daten</div>';
+      setEmpty(root, 'trophy', 'Keine Daten');
       return;
     }
-    const stateIcon = (s) => s === 'active' ? '🟢' : s === 'break' ? '🟡' : '⚫';
     root.innerHTML = `<div class="card">
-      <div class="card-title">🏆 Top 25</div>
-      ${rows.map((r, i) => `
-        <div class="list-item">
-          ${r.avatar ? `<img src="${escapeHtml(r.avatar)}" alt="">` : `<div class="avatar-fallback">${i + 1}</div>`}
-          <div class="list-item-body">
-            <div class="list-item-title">${stateIcon(r.state)} #${i + 1} ${escapeHtml(r.username)}</div>
-            <div class="list-item-meta">${fmtMs(r.totalMs)}</div>
-          </div>
-        </div>
-      `).join('')}
+      <div class="card-title"><i data-lucide="trophy"></i><span>Top ${rows.length}</span></div>
+      ${rows.map((r, i) => itemHtml(r, i + 1, session.discordId === r.id)).join('')}
     </div>`;
+    refreshIcons();
   } catch (e) {
-    root.innerHTML = `<div class="empty">Fehler: ${escapeHtml(e.message || String(e))}</div>`;
+    setError(root, e.message);
   }
+}
+
+function itemHtml(r, rank, isMe) {
+  const stateIcon = r.state === 'active' ? '<i data-lucide="circle-dot" style="color:var(--success);"></i>'
+    : r.state === 'break' ? '<i data-lucide="pause" style="color:var(--warn);"></i>'
+    : '<i data-lucide="moon" style="color:var(--text-muted);"></i>';
+  const ava = r.avatar
+    ? `<img class="li-avatar" src="${escapeHtml(r.avatar)}" alt="">`
+    : `<div class="li-avatar">${rank}</div>`;
+  const rankIcon = rank === 1 ? '<i data-lucide="crown" style="color:#fbbf24;"></i>'
+    : rank === 2 ? '<i data-lucide="medal" style="color:#cbd5e1;"></i>'
+    : rank === 3 ? '<i data-lucide="medal" style="color:#cd7f32;"></i>'
+    : `<span style="color:var(--text-muted);font-weight:700;">#${rank}</span>`;
+  return `<div class="list-item no-hover${isMe ? ' mine' : ''}">
+    <div style="display:flex;align-items:center;justify-content:center;width:28px;flex-shrink:0;">${rankIcon}</div>
+    ${ava}
+    <div class="li-body">
+      <div class="li-title">${escapeHtml(r.username)}</div>
+      <div class="li-meta">${stateIcon} <span>${fmtDuration(r.totalMs)}</span></div>
+    </div>
+  </div>`;
 }

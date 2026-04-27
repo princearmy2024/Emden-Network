@@ -1,4 +1,4 @@
-// Shared API helper — alle Views nutzen dies
+// Shared helper für alle Views — API + UI Utilities
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
@@ -12,7 +12,9 @@ export async function api(path, opts = {}) {
   const r = await fetch(url, { ...opts, headers });
   if (!r.ok) {
     const err = await r.json().catch(() => ({ error: 'HTTP ' + r.status }));
-    throw new Error(err.error || `HTTP ${r.status}`);
+    const e = new Error(err.error || `HTTP ${r.status}`);
+    e.status = r.status;
+    throw e;
   }
   return r.json();
 }
@@ -29,4 +31,87 @@ export function timeAgo(ts) {
   if (s < 3600) return Math.floor(s / 60) + 'm';
   if (s < 86400) return Math.floor(s / 3600) + 'h';
   return Math.floor(s / 86400) + 'd';
+}
+
+export function fmtDuration(ms) {
+  if (!ms || ms < 0) return '0s';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return Math.floor((ms % 60000) / 1000) + 's';
+}
+
+// Lucide-Icons nach Render-Update neu erzeugen
+export function refreshIcons(root) {
+  if (window.lucide?.createIcons) {
+    window.lucide.createIcons({ icons: undefined, attrs: {}, nameAttr: 'data-lucide' });
+  }
+}
+
+// Toast (kurze Bestätigung)
+let _toastTimeout = null;
+export function toast(text, kind = '') {
+  let el = document.getElementById('app-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app-toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.className = 'toast ' + kind;
+  const iconName = kind === 'success' ? 'check-circle' : kind === 'danger' ? 'alert-circle' : 'info';
+  el.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(text)}</span>`;
+  refreshIcons();
+  requestAnimationFrame(() => el.classList.add('show'));
+  if (_toastTimeout) clearTimeout(_toastTimeout);
+  _toastTimeout = setTimeout(() => {
+    el.classList.remove('show');
+  }, 3000);
+}
+
+// Confirm Modal — Promise<boolean>
+export function confirmModal({ title, text, confirmLabel = 'Bestätigen', cancelLabel = 'Abbrechen', kind = 'danger', icon = 'alert-triangle' }) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-icon" style="${kind === 'danger' ? '' : 'background:rgba(91,154,255,.15);color:var(--accent);'}"><i data-lucide="${icon}"></i></div>
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(text || '')}</p>
+        <div class="action-row">
+          <button class="btn full" data-act="cancel">${escapeHtml(cancelLabel)}</button>
+          <button class="btn ${kind === 'danger' ? 'danger' : 'primary'} full" data-act="ok">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    refreshIcons();
+    overlay.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]');
+      if (b) {
+        document.body.removeChild(overlay);
+        resolve(b.dataset.act === 'ok');
+      } else if (e.target === overlay) {
+        document.body.removeChild(overlay);
+        resolve(false);
+      }
+    });
+  });
+}
+
+// Loading-Helper
+export function setLoading(root, text = 'Lade...') {
+  if (!root) return;
+  root.innerHTML = `<div class="loading"><div class="spinner"></div><span>${escapeHtml(text)}</span></div>`;
+}
+export function setEmpty(root, icon, text) {
+  if (!root) return;
+  root.innerHTML = `<div class="empty"><i data-lucide="${icon}"></i><span>${escapeHtml(text)}</span></div>`;
+  refreshIcons();
+}
+export function setError(root, message) {
+  if (!root) return;
+  root.innerHTML = `<div class="empty"><i data-lucide="alert-circle" style="color:var(--danger);"></i><span>${escapeHtml(message)}</span></div>`;
+  refreshIcons();
 }
