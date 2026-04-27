@@ -731,10 +731,20 @@ const premiumCommand = new SlashCommandBuilder()
     .setName("premium")
     .setDescription("Zeige deinen Spender-Status");
 
+const premiumGrantCommand = new SlashCommandBuilder()
+    .setName("premium-grant")
+    .setDescription("Test-Entitlement vergeben (Owner-only, nur fuer Testing)")
+    .addUserOption(opt => opt.setName("user").setDescription("User der's bekommen soll").setRequired(true));
+
+const premiumRevokeCommand = new SlashCommandBuilder()
+    .setName("premium-revoke")
+    .setDescription("Test-Entitlement entfernen (Owner-only)")
+    .addUserOption(opt => opt.setName("user").setDescription("User dem's entzogen werden soll").setRequired(true));
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON(), premiumPanelCommand.toJSON(), premiumCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON(), premiumPanelCommand.toJSON(), premiumCommand.toJSON(), premiumGrantCommand.toJSON(), premiumRevokeCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -1586,6 +1596,87 @@ client.on("interactionCreate", async interaction => {
             return interaction.editReply({ content: `✅ Premium-Panel gepostet in <#${interaction.channelId}>` });
         } catch(e) {
             console.error('[Premium] Panel-Fehler:', e);
+            const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
+        }
+        return;
+    }
+
+    // /premium-grant — Test-Entitlement vergeben (Owner-only)
+    if (interaction.commandName === "premium-grant") {
+        try {
+            if (!OWNER_IDS.includes(interaction.user.id)) {
+                return interaction.reply({ content: "❌ Nur Bot-Owner.", flags: MessageFlags.Ephemeral });
+            }
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const target = interaction.options.getUser("user");
+            const r = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bot ${process.env.TOKEN}`,
+                },
+                body: JSON.stringify({ sku_id: PREMIUM_SKU_ID, owner_id: target.id, owner_type: 2 }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                return interaction.editReply({ content: `❌ Discord API: ${data.message || r.status}\n\`\`\`json\n${JSON.stringify(data, null, 2).slice(0, 1500)}\n\`\`\`` });
+            }
+            // Rolle direkt setzen
+            try {
+                const guild = client.guilds.cache.get(GUILD_ID);
+                const member = await guild?.members.fetch(target.id).catch(() => null);
+                if (member && !member.roles.cache.has(PREMIUM_ROLE_ID)) {
+                    await member.roles.add(PREMIUM_ROLE_ID).catch(() => {});
+                }
+            } catch(_) {}
+            return interaction.editReply({ content: `✅ Test-Entitlement fuer <@${target.id}> erstellt. Rolle <@&${PREMIUM_ROLE_ID}> wurde zugewiesen.\nEntitlement-ID: \`${data.id}\`` });
+        } catch(e) {
+            console.error('[Premium] Grant-Fehler:', e);
+            const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
+        }
+        return;
+    }
+
+    // /premium-revoke — Test-Entitlement loeschen (Owner-only)
+    if (interaction.commandName === "premium-revoke") {
+        try {
+            if (!OWNER_IDS.includes(interaction.user.id)) {
+                return interaction.reply({ content: "❌ Nur Bot-Owner.", flags: MessageFlags.Ephemeral });
+            }
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const target = interaction.options.getUser("user");
+            // Erst Entitlements suchen
+            const r = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements?user_id=${target.id}&sku_ids=${PREMIUM_SKU_ID}`, {
+                headers: { Authorization: `Bot ${process.env.TOKEN}` },
+            });
+            const list = await r.json().catch(() => []);
+            if (!Array.isArray(list) || list.length === 0) {
+                return interaction.editReply({ content: `ℹ️ <@${target.id}> hat keine aktiven Entitlements.` });
+            }
+            let deleted = 0;
+            for (const e of list) {
+                if (String(e.sku_id) !== String(PREMIUM_SKU_ID)) continue;
+                const dr = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements/${e.id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bot ${process.env.TOKEN}` },
+                });
+                if (dr.ok) deleted++;
+            }
+            // Rolle entfernen
+            try {
+                const guild = client.guilds.cache.get(GUILD_ID);
+                const member = await guild?.members.fetch(target.id).catch(() => null);
+                if (member && member.roles.cache.has(PREMIUM_ROLE_ID)) {
+                    await member.roles.remove(PREMIUM_ROLE_ID).catch(() => {});
+                }
+            } catch(_) {}
+            return interaction.editReply({ content: `✅ ${deleted} Entitlement(s) fuer <@${target.id}> entfernt. Rolle <@&${PREMIUM_ROLE_ID}> wurde abgenommen.` });
+        } catch(e) {
+            console.error('[Premium] Revoke-Fehler:', e);
             const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
             if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
             else await interaction.reply(reply).catch(() => {});
