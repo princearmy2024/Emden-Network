@@ -1,7 +1,7 @@
 /**
  * GSG9 Team View — Mitglieder pro Rolle + Roblox-Verknüpfung anzeigen
  */
-import { api, escapeHtml, refreshIcons, setLoading, setEmpty, setError } from './api.js';
+import { api, escapeHtml, refreshIcons, setLoading, setEmpty, setError, imgUrl } from './api.js';
 
 export async function renderGsg9(root, session) {
   setLoading(root, 'Lade GSG9 Team...');
@@ -62,7 +62,7 @@ function memberHtml(m) {
   return `<div class="list-item no-hover">
     <div style="position:relative;flex-shrink:0;">
       ${m.avatar
-        ? `<img class="li-avatar" src="${escapeHtml(m.avatar)}" alt="">`
+        ? `<img class="li-avatar" src="${escapeHtml(imgUrl(m.avatar))}" alt="">`
         : `<div class="li-avatar">${escapeHtml((m.username || '?').charAt(0).toUpperCase())}</div>`}
       <span style="position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;background:${statusColor};border:2px solid var(--bg-1);"></span>
     </div>

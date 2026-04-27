@@ -1,7 +1,7 @@
 /**
  * Profil: User-Info + Shift-Controls + Streak + Roblox-Verknüpfung
  */
-import { api, escapeHtml, fmtDuration, refreshIcons, toast } from './api.js';
+import { api, escapeHtml, fmtDuration, refreshIcons, toast, imgUrl } from './api.js';
 import * as sound from '../../sounds.js';
 import * as device from '../../device.js';
 
@@ -274,7 +274,7 @@ function renderRobloxCard(d) {
     <div class="card-title"><i data-lucide="gamepad-2"></i><span>Roblox-Verknüpfung</span></div>
     <div class="list-item no-hover">
       ${p.avatar
-        ? `<img class="li-avatar" src="${escapeHtml(p.avatar)}" alt="">`
+        ? `<img class="li-avatar" src="${escapeHtml(imgUrl(p.avatar))}" alt="">`
         : `<div class="li-avatar"><i data-lucide="user"></i></div>`}
       <div class="li-body">
         <div class="li-title">${escapeHtml(p.displayName || p.username)}</div>

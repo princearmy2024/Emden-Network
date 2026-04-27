@@ -1,7 +1,7 @@
 /**
  * Mod-Log View — Letzte Mod-Einträge mit Roblox-Avatars und Action-Icons
  */
-import { api, escapeHtml, timeAgo, refreshIcons, setLoading, setEmpty, setError } from './api.js';
+import { api, escapeHtml, timeAgo, refreshIcons, setLoading, setEmpty, setError, imgUrl } from './api.js';
 
 const ACTION_META = {
   'Ban':         { icon: 'ban',             tone: 'red',   label: 'Ban' },
@@ -37,7 +37,7 @@ function itemHtml(e) {
   const dateStr = e.date ? new Date(e.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
   const timeStr = e.date ? new Date(e.date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   const avatar = e.targetAvatar
-    ? `<img class="li-avatar" src="${escapeHtml(e.targetAvatar)}" alt="">`
+    ? `<img class="li-avatar" src="${escapeHtml(imgUrl(e.targetAvatar))}" alt="">`
     : `<div class="li-avatar">${escapeHtml((e.displayName || '?').charAt(0).toUpperCase())}</div>`;
   return `<div class="list-item no-hover" style="position:relative;">
     ${avatar}

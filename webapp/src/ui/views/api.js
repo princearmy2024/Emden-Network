@@ -2,6 +2,28 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
+/**
+ * Discord-Activity-CSP blockt img-src von externen Hosts (rbxcdn.com etc.).
+ * Wir routen alle externen Image-URLs durch /api/img?url=... — der Vercel-
+ * Proxy laedt das Bild und reicht die Bytes als 'self' zurueck.
+ *
+ * Discord-eigene CDN (cdn.discordapp.com) hat Discord schon erlaubt, daher
+ * lassen wir die unveraendert.
+ */
+const PROXY_HOSTS = /(^|\.)(rbxcdn\.com|roblox\.com)$/i;
+export function imgUrl(src) {
+  if (!src) return '';
+  if (typeof src !== 'string') return '';
+  if (src.startsWith('/') || src.startsWith('data:') || src.startsWith('blob:')) return src;
+  try {
+    const u = new URL(src);
+    if (PROXY_HOSTS.test(u.hostname)) {
+      return `${API_BASE}/img?url=${encodeURIComponent(src)}`;
+    }
+    return src;
+  } catch(_) { return src; }
+}
+
 export async function api(path, opts = {}) {
   const headers = { 'x-api-key': API_KEY, ...(opts.headers || {}) };
   if (opts.body && typeof opts.body !== 'string') {

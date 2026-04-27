@@ -5,7 +5,7 @@
  *  - Oben: Suche → Form
  *  - Unten: Live-Feed der letzten 10 Mod-Aktionen (zeigt wer was eingetragen hat)
  */
-import { api, escapeHtml, timeAgo, refreshIcons, toast } from './api.js';
+import { api, escapeHtml, timeAgo, refreshIcons, toast, imgUrl } from './api.js';
 
 const ACTIONS = [
   { id: 'Warn',         icon: 'alert-triangle', label: 'Warn' },
@@ -142,7 +142,7 @@ function onSearch(q) {
       }
       results.innerHTML = `<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">${users.map(u => `
         <div class="list-item" data-uid="${escapeHtml(u.userId)}" data-uname="${escapeHtml(u.username)}" data-dname="${escapeHtml(u.displayName)}" data-avatar="${escapeHtml(u.avatar || '')}">
-          ${u.avatar ? `<img class="li-avatar" src="${escapeHtml(u.avatar)}" alt="">` : `<div class="li-avatar">?</div>`}
+          ${u.avatar ? `<img class="li-avatar" src="${escapeHtml(imgUrl(u.avatar))}" alt="">` : `<div class="li-avatar">?</div>`}
           <div class="li-body">
             <div class="li-title">${escapeHtml(u.displayName)}</div>
             <div class="li-meta">@${escapeHtml(u.username)} · ID ${escapeHtml(u.userId)}</div>
@@ -177,7 +177,7 @@ function pickUser(u) {
   const card = document.getElementById('mc-user-card');
   card.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;padding:12px;margin-top:10px;background:rgba(91,154,255,.08);border:1px solid rgba(91,154,255,.25);border-radius:10px;">
-      ${u.avatar ? `<img src="${escapeHtml(u.avatar)}" style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border-strong);object-fit:cover;">` : `<div class="li-avatar" style="width:48px;height:48px;font-size:18px;">?</div>`}
+      ${u.avatar ? `<img src="${escapeHtml(imgUrl(u.avatar))}" style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border-strong);object-fit:cover;">` : `<div class="li-avatar" style="width:48px;height:48px;font-size:18px;">?</div>`}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:800;color:var(--text);font-size:14px;">${escapeHtml(u.displayName || u.username || 'Unbekannt')}</div>
         <div style="font-size:11px;color:var(--text-dim);">@${escapeHtml(u.username || '?')} · ID ${escapeHtml(u.userId)}</div>
@@ -258,7 +258,7 @@ function historyItemHtml(e) {
   const dateStr = e.date ? new Date(e.date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   const tagClass = tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : '';
   const targetAva = e.targetAvatar
-    ? `<img class="li-avatar" style="width:30px;height:30px;" src="${escapeHtml(e.targetAvatar)}" alt="">`
+    ? `<img class="li-avatar" style="width:30px;height:30px;" src="${escapeHtml(imgUrl(e.targetAvatar))}" alt="">`
     : `<div class="li-avatar" style="width:30px;height:30px;font-size:11px;">${escapeHtml((e.displayName || '?').charAt(0).toUpperCase())}</div>`;
   return `<div class="list-item no-hover" style="padding:8px;">
     ${targetAva}

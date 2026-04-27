@@ -6,7 +6,7 @@
  *
  * Auf Handy stapeln sich die Spalten untereinander.
  */
-import { api, escapeHtml, fmtDuration, refreshIcons, toast, setLoading } from './api.js';
+import { api, escapeHtml, fmtDuration, refreshIcons, toast, setLoading, imgUrl } from './api.js';
 import { renderModCreate } from './modcreate.js';
 import * as live from '../../live.js';
 
@@ -382,10 +382,10 @@ function renderFeed() {
   }
   list.innerHTML = feedItems.map(i => {
     const avaCell = i.avatar
-      ? `<img class="feed-ava" src="${escapeHtml(i.avatar)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'feed-icon',innerHTML:'<i data-lucide=\\'${i.icon}\\'></i>'}))">`
+      ? `<img class="feed-ava" src="${escapeHtml(imgUrl(i.avatar))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'feed-icon',innerHTML:'<i data-lucide=\\'${i.icon}\\'></i>'}))">`
       : `<div class="feed-icon"><i data-lucide="${i.icon}"></i></div>`;
     const modAva = i.modAvatar
-      ? `<img class="feed-mod" src="${escapeHtml(i.modAvatar)}" alt="">`
+      ? `<img class="feed-mod" src="${escapeHtml(imgUrl(i.modAvatar))}" alt="">`
       : '';
     return `<div class="feed-item ${i.tone}">
       ${avaCell}
