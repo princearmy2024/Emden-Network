@@ -723,10 +723,18 @@ const leaderboardInitCommand = new SlashCommandBuilder()
     .setName("leaderboard-init")
     .setDescription("Erstellt das Live-Shift-Leaderboard-Panel (nur Owner)");
 
+const premiumPanelCommand = new SlashCommandBuilder()
+    .setName("premium-panel")
+    .setDescription("Postet das Spender/Premium-Panel in den aktuellen Channel (nur Owner)");
+
+const premiumCommand = new SlashCommandBuilder()
+    .setName("premium")
+    .setDescription("Zeige deinen Spender-Status");
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON(), premiumPanelCommand.toJSON(), premiumCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -1001,6 +1009,27 @@ client.on("interactionCreate", async interaction => {
             } catch(e) {
                 return interaction.respond([]).catch(() => {});
             }
+        }
+        return;
+    }
+
+    // ============================================
+    // 💎 PREMIUM PANEL Buttons
+    // ============================================
+    if (interaction.isButton() && (interaction.customId === 'premium_status' || interaction.customId === 'premium_info')) {
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            if (interaction.customId === 'premium_status') {
+                const status = await checkPremiumForUser(interaction.user.id);
+                const container = buildPremiumStatusContainer(interaction.user, status);
+                return interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            } else {
+                const container = buildPremiumInfoContainer();
+                return interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            }
+        } catch(e) {
+            console.error('[Premium] Button:', e);
+            try { await interaction.editReply({ content: '❌ ' + e.message }); } catch(_) {}
         }
         return;
     }
@@ -1541,6 +1570,41 @@ client.on("interactionCreate", async interaction => {
             const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
             if (interaction.deferred) await interaction.editReply({ content: reply.content }).catch(err => console.error('[Leaderboard] editReply scheiterte:', err.message));
             else await interaction.reply(reply).catch(err => console.error('[Leaderboard] reply scheiterte:', err.message));
+        }
+        return;
+    }
+
+    // /premium-panel — Postet das schoene Premium-Panel im aktuellen Channel (Owner-only)
+    if (interaction.commandName === "premium-panel") {
+        try {
+            if (!OWNER_IDS.includes(interaction.user.id)) {
+                return interaction.reply({ content: "❌ Nur Bot-Owner.", flags: MessageFlags.Ephemeral });
+            }
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const container = await buildPremiumPanelContainer();
+            await interaction.channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            return interaction.editReply({ content: `✅ Premium-Panel gepostet in <#${interaction.channelId}>` });
+        } catch(e) {
+            console.error('[Premium] Panel-Fehler:', e);
+            const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
+        }
+        return;
+    }
+
+    // /premium — User-Status anzeigen (jeder darf)
+    if (interaction.commandName === "premium") {
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const status = await checkPremiumForUser(interaction.user.id);
+            const container = buildPremiumStatusContainer(interaction.user, status);
+            return interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        } catch(e) {
+            console.error('[Premium] Status-Fehler:', e);
+            const reply = { content: '❌ Fehler: ' + e.message, flags: MessageFlags.Ephemeral };
+            if (interaction.deferred) await interaction.editReply(reply).catch(() => {});
+            else await interaction.reply(reply).catch(() => {});
         }
         return;
     }
@@ -3848,6 +3912,186 @@ async function updateBotStatus(ci) {
 // ================================================================
 // 🏆 LIVE SHIFT LEADERBOARD — Components V2 Panel, Single-Message-Edit
 // ================================================================
+// ================================================================
+// 💎 PREMIUM-PANEL Builders
+// ================================================================
+async function checkPremiumForUser(discordId) {
+    try {
+        if (!DISCORD_CLIENT_ID || !PREMIUM_SKU_ID) return { active: false, error: 'not_configured' };
+        const r = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements?user_id=${encodeURIComponent(discordId)}&sku_ids=${PREMIUM_SKU_ID}&exclude_ended=true`, {
+            headers: { Authorization: `Bot ${process.env.TOKEN}` },
+        });
+        const list = await r.json().catch(() => []);
+        if (!Array.isArray(list)) return { active: false, error: 'api_error' };
+        const now = Date.now();
+        const active = list.find(e =>
+            String(e.sku_id) === String(PREMIUM_SKU_ID)
+            && (!e.ends_at || new Date(e.ends_at).getTime() > now)
+            && (!e.deleted)
+        );
+        // Rolle synchronisieren
+        try {
+            const guild = client.guilds.cache.get(GUILD_ID);
+            if (guild) {
+                const member = await guild.members.fetch(discordId).catch(() => null);
+                if (member) {
+                    const has = member.roles.cache.has(PREMIUM_ROLE_ID);
+                    if (active && !has) await member.roles.add(PREMIUM_ROLE_ID).catch(() => {});
+                    else if (!active && has) await member.roles.remove(PREMIUM_ROLE_ID).catch(() => {});
+                }
+            }
+        } catch(_) {}
+        return {
+            active: !!active,
+            endsAt: active?.ends_at ? new Date(active.ends_at).getTime() : null,
+            entitlementId: active?.id || null,
+        };
+    } catch(e) {
+        return { active: false, error: e.message };
+    }
+}
+
+async function countPremiumSubscribers() {
+    try {
+        const r = await fetch(`https://discord.com/api/v10/applications/${DISCORD_CLIENT_ID}/entitlements?sku_ids=${PREMIUM_SKU_ID}&exclude_ended=true&limit=100`, {
+            headers: { Authorization: `Bot ${process.env.TOKEN}` },
+        });
+        const list = await r.json().catch(() => []);
+        if (!Array.isArray(list)) return 0;
+        const now = Date.now();
+        const unique = new Set();
+        for (const e of list) {
+            if (String(e.sku_id) !== String(PREMIUM_SKU_ID)) continue;
+            if (e.ends_at && new Date(e.ends_at).getTime() <= now) continue;
+            if (e.deleted) continue;
+            if (e.user_id) unique.add(e.user_id);
+        }
+        return unique.size;
+    } catch(_) { return 0; }
+}
+
+async function buildPremiumPanelContainer() {
+    const subs = await countPremiumSubscribers();
+    const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `# 💎  Emden Network · Spender-Programm\n` +
+            `Unterstuetze die Community und sichere dir exklusive Vorteile.`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## ✨ Was bekommst du?\n` +
+            `<:Administration:1489312566030110721>  Exklusive **<@&${PREMIUM_ROLE_ID}>**-Rolle\n` +
+            `🎨  Farbiger Name im Chat — heb dich vom Rest ab\n` +
+            `🚀  VIP-Support — schnellere Antworten\n` +
+            `💎  Spender-Badge auf deinem Profil im Dashboard\n` +
+            `🎮  *(geplant)* In-Game Vorteile im Roblox-Server`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## 💰 Preis\n` +
+            `\`2,99 €\` pro Monat · jederzeit kuendbar\n\n` +
+            `📊  **Aktive Spender:** \`${subs}\``
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## 🚀 So gehts\n` +
+            `1. Klick **"Spender werden"** unten\n` +
+            `2. Du bekommst Anweisungen wie's geht\n` +
+            `3. Discord wickelt die Zahlung sicher ab\n` +
+            `4. Deine Rolle erscheint **automatisch** innerhalb von 30 Sekunden\n\n` +
+            `-# Du bist schon Spender? Klick **"Mein Status"** um's zu sehen.`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addActionRowComponents(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('premium_info')
+                    .setLabel('Spender werden')
+                    .setEmoji('💎')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('premium_status')
+                    .setLabel('Mein Status')
+                    .setEmoji('📋')
+                    .setStyle(ButtonStyle.Secondary),
+            )
+        )
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `-# Vielen Dank an alle Spender — ihr macht Emden Network moeglich. ❤️`
+        ));
+    return container;
+}
+
+function buildPremiumStatusContainer(user, status) {
+    const isActive = !!status.active;
+    const endsStr = status.endsAt ? `<t:${Math.floor(status.endsAt/1000)}:F> (<t:${Math.floor(status.endsAt/1000)}:R>)` : '—';
+    const container = new ContainerBuilder();
+    if (isActive) {
+        container
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `# ✨ Du bist Spender, ${user.displayName || user.username}!\n` +
+                `Vielen Dank fuer deinen Support 💎`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `**Status** · 🟢 Aktiv\n` +
+                `**Verlaengert sich** · ${endsStr}\n` +
+                `**Rolle** · <@&${PREMIUM_ROLE_ID}>`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `-# Kuendigen kannst du jederzeit ueber Discord-Einstellungen → Abos.`
+            ));
+    } else {
+        container
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `# 💎 Werde Spender, ${user.displayName || user.username}!\n` +
+                `Du bist aktuell **kein Spender**.`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `**Status** · ⚫ Inaktiv\n` +
+                `**Preis** · \`2,99 €\` / Monat`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `## 🚀 So wirst du Spender:\n` +
+                `1. Oeffne die **Emden Network Activity** in einem Voice-Channel (Plus-Icon → Aktivitaeten)\n` +
+                `2. Klick links auf **Profil**\n` +
+                `3. Klick auf den **"Jetzt Spender werden"** Button\n` +
+                `4. Discord oeffnet das Bezahl-Fenster\n` +
+                `5. Nach erfolgreichem Kauf bekommst du die Rolle automatisch ✨`
+            ));
+    }
+    return container;
+}
+
+function buildPremiumInfoContainer() {
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `# 💎 So wirst du Spender\n` +
+            `Discord-Activity-Subscriptions werden direkt **in der Activity** gekauft — nicht im Discord-Browser oder per Link.`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `## Schritt fuer Schritt\n\n` +
+            `**1.**  Joine einen Voice-Channel\n` +
+            `**2.**  Klick im Voice unten auf das **➕ Plus-Symbol**\n` +
+            `**3.**  Waehle **"Aktivitaeten"** → **Emden Network**\n` +
+            `**4.**  In der Activity links auf **"Profil"** klicken\n` +
+            `**5.**  Bei der **"Spender / Premium"** Karte auf **"Jetzt Spender werden"** klicken\n` +
+            `**6.**  Discord oeffnet das Bezahl-Fenster — Zahlmethode auswaehlen, fertig\n\n` +
+            `Innerhalb von **30 Sekunden** bekommst du die <@&${PREMIUM_ROLE_ID}>-Rolle automatisch.`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `-# 💡 Tipp: Du kannst die Activity auch im Sprachkanal allein starten — Voice muss nicht voll sein.`
+        ));
+    return container;
+}
+
 function formatShiftDuration(ms) {
     if (!ms || ms < 0) ms = 0;
     const h = Math.floor(ms / 3600000);
