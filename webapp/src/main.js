@@ -14,8 +14,12 @@ import { applyMode, watchResize } from './device.js';
 import { unlockOnFirstGesture } from './sounds.js';
 import { createIcons, icons } from 'lucide';
 
-// Lucide global verfuegbar machen (statt CDN — Discord-CSP blockt unpkg)
-window.lucide = { createIcons: (opts = {}) => createIcons({ icons, ...opts }) };
+// Lucide global verfuegbar machen (statt CDN — Discord-CSP blockt unpkg).
+// Wichtig: icons MUSS nach opts kommen, damit ein versehentliches
+// `icons: undefined` aus refreshIcons() nicht das gebakte Set ueberschreibt.
+window.lucide = {
+  createIcons: (opts = {}) => createIcons({ ...opts, icons }),
+};
 
 const $ = (id) => document.getElementById(id);
 
