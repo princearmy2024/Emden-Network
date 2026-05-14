@@ -64,6 +64,162 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const PREMIUM_SKU_ID = process.env.PREMIUM_SKU_ID || '1498325834338144297';
 const PREMIUM_ROLE_ID = process.env.PREMIUM_ROLE_ID || '1498325487636840529';
 
+// === AI Support Bot (Groq) ===
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const AI_HELP_CHANNEL_ID = process.env.AI_HELP_CHANNEL_ID || ''; // Dedizierter AI-Channel (Option B)
+const AI_SUPPORT_PING_ROLE = process.env.AI_SUPPORT_PING_ROLE || SUPPORT_PING_ROLE_ID;
+const AI_ENABLED_FILE = path.join(path.resolve(), 'data', 'aiEnabled.json');
+let aiEnabledChannels = {}; // channelId → true/false (manuell pro Channel an/aus)
+try { aiEnabledChannels = JSON.parse(fs.readFileSync(AI_ENABLED_FILE, 'utf-8')); } catch(_) {}
+function saveAiEnabled() {
+    try {
+        if (!fs.existsSync(path.dirname(AI_ENABLED_FILE))) fs.mkdirSync(path.dirname(AI_ENABLED_FILE), { recursive: true });
+        fs.writeFileSync(AI_ENABLED_FILE, JSON.stringify(aiEnabledChannels, null, 2));
+    } catch(_) {}
+}
+
+// AI-Conversation-State pro Channel: { messages: [...], escalated: bool, lastUserAt: ts }
+const aiConversations = new Map();
+// Rate-Limits pro User: { userId: { count, resetAt } }
+const aiUserLimits = new Map();
+const AI_USER_LIMIT = 20; // max 20 AI-Antworten pro Stunde pro User
+const AI_HISTORY_MAX = 12; // letzte 12 Messages im Kontext halten
+
+const AI_SYSTEM_PROMPT = `Du bist der KI-Support-Assistent vom Discord-Server "Emden Network" — eine deutsche Roblox-Roleplay-Community.
+
+DEINE AUFGABE:
+- Hilf Usern freundlich, kurz, auf den Punkt
+- Antworte auf DEUTSCH (Du-Form, locker aber respektvoll)
+- Halte Antworten unter 5 Saetzen wenn moeglich
+- Bei komplexen oder unklaren Anfragen: schreib am Ende deiner Antwort das Wort [ESCALATE], dann pingt der Bot automatisch Staff
+- Wenn der User schreibt "staff", "mod", "echte person", "mensch" → schreib NUR "[ESCALATE]" als Antwort
+
+WAS DU WEISST UEBER EMDEN NETWORK:
+- Roblox-RP-Server, ~2000 Mitglieder
+- Wichtige Commands: /verify (Discord-Verifikation), /gsg9verify (GSG9 Roblox-Verknuepfung)
+- Premium-Spende: 2,99 EUR/Monat via Activity, vergibt Spender-Rolle
+- Support-System: User joinen Voice-Warteraum, dann uebernimmt Staff
+- Rollen: EN-Team (Staff), GSG9 (Spezial-Einheit), Spender (Premium)
+- Probleme oft mit: Roblox-Account-Verknuepfung, Rollen-Vergabe, RP-Regeln
+- Bei Bewerbungen → User soll #bewerbung-channel nutzen (escalate wenn unklar)
+- Bei Reports/Beschwerden → immer [ESCALATE] (Staff muss draufschauen)
+
+WAS DU NICHT MACHEN DARFST:
+- Keine Versprechen ueber Ban-Aufhebungen
+- Keine privaten User-Daten preisgeben
+- Keine Roleplay-Geschichten erfinden oder mitspielen
+- Keine Moderations-Entscheidungen (immer eskalieren)
+- Keine Code-Snippets oder technische Hilfe ausserhalb von Discord-Setup`;
+
+async function askGroq(messages) {
+    if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY nicht gesetzt');
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [
+                { role: 'system', content: AI_SYSTEM_PROMPT },
+                ...messages,
+            ],
+            max_tokens: 400,
+            temperature: 0.7,
+        }),
+    });
+    if (!r.ok) {
+        const err = await r.text().catch(() => '');
+        throw new Error(`Groq API ${r.status}: ${err.slice(0, 200)}`);
+    }
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content || '';
+}
+
+function aiUserAllowed(userId) {
+    const now = Date.now();
+    const entry = aiUserLimits.get(userId);
+    if (!entry || now > entry.resetAt) {
+        aiUserLimits.set(userId, { count: 1, resetAt: now + 60 * 60 * 1000 });
+        return true;
+    }
+    if (entry.count >= AI_USER_LIMIT) return false;
+    entry.count++;
+    return true;
+}
+
+async function handleAiMessage(msg, opts = {}) {
+    const channelId = msg.channel.id;
+    const userId = msg.author.id;
+
+    // Rate-Limit-Check
+    if (!aiUserAllowed(userId)) {
+        await msg.channel.send({
+            content: `<@${userId}> Du hast in der letzten Stunde zu viele AI-Anfragen gestellt. Bitte warte etwas oder warte auf Staff <@&${AI_SUPPORT_PING_ROLE}>.`,
+        }).catch(() => {});
+        return;
+    }
+
+    // Conversation-History laden
+    let conv = aiConversations.get(channelId);
+    if (!conv) {
+        conv = { messages: [], escalated: false, lastUserAt: 0 };
+        aiConversations.set(channelId, conv);
+    }
+
+    // Wenn bereits eskaliert: nicht mehr antworten, Staff hat uebernommen
+    if (conv.escalated) return;
+
+    // Trigger-Woerter fuer sofortige Eskalation
+    const text = msg.content.trim();
+    const lower = text.toLowerCase();
+    const wantsHuman = /\b(staff|mod|moderator|mensch|echte\s*person|human)\b/.test(lower);
+
+    conv.messages.push({ role: 'user', content: text });
+    if (conv.messages.length > AI_HISTORY_MAX) conv.messages = conv.messages.slice(-AI_HISTORY_MAX);
+    conv.lastUserAt = Date.now();
+
+    // Typing-Indicator (sieht professionell aus)
+    msg.channel.sendTyping().catch(() => {});
+
+    if (wantsHuman) {
+        conv.escalated = true;
+        await msg.channel.send({
+            content: `Klar, ich hol dir Staff! <@&${AI_SUPPORT_PING_ROLE}> bitte hier uebernehmen — User: <@${userId}>`,
+            allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
+        }).catch(() => {});
+        return;
+    }
+
+    try {
+        const reply = await askGroq(conv.messages);
+        const shouldEscalate = reply.includes('[ESCALATE]');
+        const cleanReply = reply.replace(/\[ESCALATE\]/g, '').trim();
+
+        if (cleanReply) {
+            conv.messages.push({ role: 'assistant', content: cleanReply });
+            await msg.channel.send({ content: cleanReply }).catch(() => {});
+        }
+
+        if (shouldEscalate) {
+            conv.escalated = true;
+            await msg.channel.send({
+                content: `\n— Ich hol Staff dazu — <@&${AI_SUPPORT_PING_ROLE}>`,
+                allowedMentions: { roles: [AI_SUPPORT_PING_ROLE] },
+            }).catch(() => {});
+        }
+    } catch(e) {
+        console.error('[AI]', e.message);
+        await msg.channel.send({
+            content: `<@&${AI_SUPPORT_PING_ROLE}> AI nicht erreichbar, bitte manuell helfen. (User: <@${userId}>)`,
+            allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
+        }).catch(() => {});
+        conv.escalated = true;
+    }
+}
+
 // === Overlay & Roblox Link Tracking ===
 const ON_DUTY_ROLE_ID = "1367160344992284803";
 const LINKS_FILE = path.join(path.resolve(), "data", "robloxLinks.json");
@@ -741,10 +897,22 @@ const premiumRevokeCommand = new SlashCommandBuilder()
     .setDescription("Test-Entitlement entfernen (Owner-only)")
     .addUserOption(opt => opt.setName("user").setDescription("User dem's entzogen werden soll").setRequired(true));
 
+const aiToggleCommand = new SlashCommandBuilder()
+    .setName("ai-toggle")
+    .setDescription("AI-Support in diesem Channel an/aus schalten (nur Staff)");
+
+const aiResetCommand = new SlashCommandBuilder()
+    .setName("ai-reset")
+    .setDescription("AI-Konversation in diesem Channel zuruecksetzen (nur Staff)");
+
+const aiStatusCommand = new SlashCommandBuilder()
+    .setName("ai-status")
+    .setDescription("AI-Support-Konfiguration anzeigen (nur Staff)");
+
 // ================================================================
 // 🔄 COMMAND LOADER — Lädt alle Commands aus commands/
 // ================================================================
-const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON(), premiumPanelCommand.toJSON(), premiumCommand.toJSON(), premiumGrantCommand.toJSON(), premiumRevokeCommand.toJSON()];
+const commandsForDiscord = [verifyCommand.toJSON(), gsg9VerifyCommand.toJSON(), moderateCommand.toJSON(), moderationsCommand.toJSON(), leaderboardInitCommand.toJSON(), premiumPanelCommand.toJSON(), premiumCommand.toJSON(), premiumGrantCommand.toJSON(), premiumRevokeCommand.toJSON(), aiToggleCommand.toJSON(), aiResetCommand.toJSON(), aiStatusCommand.toJSON()];
 const commandHandlers = new Map();
 
 const commandsPath = path.join(path.resolve(), "commands");
@@ -1682,6 +1850,76 @@ client.on("interactionCreate", async interaction => {
             else await interaction.reply(reply).catch(() => {});
         }
         return;
+    }
+
+    // /ai-toggle — AI in diesem Channel an/aus (Staff-only)
+    if (interaction.commandName === "ai-toggle") {
+        try {
+            const EN_TEAM = "1365083291044282389";
+            const m = interaction.member;
+            if (!m?.roles?.cache?.has(EN_TEAM)) {
+                return interaction.reply({ content: "❌ Nur EN-Team kann das.", flags: MessageFlags.Ephemeral });
+            }
+            const chId = interaction.channelId;
+            const isOff = aiEnabledChannels[chId] === false;
+            if (isOff) {
+                delete aiEnabledChannels[chId];
+                saveAiEnabled();
+                return interaction.reply({ content: "✅ AI-Support **AN** fuer diesen Channel.", flags: MessageFlags.Ephemeral });
+            } else {
+                aiEnabledChannels[chId] = false;
+                saveAiEnabled();
+                return interaction.reply({ content: "🔇 AI-Support **AUS** fuer diesen Channel.", flags: MessageFlags.Ephemeral });
+            }
+        } catch(e) {
+            return interaction.reply({ content: '❌ ' + e.message, flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
+    }
+
+    // /ai-reset — Konversation in diesem Channel zuruecksetzen
+    if (interaction.commandName === "ai-reset") {
+        try {
+            const EN_TEAM = "1365083291044282389";
+            const m = interaction.member;
+            if (!m?.roles?.cache?.has(EN_TEAM)) {
+                return interaction.reply({ content: "❌ Nur EN-Team kann das.", flags: MessageFlags.Ephemeral });
+            }
+            aiConversations.delete(interaction.channelId);
+            return interaction.reply({ content: "🔄 AI-Konversation zurueckgesetzt. AI antwortet wieder.", flags: MessageFlags.Ephemeral });
+        } catch(e) {
+            return interaction.reply({ content: '❌ ' + e.message, flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
+    }
+
+    // /ai-status — Konfiguration anzeigen
+    if (interaction.commandName === "ai-status") {
+        try {
+            const EN_TEAM = "1365083291044282389";
+            const m = interaction.member;
+            if (!m?.roles?.cache?.has(EN_TEAM)) {
+                return interaction.reply({ content: "❌ Nur EN-Team kann das.", flags: MessageFlags.Ephemeral });
+            }
+            const conv = aiConversations.get(interaction.channelId);
+            const chOff = aiEnabledChannels[interaction.channelId] === false;
+            const lines = [
+                `## 🤖 AI-Support-Status`,
+                ``,
+                `**API-Key** · ${GROQ_API_KEY ? '✅ Konfiguriert' : '❌ Fehlt (GROQ_API_KEY env)'}`,
+                `**Modell** · \`${GROQ_MODEL}\``,
+                `**AI-Help-Channel** · ${AI_HELP_CHANNEL_ID ? `<#${AI_HELP_CHANNEL_ID}>` : '*nicht gesetzt*'}`,
+                `**Ping-Rolle** · <@&${AI_SUPPORT_PING_ROLE}>`,
+                ``,
+                `**Dieser Channel:**`,
+                `- AI aktiv: ${chOff ? '🔇 AUS' : '✅ AN'}`,
+                `- Conversation: ${conv ? `${conv.messages.length} Messages${conv.escalated ? ' (ESKALIERT)' : ''}` : 'keine'}`,
+                ``,
+                `**Aktive Konversationen total:** ${aiConversations.size}`,
+                `**Channels manuell deaktiviert:** ${Object.values(aiEnabledChannels).filter(v => v === false).length}`,
+            ].join('\n');
+            return interaction.reply({ content: lines, flags: MessageFlags.Ephemeral });
+        } catch(e) {
+            return interaction.reply({ content: '❌ ' + e.message, flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
     }
 
     // /premium — User-Status anzeigen (jeder darf)
@@ -4732,6 +4970,69 @@ client.on("messageCreate", async msg => {
             });
         }
     }
+});
+
+// ================================================================
+// 🤖 AI SUPPORT BOT — Auto-Reply in Tickets + AI-Help-Channel
+// ================================================================
+client.on("messageCreate", async msg => {
+    if (msg.author.bot) return;
+    if (!msg.guild || msg.guild.id !== GUILD_ID) return;
+    if (!GROQ_API_KEY) return; // Nicht konfiguriert
+
+    const channelId = msg.channel.id;
+    const isTicketCh = isTicketChannel(msg.channel);
+    const isAiHelpCh = AI_HELP_CHANNEL_ID && channelId === AI_HELP_CHANNEL_ID;
+
+    // Nur in Ticket-Channels ODER im AI-Help-Channel reagieren
+    if (!isTicketCh && !isAiHelpCh) return;
+
+    // Per-Channel Override (durch /ai-toggle)
+    if (aiEnabledChannels[channelId] === false) return;
+
+    // Staff-Messages NICHT als User behandeln (Staff hat eskaliert)
+    const EN_TEAM = '1365083291044282389';
+    if (msg.member?.roles?.cache?.has(EN_TEAM)) {
+        // Wenn Staff schreibt: Conversation als eskaliert markieren
+        const conv = aiConversations.get(channelId);
+        if (conv && !conv.escalated) {
+            conv.escalated = true;
+        }
+        return;
+    }
+
+    // Ignoriere triviale Messages (z.B. nur Emoji oder unter 3 Zeichen)
+    const text = (msg.content || '').trim();
+    if (text.length < 3) return;
+
+    // Async handle ohne await — Bot blockt sonst andere Events
+    handleAiMessage(msg).catch(e => console.error('[AI handle]', e.message));
+});
+
+// Reset AI-Conversation wenn Ticket geschlossen wird (channelDelete)
+client.on("channelDelete", channel => {
+    if (aiConversations.has(channel.id)) {
+        aiConversations.delete(channel.id);
+        console.log(`[AI] Conversation cleared fuer geloeschten Channel ${channel.id}`);
+    }
+});
+
+// AI-Begruessung bei neuem Ticket
+client.on("channelCreate", async channel => {
+    if (!GROQ_API_KEY) return;
+    if (!isTicketChannel(channel)) return;
+    if (aiEnabledChannels[channel.id] === false) return;
+    // Kurz warten damit Ticket-Bot zuerst sein Welcome postet
+    setTimeout(async () => {
+        try {
+            await channel.send({
+                content: `👋 Hi! Ich bin der **AI-Support** vom Emden Network. ` +
+                         `Beschreib kurz dein Anliegen — ich versuche zu helfen oder hol Staff dazu. ` +
+                         `Wenn du direkt mit einer Person reden willst, schreib einfach "**staff**".`,
+            }).catch(() => {});
+            console.log(`[AI] Begruessung gepostet in neuem Ticket ${channel.name}`);
+        } catch(_) {}
+    }, 2000);
 });
 
 // ================================================================
