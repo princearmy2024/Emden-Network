@@ -98,17 +98,30 @@ const chSupport   = AI_CH_SUPPORT   ? `<#${AI_CH_SUPPORT}>`   : '#support-status
 const chBewerbung = AI_CH_BEWERBUNG ? `<#${AI_CH_BEWERBUNG}>` : 'Bewerbungsbereich';
 const chVerify    = AI_CH_VERIFY    ? `<#${AI_CH_VERIFY}>`    : '#verify';
 
-const AI_SYSTEM_PROMPT = `Du bist der offizielle Support-AI-Bot fuer den Discord-RP-Server ENRP / Emergency Emden RP (Teil von Emden Network).
+// Channel fuer AI-Feedback-Logs (Transcripts + Bewertungen)
+const AI_FEEDBACK_LOG_CHANNEL = '1371113716619153488';
 
-Deine Aufgabe ist es, neuen und bestehenden Mitgliedern freundlich, klar und hilfreich zu antworten. Du erklaerst Regeln, Bewerbungen, Serverablaeufe, RP-Fragen, Fraktionen, Support-Wege und allgemeine Informationen zum RP-Server.
+// Bewertungen pro Channel: { stars: 1-5, ratedAt: ts }
+const aiRatings = new Map();
+
+const AI_SYSTEM_PROMPT = `Du bist der offizielle Support-AI-Bot fuer den Discord-Server **Emden Network** — eine deutsche Roblox-RP-Community.
+
+Deine Aufgabe ist es, neuen und bestehenden Mitgliedern freundlich, klar und hilfreich zu antworten. Du erklaerst Regeln, Bewerbungen, Serverablaeufe, RP-Fragen, Fraktionen, Support-Wege und allgemeine Informationen.
 
 Du sprichst auf DEUTSCH, locker, respektvoll und verstaendlich. Du klingst nicht wie ein Roboter. Du bist freundlich, aber nicht kindisch. Du bleibst professionell und ruhig, auch wenn Nutzer unhoeflich sind.
+
+**USER ANSPRECHEN:** Wenn ich dir am Anfang eine User-Mention gebe (z.B. <@123456>), nutze sie am Anfang deiner Antwort um den User direkt anzusprechen. Beispiel: "Hi <@123>! Klar, ich helf dir...".
 
 WICHTIG:
 - Du darfst keine Informationen erfinden.
 - Wenn du dir nicht sicher bist, sagst du ehrlich, dass du es nicht sicher weisst.
 - Wenn eine Frage durch das Regelwerk, den Support-Status oder andere Serverkanaele beantwortet werden kann, verweist du auf den passenden Kanal.
 - Du nimmst KEINE Bewerbungen an oder ab — Bewerbungen werden nur ueber den offiziellen Bewerbungsbereich + Staff bearbeitet.
+
+TICKET-CLOSE-MECHANIK (technisch):
+Wenn der User sich bedankt, "passt", "alles klar", "kein weiteres Anliegen", oder offensichtlich fertig ist:
+- Frag freundlich nach: "Cool, freut mich dass ich helfen konnte! Hast du noch eine andere Frage, oder kann ich das Ticket schliessen?"
+- Wenn der User dann bestaetigt fertig zu sein ("ja", "passt", "nein keine"), schreib am Ende deiner Antwort \`[OFFER_CLOSE]\` — dann poste ich automatisch einen "Ticket schliessen"-Button.
 
 ESKALATIONS-MECHANIK (technisch):
 Wenn du Staff dazuholen willst, schreib am Ende deiner Antwort \`[ESCALATE]\`. Dann pingt der Bot automatisch die Staff-Rolle. Setze das nur ein wenn wirklich noetig — siehe unten.
@@ -120,9 +133,8 @@ WICHTIGE SERVER-KANAELE:
 - Verify: ${chVerify}
 
 SERVER-FACTS:
-- ENRP / Emergency Emden RP — deutscher RP-Server
-- Teil von / Partner-Server von Emden Network
-- Fraktionen: Polizei, Feuerwehr, Rettungsdienst u.a.
+- **Emden Network** — deutsche Roblox-RP-Community (~2000 Mitglieder)
+- Fraktionen: Polizei, Feuerwehr, Rettungsdienst und weitere RP-Bereiche
 - RP ist grundsaetzlich IMMER aktiv, ausser offizieller RP-Stop wurde angekuendigt
 - Bewerbungen sind grundsaetzlich offen, ausser anders angekuendigt
 - Aktuell besonders gesucht: aktive Leute fuer die Feuerwehr
@@ -136,7 +148,7 @@ Bei Frage ob RP gerade ist:
 "RP ist grundsaetzlich immer aktiv. Schau aber bitte einmal in ${chSupport}, ob gerade ein RP-Stop oder eine besondere Info angekuendigt wurde."
 
 Bei Frage was man auf dem Server macht:
-"Wir sind ein deutscher Emergency Emden RP-Server. Hier spielst du realistisches Roleplay mit Fraktionen wie Polizei, Feuerwehr, Rettungsdienst und weiteren Bereichen. Wichtig ist, dass du dich an das Regelwerk haeltst und ordentliches RP spielst."
+"Wir sind Emden Network — eine deutsche Roblox-RP-Community. Hier spielst du realistisches Roleplay mit Fraktionen wie Polizei, Feuerwehr, Rettungsdienst und weiteren Bereichen. Wichtig ist, dass du dich an das Regelwerk haeltst und ordentliches RP spielst."
 
 Bei Frage ob Feuerwehr gesucht wird:
 "Ja, aktuell suchen wir besonders aktive Leute fuer die Feuerwehr. Wenn du Lust auf Feuerwehr-RP hast, kannst du dich gerne im ${chBewerbung} bewerben."
@@ -248,7 +260,9 @@ async function handleAiMessage(msg, opts = {}) {
     const lower = text.toLowerCase();
     const wantsHuman = /\b(staff|mod|moderator|mensch|echte\s*person|human)\b/.test(lower);
 
-    conv.messages.push({ role: 'user', content: text });
+    // User-Ping fuer AI-Kontext mitgeben damit sie ihn ansprechen kann
+    const userMention = `<@${userId}>`;
+    conv.messages.push({ role: 'user', content: `[User: ${userMention}] ${text}` });
     if (conv.messages.length > AI_HISTORY_MAX) conv.messages = conv.messages.slice(-AI_HISTORY_MAX);
     conv.lastUserAt = Date.now();
 
@@ -258,7 +272,7 @@ async function handleAiMessage(msg, opts = {}) {
     if (wantsHuman) {
         conv.escalated = true;
         await msg.channel.send({
-            content: `Klar, ich hol dir Staff! <@&${AI_SUPPORT_PING_ROLE}> bitte hier uebernehmen — User: <@${userId}>`,
+            content: `Klar ${userMention}, ich hol dir Staff! <@&${AI_SUPPORT_PING_ROLE}> bitte hier uebernehmen.`,
             allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
         }).catch(() => {});
         return;
@@ -269,29 +283,149 @@ async function handleAiMessage(msg, opts = {}) {
         const reply = await askGroq(conv.messages);
         console.log(`[AI] Groq-Antwort erhalten: "${reply.slice(0, 100)}..."`);
         const shouldEscalate = reply.includes('[ESCALATE]');
-        const cleanReply = reply.replace(/\[ESCALATE\]/g, '').trim();
+        const shouldOfferClose = reply.includes('[OFFER_CLOSE]');
+        const cleanReply = reply
+            .replace(/\[ESCALATE\]/g, '')
+            .replace(/\[OFFER_CLOSE\]/g, '')
+            .trim();
 
         if (cleanReply) {
             conv.messages.push({ role: 'assistant', content: cleanReply });
-            await msg.channel.send({ content: cleanReply })
-                .then(() => console.log('[AI] Antwort gepostet.'))
+            // Falls AI Close anbietet: Button mit anhaengen
+            const messagePayload = { content: cleanReply, allowedMentions: { users: [userId] } };
+            if (shouldOfferClose && isTicketChannel(msg.channel)) {
+                const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+                messagePayload.components = [
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`ai_close_${msg.channel.id}`)
+                            .setLabel('Ticket schliessen')
+                            .setStyle(ButtonStyle.Danger)
+                            .setEmoji('🔒'),
+                        new ButtonBuilder()
+                            .setCustomId(`ai_keep_${msg.channel.id}`)
+                            .setLabel('Noch eine Frage')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji('💬'),
+                    )
+                ];
+            }
+            await msg.channel.send(messagePayload)
+                .then(() => console.log('[AI] Antwort gepostet.' + (shouldOfferClose ? ' (mit Close-Button)' : '')))
                 .catch(err => console.error('[AI] Send-Fehler:', err.message));
         }
 
         if (shouldEscalate) {
             conv.escalated = true;
             await msg.channel.send({
-                content: `\n— Ich hol Staff dazu — <@&${AI_SUPPORT_PING_ROLE}>`,
-                allowedMentions: { roles: [AI_SUPPORT_PING_ROLE] },
+                content: `\n— Ich hol Staff dazu fuer ${userMention} — <@&${AI_SUPPORT_PING_ROLE}>`,
+                allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
             }).catch(err => console.error('[AI] Escalate-Send-Fehler:', err.message));
         }
     } catch(e) {
         console.error('[AI] Groq-Fehler:', e.message);
         await msg.channel.send({
-            content: `<@&${AI_SUPPORT_PING_ROLE}> AI nicht erreichbar, bitte manuell helfen. (User: <@${userId}>)\n-# Fehler: \`${e.message}\``,
+            content: `<@&${AI_SUPPORT_PING_ROLE}> AI nicht erreichbar, bitte manuell helfen fuer ${userMention}.\n-# Fehler: \`${e.message}\``,
             allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
         }).catch(err => console.error('[AI] Fallback-Send-Fehler:', err.message));
         conv.escalated = true;
+    }
+}
+
+// ================================================================
+// 🎫 AI-Ticket-Close + Rating Flow
+// ================================================================
+
+async function postAiRatingPanel(channel, userId, transcript) {
+    const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+    const container = new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `# ✅ Ticket geschlossen\n` +
+            `Vielen Dank fuer dein Anliegen, <@${userId}>!\n` +
+            `Wie war dein AI-Support-Erlebnis? Gib uns kurz Feedback ueber die Sterne:`
+        ))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `**Wie zufrieden bist du mit dem Support?**\n` +
+            `⭐ = Gar nicht zufrieden  ·  ⭐⭐⭐⭐⭐ = Super zufrieden`
+        ))
+        .addActionRowComponents(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ai_rate_1_${channel.id}_${userId}`).setLabel('⭐ 1').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`ai_rate_2_${channel.id}_${userId}`).setLabel('⭐ 2').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`ai_rate_3_${channel.id}_${userId}`).setLabel('⭐ 3').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`ai_rate_4_${channel.id}_${userId}`).setLabel('⭐ 4').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`ai_rate_5_${channel.id}_${userId}`).setLabel('⭐ 5').setStyle(ButtonStyle.Success),
+            )
+        )
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `-# Das Ticket wird nach deiner Bewertung in 30 Sekunden geschlossen. Bot bedankt sich!`
+        ));
+
+    // Speichere Transcript in der conversation fuer spaeter
+    const conv = aiConversations.get(channel.id);
+    if (conv) conv.transcript = transcript;
+
+    await channel.send({ components: [container], flags: MessageFlags.IsComponentsV2 }).catch(err => {
+        console.error('[AI Close] Rating-Panel-Fehler:', err.message);
+    });
+}
+
+function buildTranscriptText(conv) {
+    if (!conv?.messages) return 'Kein Transcript.';
+    return conv.messages.map(m => {
+        const role = m.role === 'user' ? '👤 User' : '🤖 AI';
+        const content = (m.content || '').replace(/\[User: <@\d+>\]\s*/g, ''); // Strip our internal mention prefix
+        return `**${role}:**\n${content.slice(0, 800)}`;
+    }).join('\n\n');
+}
+
+async function postAiFeedbackLog(channel, userId, stars, conv) {
+    try {
+        const logCh = await client.channels.fetch(AI_FEEDBACK_LOG_CHANNEL).catch(() => null);
+        if (!logCh) {
+            console.error('[AI Feedback] Log-Channel nicht erreichbar:', AI_FEEDBACK_LOG_CHANNEL);
+            return;
+        }
+
+        const starsVisual = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
+        const ratingLabel = stars >= 5 ? '🟢 Super' : stars >= 4 ? '🟢 Gut' : stars >= 3 ? '🟡 OK' : stars >= 2 ? '🟠 Schlecht' : '🔴 Sehr schlecht';
+
+        const transcriptText = buildTranscriptText(conv);
+        // Discord-Message-Limit beachten — splitten falls noetig
+        const transcriptShort = transcriptText.length > 1800 ? transcriptText.slice(0, 1800) + '\n...\n*(gekuerzt)*' : transcriptText;
+
+        const botUser = client.user;
+        const supporterMention = botUser ? `<@${botUser.id}>` : 'AI-Bot';
+        const supporterAvatar = botUser?.displayAvatarURL({ size: 128 }) || null;
+
+        const container = new ContainerBuilder()
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `# 🎫 AI-Support-Feedback\n` +
+                `Ticket geschlossen mit Bewertung **${starsVisual}** (${stars}/5) · ${ratingLabel}`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `**User** · <@${userId}>\n` +
+                `**Bearbeitet von** · ${supporterMention} (AI-Support)\n` +
+                `**Channel** · ${channel?.name ? `#${channel.name}` : channel?.id || '?'}\n` +
+                `**Zeitpunkt** · <t:${Math.floor(Date.now()/1000)}:F>\n` +
+                `**Bewertung** · ${starsVisual} (${stars}/5)`
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `## 💬 Konversation\n` + transcriptShort
+            ))
+            .addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Large))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(
+                `-# Automatisch generiert vom AI-Support · ${conv?.messages?.length || 0} Messages insgesamt`
+            ));
+
+        await logCh.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+        console.log(`[AI Feedback] Log gepostet fuer Channel ${channel?.id}, Rating ${stars}/5`);
+    } catch(e) {
+        console.error('[AI Feedback] Log-Fehler:', e.message);
     }
 }
 
@@ -1262,6 +1396,103 @@ client.on("interactionCreate", async interaction => {
             } catch(e) {
                 return interaction.respond([]).catch(() => {});
             }
+        }
+        return;
+    }
+
+    // ============================================
+    // 🤖 AI Ticket-Close + Rating Buttons
+    // ============================================
+    if (interaction.isButton() && interaction.customId.startsWith('ai_close_')) {
+        try {
+            const channelId = interaction.customId.replace('ai_close_', '');
+            await interaction.deferUpdate();
+            const conv = aiConversations.get(channelId);
+            // Disable buttons auf der vorherigen Message
+            try {
+                const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+                const disabledRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('disabled_close').setLabel('Ticket geschlossen').setStyle(ButtonStyle.Secondary).setDisabled(true).setEmoji('🔒'),
+                );
+                await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+            } catch(_) {}
+            // Rating-Panel posten
+            await postAiRatingPanel(interaction.channel, interaction.user.id, buildTranscriptText(conv));
+        } catch(e) {
+            console.error('[AI Close] Button-Fehler:', e);
+        }
+        return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('ai_keep_')) {
+        try {
+            await interaction.deferUpdate();
+            const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+            const disabledRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('disabled_keep').setLabel('Konversation laeuft weiter').setStyle(ButtonStyle.Secondary).setDisabled(true).setEmoji('💬'),
+            );
+            await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+            await interaction.followUp({
+                content: `Alles gut <@${interaction.user.id}>, ich bin weiter da! Was wolltest du noch wissen?`,
+                allowedMentions: { users: [interaction.user.id] },
+            });
+        } catch(e) { console.error('[AI Keep] Button-Fehler:', e); }
+        return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('ai_rate_')) {
+        try {
+            // Format: ai_rate_<stars>_<channelId>_<userId>
+            const parts = interaction.customId.split('_');
+            const stars = parseInt(parts[2]) || 0;
+            const channelId = parts[3];
+            const userIdForRating = parts[4];
+            // Nur der Original-User darf bewerten
+            if (interaction.user.id !== userIdForRating) {
+                return interaction.reply({ content: 'Nur der Ticket-Ersteller kann bewerten.', flags: MessageFlags.Ephemeral });
+            }
+            if (aiRatings.has(channelId)) {
+                return interaction.reply({ content: 'Du hast schon bewertet — danke!', flags: MessageFlags.Ephemeral });
+            }
+            aiRatings.set(channelId, { stars, ratedAt: Date.now() });
+
+            await interaction.deferUpdate();
+            const conv = aiConversations.get(channelId);
+
+            // Buttons auf der Rating-Message disablen
+            try {
+                const { ButtonBuilder, ButtonStyle } = await import('discord.js');
+                const disabledRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('disabled_rating').setLabel(`Du hast ${stars}/5 ⭐ gegeben — danke!`).setStyle(ButtonStyle.Success).setDisabled(true),
+                );
+                await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+            } catch(_) {}
+
+            // Feedback-Log posten
+            await postAiFeedbackLog(interaction.channel, userIdForRating, stars, conv);
+
+            // Dankeschoen + Ticket schliessen in 30s
+            await interaction.followUp({
+                content: `Danke fuer dein Feedback, <@${userIdForRating}>! ${stars >= 4 ? '🎉' : '🙏'}\nDas Ticket wird in 30 Sekunden geschlossen.`,
+                allowedMentions: { users: [userIdForRating] },
+            }).catch(() => {});
+
+            // AI-Conversation als geschlossen markieren
+            if (conv) conv.escalated = true;
+
+            // Channel-Delete nach 30s (nur falls Ticket-Channel)
+            if (isTicketChannel(interaction.channel)) {
+                setTimeout(async () => {
+                    try {
+                        const ch = await client.channels.fetch(channelId).catch(() => null);
+                        if (ch) await ch.delete('AI-Ticket geschlossen mit Rating ' + stars + '/5').catch(() => {});
+                        aiConversations.delete(channelId);
+                        aiRatings.delete(channelId);
+                    } catch(_) {}
+                }, 30000);
+            }
+        } catch(e) {
+            console.error('[AI Rating] Button-Fehler:', e);
         }
         return;
     }
