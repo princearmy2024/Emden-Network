@@ -194,13 +194,17 @@ async function handleAiMessage(msg, opts = {}) {
     }
 
     try {
+        console.log(`[AI] Sende Anfrage an Groq (${conv.messages.length} Messages history)...`);
         const reply = await askGroq(conv.messages);
+        console.log(`[AI] Groq-Antwort erhalten: "${reply.slice(0, 100)}..."`);
         const shouldEscalate = reply.includes('[ESCALATE]');
         const cleanReply = reply.replace(/\[ESCALATE\]/g, '').trim();
 
         if (cleanReply) {
             conv.messages.push({ role: 'assistant', content: cleanReply });
-            await msg.channel.send({ content: cleanReply }).catch(() => {});
+            await msg.channel.send({ content: cleanReply })
+                .then(() => console.log('[AI] Antwort gepostet.'))
+                .catch(err => console.error('[AI] Send-Fehler:', err.message));
         }
 
         if (shouldEscalate) {
@@ -208,14 +212,14 @@ async function handleAiMessage(msg, opts = {}) {
             await msg.channel.send({
                 content: `\n— Ich hol Staff dazu — <@&${AI_SUPPORT_PING_ROLE}>`,
                 allowedMentions: { roles: [AI_SUPPORT_PING_ROLE] },
-            }).catch(() => {});
+            }).catch(err => console.error('[AI] Escalate-Send-Fehler:', err.message));
         }
     } catch(e) {
-        console.error('[AI]', e.message);
+        console.error('[AI] Groq-Fehler:', e.message);
         await msg.channel.send({
-            content: `<@&${AI_SUPPORT_PING_ROLE}> AI nicht erreichbar, bitte manuell helfen. (User: <@${userId}>)`,
+            content: `<@&${AI_SUPPORT_PING_ROLE}> AI nicht erreichbar, bitte manuell helfen. (User: <@${userId}>)\n-# Fehler: \`${e.message}\``,
             allowedMentions: { roles: [AI_SUPPORT_PING_ROLE], users: [userId] },
-        }).catch(() => {});
+        }).catch(err => console.error('[AI] Fallback-Send-Fehler:', err.message));
         conv.escalated = true;
     }
 }
@@ -4998,13 +5002,14 @@ client.on("messageCreate", async msg => {
     // Per-Channel Override (durch /ai-toggle)
     if (aiEnabledChannels[channelId] === false) return;
 
-    // Staff-Messages NICHT als User behandeln (Staff hat eskaliert)
+    // Staff-Messages NUR in TICKET-Channels als "Übernahme" werten — im
+    // AI-Help-Channel soll die AI fuer JEDEN antworten (auch Staff testet hier).
     const EN_TEAM = '1365083291044282389';
-    if (msg.member?.roles?.cache?.has(EN_TEAM)) {
-        // Wenn Staff schreibt: Conversation als eskaliert markieren
+    if (isTicketCh && msg.member?.roles?.cache?.has(EN_TEAM)) {
         const conv = aiConversations.get(channelId);
         if (conv && !conv.escalated) {
             conv.escalated = true;
+            console.log(`[AI] Staff hat Ticket ${msg.channel.name} uebernommen — AI pausiert.`);
         }
         return;
     }
@@ -5013,7 +5018,7 @@ client.on("messageCreate", async msg => {
     const text = (msg.content || '').trim();
     if (text.length < 3) return;
 
-    // Async handle ohne await — Bot blockt sonst andere Events
+    console.log(`[AI] Message in #${msg.channel.name} von ${msg.author.username}: "${text.slice(0, 50)}..."`);
     handleAiMessage(msg).catch(e => console.error('[AI handle]', e.message));
 });
 
