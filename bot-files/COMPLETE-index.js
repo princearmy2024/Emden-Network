@@ -1957,23 +1957,28 @@ client.on("interactionCreate", async interaction => {
 });
 
 // === Slash Commands registrieren (Guild = sofort!) ===
+// Wird im 'ready'-Event aufgerufen (s.u.), damit client.user.id verfuegbar ist.
+// CLIENT_ID-Env-Var ist optional — Fallback auf client.user.id.
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 const GSG9_GUILD_ID_CMD = '1398612779325329418';
-(async () => {
+async function registerSlashCommands() {
+    const appId = process.env.CLIENT_ID || client.user?.id;
+    if (!appId) {
+        console.error("❌ Commands: Keine App-ID — CLIENT_ID env-var fehlt und client.user noch nicht ready.");
+        return;
+    }
     try {
-        // Haupt-Server
         await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, GUILD_ID),
+            Routes.applicationGuildCommands(appId, GUILD_ID),
             { body: commandsForDiscord }
         );
-        // GSG9-Server (für /gsg9verify)
         await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, GSG9_GUILD_ID_CMD),
+            Routes.applicationGuildCommands(appId, GSG9_GUILD_ID_CMD),
             { body: [gsg9VerifyCommand.toJSON()] }
         );
-        console.log("✅ Slash Commands auf beiden Servern registriert!");
+        console.log(`✅ Slash Commands auf beiden Servern registriert! (App-ID: ${appId})`);
     } catch (e) { console.error("❌ Commands:", e.message); }
-})();
+}
 
 // === 🌐 API Server ===
 const dashboardUsers = new Map();
@@ -4719,6 +4724,9 @@ async function checkGithubRelease() {
 client.once("ready", async () => {
     console.log(`🤖 ${client.user.tag} ist online!`);
     console.log(`[Bot-Config] Support-System → Warteraum=${SUPPORT_VOICE_CHANNEL_ID}, Logs=${SUPPORT_LOGS_CHANNEL_ID}, Ping-Rolle=${SUPPORT_PING_ROLE_ID}`);
+
+    // Slash Commands JETZT registrieren (client.user.id verfuegbar)
+    await registerSlashCommands();
 
     // === Trident-Einträge importieren (einmalig beim Start) ===
     if (Object.keys(modHistory).length === 0) {
